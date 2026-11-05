@@ -265,7 +265,7 @@ COMPANY_HINTS = (
     "industries",
 )
 
-DEGREE_PATTERNS = (
+DEGREE_PATTERNS: tuple[str, ...] = (
     r"b\.?\s?tech",
     r"m\.?\s?tech",
     r"b\.?\s?e\b",
@@ -437,6 +437,8 @@ _register(
         "Adobe XD|Photoshop|Illustrator|Postman|Swagger|VS Code|IntelliJ|Eclipse|Xcode|"
         "Android Studio|Excel|Microsoft Excel|Power BI|Tableau|Looker|Google Analytics|"
         "SAP|Salesforce|HubSpot|Zendesk|Linear|Maven|Gradle|npm|Yarn|pnpm|Webpack|Babel|"
+        "Prototyping|User Research|Wireframing|Usability Testing|Design Systems|Interaction Design|"
+        "UX Design|UI Design|UX|UI|InVision|Framer|Zeplin|"
         "ESLint|Prettier|SonarQube|Vim|Agile|Scrum|Kanban|TDD|REST|REST APIs|RESTful APIs|"
         "Microservices|OOP|Data Structures|Algorithms|System Design|Unix|Windows|macOS|"
         "WordPress|Shopify|Webflow|Zapier|Airtable|Miro|Canva|Blender|AutoCAD|SolidWorks"
@@ -452,3 +454,104 @@ _register(
         "Customer Service|Analytical Skills|Interpersonal Skills|Ownership|Emotional Intelligence"
     ),
 )
+
+SECTION_HEADINGS["education"] = (
+    *SECTION_HEADINGS["education"],
+    "academic details",
+    "academic profile",
+    "education details",
+    "educational background",
+    "academic credentials",
+    "scholastic record",
+)
+
+DEGREE_PATTERNS = (
+    *DEGREE_PATTERNS,
+    r"b\.?\s?f\.?\s?a\b",
+    r"m\.?\s?f\.?\s?a\b",
+    r"b\.?\s?des\b",
+    r"m\.?\s?des\b",
+    r"b\.?\s?ed\b",
+    r"m\.?\s?ed\b",
+    r"bsc",
+    r"msc",
+    r"btech",
+    r"mtech",
+    r"jd\b",
+)
+
+# Fallback for styled headings that are not in SECTION_HEADINGS verbatim.
+HEADING_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("education", "education"),
+    ("academic", "education"),
+    ("qualification", "education"),
+    ("experience", "experience"),
+    ("employment", "experience"),
+    ("internship", "experience"),
+    ("work history", "experience"),
+    ("career history", "experience"),
+    ("skill", "skills"),
+    ("competenc", "skills"),
+    ("technolog", "skills"),
+    ("project", "projects"),
+    ("certif", "certifications"),
+    ("licen", "certifications"),
+    ("course", "certifications"),
+    ("summary", "summary"),
+    ("objective", "summary"),
+    ("profile", "summary"),
+    ("about", "summary"),
+    ("award", "other"),
+    ("achievement", "other"),
+    ("honor", "other"),
+    ("interest", "other"),
+    ("hobb", "other"),
+    ("language", "other"),
+    ("volunteer", "other"),
+    ("publication", "other"),
+    ("reference", "other"),
+    ("declaration", "other"),
+    ("extracurricular", "other"),
+    ("activit", "other"),
+    ("personal", "other"),
+    ("contact", "other"),
+)
+
+# Location words that reveal a phone number's country when it has no +prefix.
+COUNTRY_HINTS: dict[str, str] = {
+    "india": "IN",
+    "tamil nadu": "IN",
+    "karnataka": "IN",
+    "maharashtra": "IN",
+    "kerala": "IN",
+    "telangana": "IN",
+    "delhi": "IN",
+    "bengaluru": "IN",
+    "bangalore": "IN",
+    "mumbai": "IN",
+    "chennai": "IN",
+    "hyderabad": "IN",
+    "pune": "IN",
+    "kolkata": "IN",
+    "gujarat": "IN",
+    "united kingdom": "GB",
+    "uk": "GB",
+    "london": "GB",
+    "england": "GB",
+    "canada": "CA",
+    "toronto": "CA",
+    "vancouver": "CA",
+    "australia": "AU",
+    "sydney": "AU",
+    "germany": "DE",
+    "berlin": "DE",
+    "singapore": "SG",
+    "dubai": "AE",
+    "uae": "AE",
+    "usa": "US",
+    "united states": "US",
+    "ireland": "IE",
+    "netherlands": "NL",
+    "france": "FR",
+}
+COMMON_REGIONS = ("US", "IN", "GB", "CA", "AU", "DE", "SG", "AE")

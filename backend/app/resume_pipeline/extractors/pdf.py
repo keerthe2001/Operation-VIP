@@ -6,6 +6,7 @@ layouts (sidebar resumes) are detected and read column by column.
 
 import io
 import logging
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 # A PDF page with fewer extractable characters than this is treated as scanned.
 MIN_CHARS_PER_PAGE = 40
+
+# pdfminer emits "(cid:N)" for glyphs without a Unicode mapping. In resumes these are
+# almost always bullets or separators, so they are normalized to "•".
+CID_RE = re.compile(r"\(cid:\d+\)")
 
 
 def _is_bold(fontname: str) -> bool:
@@ -120,7 +125,7 @@ def extract_pdf(data: bytes) -> tuple[ExtractedDocument, list[int]]:
                 textless_pages.append(number)
                 continue
             for raw in _order_columns(_group_lines(words), float(page.width)):
-                text = " ".join(raw["text"].split())
+                text = " ".join(CID_RE.sub(" • ", raw["text"]).split())
                 if text:
                     lines.append(
                         TextLine(

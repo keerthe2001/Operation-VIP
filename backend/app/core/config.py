@@ -48,6 +48,18 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=10, ge=1, le=50)
     # Pluggable engines (see docs/architecture.md). Only rule-based engines exist today.
     resume_parser: Literal["rules"] = "rules"
+    ocr_provider: Literal["tesseract", "none"] = "tesseract"
+    ocr_languages: str = "eng"
+    ocr_dpi: int = Field(default=300, ge=100, le=600)
+    ocr_max_pages: int = Field(default=6, ge=1, le=30)
+    libreoffice_binary: str = "soffice"
+    # Malware scanning: "clamd" streams every upload to a ClamAV daemon.
+    malware_scanner: Literal["none", "clamd"] = "none"
+    clamd_host: str = "localhost"
+    clamd_port: int = 3310
+    clamd_socket: str | None = None
+    # When true, uploads are rejected if the scanner cannot be reached (fail closed).
+    malware_scan_required: bool = True
     default_phone_region: str = "US"
 
     @field_validator("cors_origins", mode="before")

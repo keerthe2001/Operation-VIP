@@ -39,7 +39,7 @@ PARSER_VERSION = "rules-1.0"
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 URL_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|in|io|dev|me|org|net|co|ai|app|tech|xyz|page|site|us|uk|ca|de)"
+    r"(?:https?://)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|in|io|dev|me|org|net|co|ai|app|tech|xyz|page|site|us|uk|ca|de|design|studio|art|online|store|works|info|blog|space|website|link|ly|gg|so|to|fyi|codes|digital|eu|au|sg)(?![A-Za-z0-9-])"
     r"(?:/[^\s,|;)]*)?",
     re.IGNORECASE,
 )
@@ -94,6 +94,7 @@ def _is_bullet(line: TextLine) -> bool:
 class _EducationDraft:
     degree: str | None = None
     institution: str | None = None
+    specialization: str | None = None
     texts: list[str] = field(default_factory=list)
 
 
@@ -164,6 +165,12 @@ class RuleBasedParser:
             # and contain no sentence punctuation to avoid catching body text.
             if normalized in names and (styled or plain_ok):
                 return kind
+        # Styled short lines with a section keyword ("ACADEMIC DETAILS", "Key Projects").
+        strongly_styled = line.heading_style or text.isupper() or line.size >= body_size + 1.5
+        if strongly_styled and len(words) <= 4 and not re.search(r"[.,;:@|\d]", text):
+            for keyword, kind in lexicons.HEADING_KEYWORDS:
+                if keyword in normalized:
+                    return kind
         return None
 
     def _split_sections(
@@ -245,9 +252,17 @@ class RuleBasedParser:
         return info
 
     def _phone(self, text: str) -> tuple[str, str] | None:
-        for region in (None, self.region):
-            for match in phonenumbers.PhoneNumberMatcher(text, region or "ZZ", leniency=1):
-                if phonenumbers.is_possible_number(match.number):
+        lowered = text.lower()
+        hinted = [
+            region
+            for word, region in lexicons.COUNTRY_HINTS.items()
+            if re.search(rf"\b{re.escape(word)}\b", lowered)
+        ]
+        # International numbers first, then the location's country, then common regions.
+        regions: list[str] = ["ZZ", *hinted, self.region, *lexicons.COMMON_REGIONS]
+        for region in dict.fromkeys(regions):
+            for match in phonenumbers.PhoneNumberMatcher(text, region, leniency=1):
+                if phonenumbers.is_valid_number(match.number):
                     formatted = phonenumbers.format_number(
                         match.number, phonenumbers.PhoneNumberFormat.E164
                     )
@@ -524,12 +539,19 @@ class RuleBasedParser:
             if current is None:
                 continue
             current.texts.append(text)
-            for part in SPLIT_RE.split(text):
-                part = _clean(GRADE_RE.sub("", part))
-                if not part:
-                    continue
+            parts = [p for p in (_clean(GRADE_RE.sub("", p)) for p in SPLIT_RE.split(text)) if p]
+            for index, part in enumerate(parts):
                 if degree_re.search(part) and not current.degree:
                     current.degree = part
+                    following = parts[index + 1] if index + 1 < len(parts) else None
+                    following = self._strip_dates(following) if following else None
+                    if (
+                        following
+                        and not is_institution(following)
+                        and not degree_re.search(following)
+                        and not re.search(r"\bin\b", part)
+                    ):
+                        current.specialization = following
                 elif is_institution(part) and not current.institution:
                     current.institution = part
 
@@ -538,16 +560,34 @@ class RuleBasedParser:
             joined = " ".join(entry.texts)
             degree = entry.degree
             institution = entry.institution
+            preset_specialization = entry.specialization
             if degree:
                 degree = self._strip_dates(degree)
             if institution:
                 institution = self._strip_dates(institution)
-            specialization = None
+            specialization = preset_specialization
             if degree:
-                spec = re.search(r"\b(?:in|of)\s+([A-Z][A-Za-z &/,.-]{2,80})", degree)
+                # "Bachelor of Science in Physics": "of ..." belongs to the degree name,
+                # "in ..." is the specialization.
+                spec = re.search(r"\bin\s+([A-Z][A-Za-z &/,.-]{2,80})", degree)
+                leading = degree_re.match(degree)
+                trailing = degree[leading.end() :].strip(" .,-") if leading else ""
                 if spec and not degree_re.fullmatch(spec.group(1).strip()):
                     specialization = spec.group(1).strip(" ,.-")
                     degree = degree[: spec.start()].strip(" ,-") or degree
+                elif (
+                    leading
+                    and trailing[:1].isupper()
+                    and "(" not in trailing
+                    and not degree_re.search(trailing)
+                    and not specialization
+                ):
+                    # "B.E. Computer Science and Engineering"
+                    specialization = trailing
+                    end = leading.end() + (
+                        1 if degree[leading.end() : leading.end() + 1] == "." else 0
+                    )
+                    degree = degree[:end].strip()
                 elif "(" in degree:
                     inner = re.search(r"\(([^)]+)\)", degree)
                     if inner and not GRADE_RE.search(inner.group(1)):
@@ -610,6 +650,9 @@ class RuleBasedParser:
                 # Too ambiguous to detect inside free text.
                 continue
             if pattern.search(text) and name.lower() not in seen:
+                # Skip "GitHub" when "GitHub Actions" was already found (longest first).
+                if any(re.search(rf"\b{re.escape(name.lower())}\b", f.lower()) for f in found):
+                    continue
                 found.append(name)
                 seen.add(name.lower())
         return found
@@ -745,25 +788,21 @@ class RuleBasedParser:
                 issued = normalize_date(single.group(0))
                 text = (text[: single.start()] + text[single.end() :]).strip()
             text = re.sub(r"\(\s*\)", "", text).strip(" ,|-–()")
-            issuer = None
-            splitter = r"\s*\|\s*" if "|" in text else r"\s+[–—-]\s+(?=[A-Z][a-z])|\s*,\s+|\s+by\s+"
+            splitter = r"\s*\|\s*" if "|" in text else r"\s+[–—-]\s+(?=[A-Z])|\s*,\s+|\s+by\s+"
             parts = [p for p in (_clean(p) for p in re.split(splitter, text)) if p]
-            name = parts[0] if parts else text
-            for part in parts[1:]:
-                key = next(
-                    (
-                        k
-                        for k in lexicons.CERT_ISSUERS
-                        if re.search(rf"\b{re.escape(k)}\b", part.lower())
-                    ),
-                    None,
-                )
-                if key:
-                    issuer = part
-                    break
-            if issuer is None and len(parts) > 1:
-                issuer = parts[1]
-            if issuer is None:
+            # A part that *is* an issuer ("CNCF", "Amazon Web Services") names the issuer and
+            # the rest is the certification. Otherwise the whole line is the name and the
+            # issuer is inferred from words inside it ("Oracle Certified Associate ...").
+            issuer_index = next(
+                (i for i, part in enumerate(parts) if len(parts) > 1 and self._is_issuer(part)),
+                None,
+            )
+            if issuer_index is not None:
+                issuer: str | None = parts[issuer_index]
+                rest = [p for i, p in enumerate(parts) if i != issuer_index]
+                name = ", ".join(rest) if "|" not in text else " – ".join(rest)
+            else:
+                name = _clean(text)
                 key = next(
                     (
                         k
@@ -772,8 +811,7 @@ class RuleBasedParser:
                     ),
                     None,
                 )
-                if key:
-                    issuer = lexicons.CERT_ISSUERS[key]
+                issuer = lexicons.CERT_ISSUERS[key] if key else None
             items.append(
                 CertificationItem(
                     certification_name=name,
@@ -784,6 +822,19 @@ class RuleBasedParser:
                 )
             )
         return items
+
+    @staticmethod
+    def _is_issuer(part: str) -> bool:
+        lowered = part.lower().strip()
+        canonical = {v.lower() for v in lexicons.CERT_ISSUERS.values()}
+        if lowered in lexicons.CERT_ISSUERS or lowered in canonical:
+            return True
+        words = lowered.split()
+        return (
+            len(words) <= 3
+            and "certif" not in lowered
+            and any(re.search(rf"\b{re.escape(k)}\b", lowered) for k in lexicons.CERT_ISSUERS)
+        )
 
     # ------------------------------------------------------------------ summary
 

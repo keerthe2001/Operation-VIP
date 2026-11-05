@@ -1,7 +1,7 @@
 import pytest
 
 from app.resume_pipeline.errors import PipelineError
-from app.resume_pipeline.extract import extract_document
+from app.resume_pipeline.extract import DocumentExtractor
 from app.resume_pipeline.parsing.parser import RuleBasedParser
 from app.resume_pipeline.types import TextLine
 from app.resume_pipeline.validation import sniff_kind, validate_upload
@@ -9,6 +9,10 @@ from tests.fixtures.documents import blank_pdf, encrypt_pdf, make_docx, make_pdf
 from tests.fixtures.sample_resumes import ENGINEER
 
 MB = 1024 * 1024
+
+
+def extract_document(kind, data):
+    return DocumentExtractor(ocr=None).extract(kind, data)
 
 
 def test_sniffing_and_validation():

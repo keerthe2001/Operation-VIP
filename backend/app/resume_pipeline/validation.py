@@ -42,7 +42,8 @@ def sniff_kind(data: bytes) -> FileKind | None:
     if data.startswith(b"\xff\xd8\xff"):
         return "jpeg"
     if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
-        return "doc"
+        # OLE container (also used by .xls/.msi): require the Word stream name.
+        return "doc" if "WordDocument".encode("utf-16-le") in data else None
     if data.startswith(b"PK\x03\x04"):
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as archive:

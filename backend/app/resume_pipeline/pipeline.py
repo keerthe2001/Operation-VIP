@@ -10,10 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.db.models import Resume, ResumeStatus
+from app.resume_pipeline import errors
 from app.resume_pipeline.errors import PipelineError
-from app.resume_pipeline.extract import extract_document
+from app.resume_pipeline.extract import DocumentExtractor
+from app.resume_pipeline.ocr import create_ocr
 from app.resume_pipeline.parsing.parser import RuleBasedParser
+from app.resume_pipeline.scanning import MalwareScanner, ScannerUnavailableError, create_scanner
 from app.resume_pipeline.validation import sniff_kind
+from app.schemas.resume_data import ResumeData
 from app.services.profile import ProfileService
 from app.storage.base import FileStorage, StorageError
 
@@ -26,10 +30,25 @@ class ResumeProcessor:
         sessionmaker: async_sessionmaker[AsyncSession],
         storage: FileStorage,
         settings: Settings,
+        *,
+        scanner: MalwareScanner | None = None,
+        extractor: DocumentExtractor | None = None,
     ) -> None:
         self.sessionmaker = sessionmaker
         self.storage = storage
         self.settings = settings
+        self.scanner = scanner or create_scanner(
+            settings.malware_scanner,
+            host=settings.clamd_host,
+            port=settings.clamd_port,
+            socket_path=settings.clamd_socket,
+        )
+        self.extractor = extractor or DocumentExtractor(
+            ocr=create_ocr(settings.ocr_provider, settings.ocr_languages),
+            ocr_dpi=settings.ocr_dpi,
+            ocr_max_pages=settings.ocr_max_pages,
+            libreoffice_binary=settings.libreoffice_binary,
+        )
 
     async def process(self, resume_id: uuid.UUID) -> None:
         started = time.perf_counter()
@@ -59,6 +78,46 @@ class ResumeProcessor:
                     resume.status,
                 )
 
+    async def _scan(self, resume: Resume, data: bytes) -> None:
+        try:
+            result = await self.scanner.scan(data)
+        except ScannerUnavailableError as exc:
+            logger.error("Malware scanner unavailable: %s", exc)
+            if self.settings.malware_scan_required:
+                raise PipelineError(
+                    errors.SCAN_UNAVAILABLE,
+                    "We couldn't check this file for viruses right now. "
+                    "Try again in a few minutes.",
+                ) from exc
+            return
+        if not result.clean:
+            logger.warning("Malware detected in resume %s: %s", resume.id, result.signature)
+            try:
+                await self.storage.delete(resume.storage_key)
+            except StorageError:
+                logger.exception("Could not delete infected file %s", resume.storage_key)
+            raise PipelineError(
+                errors.MALWARE,
+                "This file was flagged by our virus scanner and has been deleted.",
+            )
+
+    @staticmethod
+    def _discount_ocr(parsed: ResumeData, ocr_confidence: float) -> ResumeData:
+        """Values read by OCR are less certain than selectable text."""
+        factor = max(0.5, min(1.0, ocr_confidence / 100))
+        for meta in parsed.field_meta.values():
+            meta.confidence = round(meta.confidence * factor, 2)
+        for section in (
+            parsed.experience,
+            parsed.education,
+            parsed.projects,
+            parsed.certifications,
+        ):
+            for item in section:
+                if item.confidence is not None:
+                    item.confidence = round(item.confidence * factor, 2)
+        return parsed
+
     async def _set_status(
         self, session: AsyncSession, resume: Resume, status: ResumeStatus
     ) -> None:
@@ -76,16 +135,19 @@ class ResumeProcessor:
     async def _run(self, session: AsyncSession, resume: Resume) -> None:
         resume.error_code = None
         resume.error_message = None
-        await self._set_status(session, resume, ResumeStatus.EXTRACTING)
+        await self._set_status(session, resume, ResumeStatus.SCANNING)
         try:
             data = await self.storage.get(resume.storage_key)
         except StorageError as exc:
             raise PipelineError("STORAGE_ERROR", "The uploaded file could not be read.") from exc
 
+        await self._scan(resume, data)
+
         kind = sniff_kind(data)
         if kind is None:
-            raise PipelineError("UNSUPPORTED_FILE_TYPE", "This file type isn't supported.")
-        document, doc_class = await asyncio.to_thread(extract_document, kind, data)
+            raise PipelineError(errors.UNSUPPORTED_TYPE, "This file type isn't supported.")
+        await self._set_status(session, resume, ResumeStatus.EXTRACTING)
+        document, doc_class = await asyncio.to_thread(self.extractor.extract, kind, data)
         if not document.text.strip():
             raise PipelineError("NO_TEXT_FOUND", "We couldn't find any text in this file.")
 
@@ -94,6 +156,8 @@ class ResumeProcessor:
             default_phone_region=self.settings.default_phone_region, today=date.today()
         )
         parsed = await asyncio.to_thread(parser.parse, document.lines)
+        if document.ocr_confidence is not None:
+            parsed = self._discount_ocr(parsed, document.ocr_confidence)
 
         resume.doc_class = doc_class
         resume.page_count = document.page_count

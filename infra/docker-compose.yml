@@ -30,7 +30,7 @@ services:
       retries: 10
 
   api:
-    build: ../backend
+    build: { context: ../backend, target: api }
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+asyncpg://copilot:copilot@postgres:5432/copilot
@@ -53,8 +53,7 @@ services:
 
   # Processes uploaded resumes (text extraction, OCR, parsing) off the request path.
   worker:
-    build: ../backend
-    command: ["arq", "app.workers.resume_worker.WorkerSettings"]
+    build: { context: ../backend, target: worker }
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+asyncpg://copilot:copilot@postgres:5432/copilot
@@ -62,10 +61,20 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in infra/.env}
       STORAGE_BACKEND: local
       STORAGE_LOCAL_ROOT: /data/storage
+      # Enable with: MALWARE_SCANNER=clamd docker compose --profile scan up
+      MALWARE_SCANNER: ${MALWARE_SCANNER:-none}
+      CLAMD_HOST: clamav
     volumes: [resume-files:/data/storage]
     depends_on:
       api: { condition: service_healthy }
 
+  # Optional virus scanning (needs ~1.5 GB RAM; downloads signatures on first start).
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: [scan]
+    volumes: [clamav-db:/var/lib/clamav]
+
 volumes:
   postgres-data:
   resume-files:
+  clamav-db:

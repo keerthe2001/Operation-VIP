@@ -94,6 +94,11 @@ export function ResumesPage() {
                         <span className="truncate">{resume.file_name}</span>
                         <ResumeStatusBadge status={resume.status} />
                         {resume.is_primary && <Badge variant="outline">Primary</Badge>}
+                        {resume.ocr_confidence != null && (
+                          <Badge variant="outline" title={`Text recognition confidence: ${Math.round(resume.ocr_confidence)}%`}>
+                            Read with OCR
+                          </Badge>
+                        )}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {formatBytes(resume.size_bytes)} · uploaded {formatDate(resume.created_at)}
@@ -102,6 +107,12 @@ export function ResumesPage() {
                       {resume.status === "failed" && resume.error_message && (
                         <p className="mt-1 text-xs text-destructive">{resume.error_message}</p>
                       )}
+                      {resume.status === "ready" &&
+                        resume.warnings.map((warning) => (
+                          <p key={warning} className="mt-1 text-xs text-warning-foreground">
+                            {warning}
+                          </p>
+                        ))}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 sm:justify-end">

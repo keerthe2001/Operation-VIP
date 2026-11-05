@@ -751,6 +751,8 @@ export interface components {
             is_primary: boolean;
             /** Mime Type */
             mime_type: string;
+            /** Ocr Confidence */
+            ocr_confidence?: number | null;
             /** Page Count */
             page_count: number | null;
             /** Processed At */
@@ -758,6 +760,11 @@ export interface components {
             /** Size Bytes */
             size_bytes: number;
             status: components["schemas"]["ResumeStatus"];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** ResumeRead */
         ResumeRead: {
@@ -782,6 +789,8 @@ export interface components {
             is_primary: boolean;
             /** Mime Type */
             mime_type: string;
+            /** Ocr Confidence */
+            ocr_confidence?: number | null;
             /** Page Count */
             page_count: number | null;
             /** Processed At */
@@ -789,6 +798,11 @@ export interface components {
             /** Size Bytes */
             size_bytes: number;
             status: components["schemas"]["ResumeStatus"];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /**
          * ResumeStatus

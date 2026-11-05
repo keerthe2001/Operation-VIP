@@ -1347,6 +1347,17 @@
             "title": "Mime Type",
             "type": "string"
           },
+          "ocr_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Confidence"
+          },
           "page_count": {
             "anyOf": [
               {
@@ -1376,6 +1387,14 @@
           },
           "status": {
             "$ref": "#/components/schemas/ResumeStatus"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -1454,6 +1473,17 @@
             "title": "Mime Type",
             "type": "string"
           },
+          "ocr_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Confidence"
+          },
           "page_count": {
             "anyOf": [
               {
@@ -1483,6 +1513,14 @@
           },
           "status": {
             "$ref": "#/components/schemas/ResumeStatus"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [

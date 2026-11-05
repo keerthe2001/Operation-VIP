@@ -1,0 +1,103 @@
+{
+  "certifications": [],
+  "education": [
+    {
+      "confidence": 0.9,
+      "degree": "High School Diploma",
+      "grade": null,
+      "graduation_year": 2018,
+      "institution": "Lincoln High School",
+      "is_confirmed": false,
+      "specialization": null,
+      "start_year": null
+    }
+  ],
+  "experience": [
+    {
+      "achievements": [],
+      "company_name": "Blue Bottle Coffee",
+      "confidence": 0.95,
+      "designation": "Barista",
+      "employment_type": null,
+      "end_date": "2022",
+      "is_confirmed": false,
+      "is_current": false,
+      "location": null,
+      "responsibilities": [
+        "Served 300 customers daily"
+      ],
+      "start_date": "2019",
+      "technologies": []
+    }
+  ],
+  "field_meta": {
+    "personal_information.email": {
+      "confidence": 0.97,
+      "is_confirmed": false,
+      "source": "john.smith@mail.com"
+    },
+    "personal_information.first_name": {
+      "confidence": 0.85,
+      "is_confirmed": false,
+      "source": "John Smith"
+    },
+    "personal_information.full_name": {
+      "confidence": 0.9,
+      "is_confirmed": false,
+      "source": "John Smith"
+    },
+    "personal_information.last_name": {
+      "confidence": 0.8,
+      "is_confirmed": false,
+      "source": "John Smith"
+    },
+    "personal_information.phone": {
+      "confidence": 0.9,
+      "is_confirmed": false,
+      "source": "(415) 555-0134"
+    },
+    "professional_summary.current_designation": {
+      "confidence": 0.5,
+      "is_confirmed": false,
+      "source": "Barista"
+    },
+    "professional_summary.employment_status": {
+      "confidence": 0.4,
+      "is_confirmed": false,
+      "source": null
+    },
+    "professional_summary.total_experience_years": {
+      "confidence": 0.65,
+      "is_confirmed": false,
+      "source": "calculated from experience dates"
+    }
+  },
+  "personal_information": {
+    "email": "john.smith@mail.com",
+    "first_name": "John",
+    "full_name": "John Smith",
+    "github": null,
+    "last_name": "Smith",
+    "linkedin": null,
+    "location": null,
+    "phone": "+14155550134",
+    "portfolio": null
+  },
+  "professional_summary": {
+    "current_designation": "Barista",
+    "employment_status": "not_employed",
+    "summary": null,
+    "total_experience_years": 4.0
+  },
+  "projects": [],
+  "skills": {
+    "ai_ml": [],
+    "cloud": [],
+    "databases": [],
+    "frameworks": [],
+    "other": [],
+    "programming_languages": [],
+    "soft_skills": [],
+    "tools": []
+  }
+}

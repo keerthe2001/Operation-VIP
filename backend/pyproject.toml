@@ -58,7 +58,7 @@ ignore = ["B008"]
 [tool.ruff.lint.per-file-ignores]
 # Resume text is full of typographic dashes and long regular expressions.
 "app/resume_pipeline/parsing/*" = ["RUF001", "E501"]
-"tests/**" = ["S101", "S105", "S106", "S107", "S603", "RUF001", "E501"]
+"tests/**" = ["S101", "S105", "S106", "S107", "S603", "S607", "RUF001", "E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -67,5 +67,5 @@ plugins = ["pydantic.mypy"]
 files = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["boto3", "botocore.*", "pytesseract", "moto"]
+module = ["boto3", "botocore.*", "pytesseract", "moto", "pypdfium2"]
 ignore_missing_imports = true

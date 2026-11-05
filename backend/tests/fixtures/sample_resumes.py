@@ -70,3 +70,55 @@ MINIMAL = lines(
         "High School Diploma, Lincoln High School, 2018",
     ]
 )
+
+FRESHER = lines(
+    [
+        ("ARJUN KUMAR", NAME),
+        "arjun.kumar2003@gmail.com | 9876501234 | Coimbatore, Tamil Nadu",
+        "https://www.linkedin.com/in/arjunkumar03",
+        ("CAREER OBJECTIVE", H),
+        "Final-year Computer Science student seeking a software developer role.",
+        ("ACADEMIC DETAILS", H),
+        "B.E. Computer Science and Engineering | PSG College of Technology | 2021 - 2025 | CGPA: 8.9",
+        "Class XII | Sri Vidya Mandir Matriculation School | 2021 | 94.2%",
+        ("INTERNSHIPS", H),
+        "Software Development Intern",
+        "Zoho Corporation, Chennai | Jun 2024 - Aug 2024",
+        "• Built an internal dashboard using React and Node.js",
+        "• Reduced report generation time by 30%",
+        ("TECHNICAL SKILLS", H),
+        "Java, Python, C++, JavaScript, React, Node.js, MySQL, Git",
+        ("PROJECTS", H),
+        ("Smart Attendance System", dict(bold=True)),
+        "• Face-recognition attendance app built with Python and OpenCV.",
+        ("CERTIFICATIONS", H),
+        "• NPTEL - Programming in Java (2023)",
+        "• Oracle Certified Associate, Java SE 8 Programmer - 2024",
+        ("ACHIEVEMENTS", H),
+        "Winner, Smart India Hackathon 2023",
+    ]
+)
+
+DESIGNER = lines(
+    [
+        ("Elena Garcia", NAME),
+        "Product Designer",
+        "elena.garcia@studio.design  ·  +1 (646) 555-0199  ·  Brooklyn, NY",
+        "elenagarcia.design/portfolio",
+        ("Professional Profile", H),
+        "Product designer with a focus on accessible design systems for fintech.",
+        ("Employment History", H),
+        ("Northwind Bank", dict(bold=True)),
+        "Lead Product Designer   March 2022 to Present",
+        "- Own the design system used by 40 product teams",
+        "- Partnered with engineering to ship a new onboarding flow",
+        ("Contoso Studio", dict(bold=True)),
+        "Product Designer (Contract)   Sept 2019 to Feb 2022",
+        "- Designed mobile banking apps for 3 clients",
+        ("Education", H),
+        "Parsons School of Design",
+        "BFA, Communication Design, 2019",
+        ("Skills", H),
+        "Figma • Sketch • Prototyping • User Research • HTML • CSS",
+    ]
+)

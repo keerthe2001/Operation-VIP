@@ -1,0 +1,234 @@
+{
+  "certifications": [
+    {
+      "certification_name": "AWS Certified Solutions Architect – Associate",
+      "confidence": 0.75,
+      "credential_url": null,
+      "is_confirmed": false,
+      "issue_date": "2022-03",
+      "issuing_organization": "Amazon Web Services"
+    },
+    {
+      "certification_name": "Certified Kubernetes Application Developer (CKAD)",
+      "confidence": 0.75,
+      "credential_url": null,
+      "is_confirmed": false,
+      "issue_date": "2021",
+      "issuing_organization": "CNCF"
+    }
+  ],
+  "education": [
+    {
+      "confidence": 0.9,
+      "degree": "B.Tech",
+      "grade": "8.6/10",
+      "graduation_year": 2017,
+      "institution": "Anna University",
+      "is_confirmed": false,
+      "specialization": "Computer Science and Engineering",
+      "start_year": 2013
+    }
+  ],
+  "experience": [
+    {
+      "achievements": [
+        "Reduced API latency by 40% by introducing Redis caching."
+      ],
+      "company_name": "Acme Technologies Pvt Ltd",
+      "confidence": 0.95,
+      "designation": "Senior Software Engineer",
+      "employment_type": null,
+      "end_date": null,
+      "is_confirmed": false,
+      "is_current": true,
+      "location": "Bengaluru, India",
+      "responsibilities": [
+        "Led migration of billing services to Kubernetes and PostgreSQL.",
+        "Mentored 4 engineers and ran design reviews for the payments platform team."
+      ],
+      "start_date": "2021-01",
+      "technologies": [
+        "PostgreSQL",
+        "Kubernetes",
+        "Redis"
+      ]
+    },
+    {
+      "achievements": [],
+      "company_name": "Globex Solutions",
+      "confidence": 0.95,
+      "designation": "Software Engineer",
+      "employment_type": null,
+      "end_date": "2020-12",
+      "is_confirmed": false,
+      "is_current": false,
+      "location": "Chennai, India",
+      "responsibilities": [
+        "Built REST APIs with Django and FastAPI.",
+        "Automated deployments with GitHub Actions and Docker."
+      ],
+      "start_date": "2017-07",
+      "technologies": [
+        "GitHub Actions",
+        "REST APIs",
+        "FastAPI",
+        "Django",
+        "Docker"
+      ]
+    },
+    {
+      "achievements": [],
+      "company_name": "Initech Labs",
+      "confidence": 0.95,
+      "designation": "Software Engineering Intern",
+      "employment_type": "Internship",
+      "end_date": "2016-08",
+      "is_confirmed": false,
+      "is_current": false,
+      "location": null,
+      "responsibilities": [
+        "Wrote data pipelines in Python."
+      ],
+      "start_date": "2016-05",
+      "technologies": [
+        "Python"
+      ]
+    }
+  ],
+  "field_meta": {
+    "personal_information.email": {
+      "confidence": 0.97,
+      "is_confirmed": false,
+      "source": "priya.raman@example.com"
+    },
+    "personal_information.first_name": {
+      "confidence": 0.85,
+      "is_confirmed": false,
+      "source": "Priya Raman"
+    },
+    "personal_information.full_name": {
+      "confidence": 0.9,
+      "is_confirmed": false,
+      "source": "Priya Raman"
+    },
+    "personal_information.github": {
+      "confidence": 0.95,
+      "is_confirmed": false,
+      "source": "github.com/priyaraman"
+    },
+    "personal_information.last_name": {
+      "confidence": 0.8,
+      "is_confirmed": false,
+      "source": "Priya Raman"
+    },
+    "personal_information.linkedin": {
+      "confidence": 0.95,
+      "is_confirmed": false,
+      "source": "linkedin.com/in/priya-raman"
+    },
+    "personal_information.location": {
+      "confidence": 0.6,
+      "is_confirmed": false,
+      "source": "Bengaluru, India"
+    },
+    "personal_information.phone": {
+      "confidence": 0.9,
+      "is_confirmed": false,
+      "source": "+91 98765 43210"
+    },
+    "personal_information.portfolio": {
+      "confidence": 0.7,
+      "is_confirmed": false,
+      "source": "priyaraman.dev"
+    },
+    "professional_summary.current_designation": {
+      "confidence": 0.7,
+      "is_confirmed": false,
+      "source": "Senior Software Engineer"
+    },
+    "professional_summary.employment_status": {
+      "confidence": 0.6,
+      "is_confirmed": false,
+      "source": null
+    },
+    "professional_summary.summary": {
+      "confidence": 0.85,
+      "is_confirmed": false,
+      "source": "Backend engineer with 7+ years of experience building distributed systems in Python and Go."
+    },
+    "professional_summary.total_experience_years": {
+      "confidence": 0.8,
+      "is_confirmed": false,
+      "source": "7+ years of experience"
+    },
+    "skills": {
+      "confidence": 0.8,
+      "is_confirmed": false,
+      "source": "skills section"
+    }
+  },
+  "personal_information": {
+    "email": "priya.raman@example.com",
+    "first_name": "Priya",
+    "full_name": "Priya Raman",
+    "github": "https://github.com/priyaraman",
+    "last_name": "Raman",
+    "linkedin": "https://linkedin.com/in/priya-raman",
+    "location": "Bengaluru, India",
+    "phone": "+919876543210",
+    "portfolio": "https://priyaraman.dev"
+  },
+  "professional_summary": {
+    "current_designation": "Senior Software Engineer",
+    "employment_status": "employed",
+    "summary": "Backend engineer with 7+ years of experience building distributed systems in Python and Go.",
+    "total_experience_years": 7.0
+  },
+  "projects": [
+    {
+      "confidence": 0.7,
+      "description": null,
+      "is_confirmed": false,
+      "outcomes": [
+        "Double-entry accounting library used by 2,000+ developers."
+      ],
+      "project_name": "OpenLedger",
+      "role": null,
+      "technologies": [
+        "Python",
+        "PostgreSQL"
+      ],
+      "url": "https://github.com/priyaraman/openledger"
+    }
+  ],
+  "skills": {
+    "ai_ml": [],
+    "cloud": [
+      "AWS",
+      "Docker",
+      "Kubernetes",
+      "Terraform"
+    ],
+    "databases": [
+      "PostgreSQL",
+      "Redis",
+      "MongoDB"
+    ],
+    "frameworks": [
+      "Django",
+      "FastAPI",
+      "React"
+    ],
+    "other": [],
+    "programming_languages": [
+      "Python",
+      "Go",
+      "SQL",
+      "JavaScript"
+    ],
+    "soft_skills": [],
+    "tools": [
+      "Git"
+    ]
+  }
+}

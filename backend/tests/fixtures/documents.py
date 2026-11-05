@@ -76,3 +76,41 @@ def blank_pdf() -> bytes:
     pdf.rect(100, 100, 200, 200)
     pdf.save()
     return buffer.getvalue()
+
+
+FONT_DIR = "/usr/share/fonts/truetype/dejavu"
+
+
+def make_image(lines: list[TextLine], *, scale: float = 3.0, fmt: str = "PNG") -> bytes:
+    """Render lines onto a white page, like a phone photo or scan of a printed resume."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    width = int(595 * scale)
+    height = int((sum(line.size + 6 for line in lines) + 120) * scale)
+    image = Image.new("L", (width, height), 255)
+    draw = ImageDraw.Draw(image)
+    y = 50 * scale
+    for line in lines:
+        font_file = "DejaVuSans-Bold.ttf" if line.bold else "DejaVuSans.ttf"
+        font = ImageFont.truetype(f"{FONT_DIR}/{font_file}", int(line.size * scale))
+        draw.text((50 * scale, y), line.text, fill=0, font=font)
+        y += (line.size + 6) * scale
+    out = io.BytesIO()
+    image.save(out, format=fmt, dpi=(int(72 * scale), int(72 * scale)))
+    return out.getvalue()
+
+
+def make_scanned_pdf(lines: list[TextLine]) -> bytes:
+    """A PDF whose page is just an image of the text (no selectable text)."""
+    from reportlab.lib.utils import ImageReader
+
+    png = make_image(lines)
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    reader = ImageReader(io.BytesIO(png))
+    iw, ih = reader.getSize()
+    draw_h = min(height - 40, width * ih / iw)
+    pdf.drawImage(reader, 20, height - 20 - draw_h, width=width - 40, height=draw_h)
+    pdf.save()
+    return buffer.getvalue()
