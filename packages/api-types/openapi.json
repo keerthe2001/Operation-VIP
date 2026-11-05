@@ -142,6 +142,215 @@
         "title": "AdditionalInfo",
         "type": "object"
       },
+      "AnswerTemplate": {
+        "properties": {
+          "answer_template": {
+            "title": "Answer Template",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "why_company",
+              "why_role",
+              "about_you",
+              "strengths",
+              "weaknesses",
+              "challenging_project",
+              "career_goals",
+              "leaving_reason",
+              "why_hire",
+              "availability",
+              "salary",
+              "relocation",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "question_text": {
+            "title": "Question Text",
+            "type": "string"
+          },
+          "variants": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "category",
+          "question_text",
+          "answer_template"
+        ],
+        "title": "AnswerTemplate",
+        "type": "object"
+      },
+      "AnswerUsageCreate": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "final_answer": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Final Answer",
+            "type": "string"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "question_text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question Text",
+            "type": "string"
+          },
+          "saved_answer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Answer Id"
+          },
+          "source": {
+            "default": "library",
+            "enum": [
+              "library",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "question_text",
+          "final_answer"
+        ],
+        "title": "AnswerUsageCreate",
+        "type": "object"
+      },
+      "AnswerUsageRead": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "final_answer": {
+            "title": "Final Answer",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "question_text": {
+            "title": "Question Text",
+            "type": "string"
+          },
+          "saved_answer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Answer Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "saved_answer_id",
+          "question_text",
+          "final_answer",
+          "source",
+          "company",
+          "job_title",
+          "url",
+          "created_at"
+        ],
+        "title": "AnswerUsageRead",
+        "type": "object"
+      },
       "Body_upload_resume_api_v1_resumes_upload_post": {
         "properties": {
           "file": {
@@ -494,6 +703,13 @@
       "ExtensionProfile": {
         "description": "Everything the extension needs to fill forms, fetched in one request.",
         "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/SavedAnswerRead"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
           "primary_resume": {
             "anyOf": [
               {
@@ -516,6 +732,7 @@
         "required": [
           "profile",
           "primary_resume",
+          "answers",
           "synced_at"
         ],
         "title": "ExtensionProfile",
@@ -1656,6 +1873,202 @@
         "title": "ResumeStatusRead",
         "type": "object"
       },
+      "SavedAnswerCreate": {
+        "properties": {
+          "answer_template": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Answer Template",
+            "type": "string"
+          },
+          "category": {
+            "default": "other",
+            "enum": [
+              "why_company",
+              "why_role",
+              "about_you",
+              "strengths",
+              "weaknesses",
+              "challenging_project",
+              "career_goals",
+              "leaving_reason",
+              "why_hire",
+              "availability",
+              "salary",
+              "relocation",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "question_text": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Question Text",
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question_text",
+          "answer_template"
+        ],
+        "title": "SavedAnswerCreate",
+        "type": "object"
+      },
+      "SavedAnswerRead": {
+        "properties": {
+          "answer_template": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Answer Template",
+            "type": "string"
+          },
+          "category": {
+            "default": "other",
+            "enum": [
+              "why_company",
+              "why_role",
+              "about_you",
+              "strengths",
+              "weaknesses",
+              "challenging_project",
+              "career_goals",
+              "leaving_reason",
+              "why_hire",
+              "availability",
+              "salary",
+              "relocation",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "question_text": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Question Text",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "usage_count": {
+            "title": "Usage Count",
+            "type": "integer"
+          },
+          "variants": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question_text",
+          "answer_template",
+          "id",
+          "usage_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SavedAnswerRead",
+        "type": "object"
+      },
+      "SavedAnswerUpdate": {
+        "properties": {
+          "answer_template": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Template"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "why_company",
+                  "why_role",
+                  "about_you",
+                  "strengths",
+                  "weaknesses",
+                  "challenging_project",
+                  "career_goals",
+                  "leaving_reason",
+                  "why_hire",
+                  "availability",
+                  "salary",
+                  "relocation",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "question_text": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Text"
+          },
+          "variants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variants"
+          }
+        },
+        "title": "SavedAnswerUpdate",
+        "type": "object"
+      },
       "Skills": {
         "properties": {
           "ai_ml": {
@@ -1858,6 +2271,274 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/answers": {
+      "get": {
+        "operationId": "list_answers_api_v1_answers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedAnswerRead"
+                  },
+                  "title": "Response List Answers Api V1 Answers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Answers",
+        "tags": [
+          "answers"
+        ]
+      },
+      "post": {
+        "operationId": "create_answer_api_v1_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedAnswerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnswerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/placeholders": {
+      "get": {
+        "description": "Placeholders an answer can use, e.g. {company}, with a description.",
+        "operationId": "placeholders_api_v1_answers_placeholders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Placeholders Api V1 Answers Placeholders Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Placeholders",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/templates": {
+      "get": {
+        "operationId": "starter_templates_api_v1_answers_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnswerTemplate"
+                  },
+                  "title": "Response Starter Templates Api V1 Answers Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Starter Templates",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/usages": {
+      "post": {
+        "operationId": "record_usage_api_v1_answers_usages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerUsageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerUsageRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Record Usage",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
+    "/api/v1/answers/{answer_id}": {
+      "delete": {
+        "operationId": "delete_answer_api_v1_answers__answer_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Answer",
+        "tags": [
+          "answers"
+        ]
+      },
+      "patch": {
+        "operationId": "update_answer_api_v1_answers__answer_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "answer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Answer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedAnswerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnswerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Answer",
+        "tags": [
+          "answers"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login_api_v1_auth_login_post",

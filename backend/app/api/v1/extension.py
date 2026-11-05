@@ -8,8 +8,10 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep, SettingsDep
 from app.db.models import Resume, TokenClient
+from app.schemas.answers import SavedAnswerRead
 from app.schemas.extension import ExtensionProfile, HandoffResponse
 from app.schemas.resume import ResumeRead
+from app.services.answers import AnswerService
 from app.services.auth import AuthService
 from app.services.profile import ProfileService
 
@@ -29,9 +31,11 @@ async def extension_profile(
     primary = await session.scalar(
         select(Resume).where(Resume.user_id == user.id, Resume.is_primary.is_(True))
     )
+    answers = await AnswerService(session).list(user.id)
     stamp = f"{profile.id}:{profile.updated_at.isoformat()}"
     if primary is not None:
         stamp += f":{primary.id}:{primary.status}:{primary.processed_at}"
+    stamp += "".join(f":{a.id}:{a.updated_at.isoformat()}:{a.usage_count}" for a in answers)
     etag = f'W/"{hashlib.sha256(stamp.encode()).hexdigest()[:32]}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
@@ -40,6 +44,7 @@ async def extension_profile(
     return ExtensionProfile(
         profile=await service.read(profile),
         primary_resume=ResumeRead.model_validate(primary) if primary else None,
+        answers=[SavedAnswerRead.model_validate(a) for a in answers],
         synced_at=datetime.now(UTC),
     )
 

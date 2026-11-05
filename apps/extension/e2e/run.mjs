@@ -112,6 +112,19 @@ try {
     body: JSON.stringify({ additional_info: { requires_sponsorship: false, notice_period: "30 days" } }),
   });
 
+  // 1b. Write a saved answer in the web app's answer library.
+  await page.goto(`${WEB}/answers`);
+  await page.getByRole("button", { name: "New answer" }).click();
+  const editor = page.getByRole("dialog");
+  await editor.getByLabel("Type of question").selectOption("why_company");
+  await editor.getByLabel("Question", { exact: true }).fill("Why do you want to work here?");
+  await editor.getByLabel("Answer", { exact: true }).fill("As a {current_designation}, I want to help {company} build reliable systems.");
+  if (shots) await page.screenshot({ path: `${shots}/web-answer-editor.png` });
+  await editor.getByRole("button", { name: "Save answer" }).click();
+  await page.getByText("Used 0 times").waitFor();
+  check(true, "answer saved in the web library");
+  if (shots) await page.screenshot({ path: `${shots}/web-answers.png` });
+
   // 2. Side panel before connecting shows the sign-in screen.
   const panel = await context.newPage();
   await panel.setViewportSize({ width: 400, height: 860 });
@@ -219,6 +232,23 @@ try {
   check(sponsor === "0", "approved review field filled (sponsorship: No)");
   const untouched = await job.evaluate(() => document.getElementById("first_name").value);
   check(untouched === "Priya", "already-filled fields were not overwritten");
+
+  // 8b. Answer suggestion for the free-text question.
+  await panel.getByText("Answer suggestions").waitFor();
+  const suggestion = panel.getByLabel(/Why do you want to work at Acme\?/);
+  const suggested = await suggestion.inputValue();
+  check(suggested === "As a Senior Software Engineer, I want to help Acme Corp build reliable systems.", `library answer suggested with placeholders filled ("${suggested}")`);
+  if (shots) await panel.screenshot({ path: `${shots}/ext-answers.png`, fullPage: true });
+  await panel.getByRole("button", { name: "Insert" }).click();
+  await panel.getByText("Inserted into the form.").waitFor();
+  check((await job.inputValue("#why")) === suggested, "answer inserted into the page's textarea");
+  let used = 0;
+  for (let i = 0; i < 20 && used === 0; i++) {
+    const library = await fetch(`${API}/api/v1/answers`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
+    used = library[0]?.usage_count ?? 0;
+    if (!used) await new Promise((r) => setTimeout(r, 250));
+  }
+  check(used === 1, "usage recorded on the server");
 
   // 9. Embedded Greenhouse iframe on a company site.
   await context.route(COMPANY_URL, (route) => route.fulfill({ contentType: "text/html", body: COMPANY_HTML }));

@@ -110,6 +110,37 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         return { ok: true };
       case "FILL_FIELDS":
         return { ok: true, data: await autofill.fill(message.tabId, message.fields, message.overwrite) };
+      case "INSERT_ANSWER": {
+        const result = await autofill.insertText(message.tabId, message.field, message.text);
+        if (result.status === "filled") {
+          const job = (await session.get(tabKey(message.tabId)))?.job;
+          // History only; a failure here must not affect the user's form.
+          void api("/api/v1/answers/usages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              saved_answer_id: message.savedAnswerId,
+              question_text: message.question.slice(0, 500) || "Question",
+              final_answer: message.text,
+              source: message.savedAnswerId ? "library" : "manual",
+              company: job?.company ?? null,
+              job_title: job?.title ?? null,
+              url: job?.url ?? null,
+            }),
+          }).catch(() => undefined);
+        }
+        return result.status === "filled" ? { ok: true, data: result } : { ok: false, error: result.message ?? "Couldn't insert the answer." };
+      }
+      case "SAVE_ANSWER": {
+        const response = await api("/api/v1/answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question_text: message.question, answer_template: message.answer, category: message.category, variants: [] }),
+        });
+        if (!response.ok) return { ok: false, error: "Couldn't save the answer." };
+        await profileSync.sync(true);
+        return { ok: true };
+      }
       case "ENABLE_ALL_SITES": {
         const enabled = await ensureAllSitesScript();
         await local.set({ allSitesEnabled: enabled });

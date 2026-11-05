@@ -89,6 +89,27 @@ export class AutofillCoordinator {
     return file;
   }
 
+  /** Inserts an answer the user chose (explicit action, so existing text is replaced). */
+  async insertText(tabId: number, key: string, text: string): Promise<FillResult> {
+    const state = await this.state(tabId);
+    const field = state?.fields.find((f) => fieldKey(f) === key);
+    if (!state || !field) return { id: key, status: "failed", message: "That field is no longer on the page." };
+    let result: FillResult;
+    try {
+      [result = { id: field.id, status: "failed" }] = await this.sendToFrame(tabId, field.frameId, [
+        { id: field.id, kind: field.kind, value: text, optionValue: null, overwrite: true },
+      ]);
+    } catch {
+      result = { id: field.id, status: "failed", message: "The page didn't respond. Reload it and try again." };
+    }
+    const latest = (await this.state(tabId)) ?? state;
+    latest.fields = latest.fields.map((f) =>
+      fieldKey(f) === key ? { ...f, result: result.status, resultMessage: result.message, currentValue: result.status === "filled" ? text : f.currentValue } : f,
+    );
+    await this.session.set(formEntry(tabId, latest));
+    return result;
+  }
+
   async fill(tabId: number, keys: string[], overwrite: boolean): Promise<FillSummary> {
     const state = await this.state(tabId);
     if (!state) return { filled: 0, skipped: 0, failed: 0 };

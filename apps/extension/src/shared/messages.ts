@@ -40,6 +40,20 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
     fields: z.array(z.string().max(60)).max(300),
     overwrite: z.boolean(),
   }),
+  z.object({
+    type: z.literal("INSERT_ANSWER"),
+    tabId: z.number().int(),
+    field: z.string().max(60),
+    text: z.string().min(1).max(20_000),
+    question: z.string().max(500),
+    savedAnswerId: z.string().uuid().nullable(),
+  }),
+  z.object({
+    type: z.literal("SAVE_ANSWER"),
+    question: z.string().min(3).max(500),
+    answer: z.string().min(1).max(10_000),
+    category: z.string().max(50),
+  }),
 ]);
 
 /** Messages accepted from the web app (externally_connectable). */

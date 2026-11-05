@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { summarize } from "@/sidepanel/autofill-model";
 import { send, useActiveTabId, useFormState, useLocal, useTabState } from "@/sidepanel/chrome-state";
+import { AnswersSection } from "@/sidepanel/components/AnswersSection";
 import { AutofillSection } from "@/sidepanel/components/AutofillSection";
 import { EmptyState } from "@/sidepanel/components/EmptyState";
 import { Header } from "@/sidepanel/components/Header";
@@ -49,6 +50,9 @@ export function App() {
           <EmptyState name={firstName} />
         )}
         {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
+        {job?.isApplicationPage && tabId !== null && (
+          <AnswersSection questions={formSummary.questions} tabId={tabId} job={job} data={profile} />
+        )}
         {job?.isApplicationPage && <ProgressCard summary={formSummary} />}
         <Readiness data={profile} />
       </main>

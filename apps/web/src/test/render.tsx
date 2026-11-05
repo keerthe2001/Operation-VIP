@@ -6,6 +6,7 @@ import { vi } from "vitest";
 
 import { SessionStore } from "@/lib/auth/session";
 import { SKILL_CATEGORIES } from "@/lib/profile/form";
+import type { SavedAnswer, SavedAnswerInput } from "@/lib/answers/answer-service";
 import type { Profile, ProfileWrite } from "@/lib/profile/profile-service";
 import type { Resume } from "@/lib/resumes/resume-service";
 import { ServicesProvider, type Services } from "@/lib/services";
@@ -61,6 +62,7 @@ interface Options {
   profile?: Profile;
   resumes?: Resume[];
   extension?: { installed: boolean; signedIn: boolean };
+  answers?: SavedAnswer[];
 }
 
 export function renderApp(path: string, options: Options = {}) {
@@ -115,14 +117,35 @@ export function renderApp(path: string, options: Options = {}) {
     connect: vi.fn(async () => ({ ok: true })),
   } satisfies Services["extensionBridge"];
 
+  let answerState: SavedAnswer[] = options.answers ?? [];
+  const answers = {
+    list: vi.fn(async () => answerState),
+    templates: vi.fn(async () => [
+      { category: "why_company" as const, question_text: "Why do you want to work at this company?", answer_template: "I like {company} because [reason].", variants: [] },
+    ]),
+    placeholders: vi.fn(async () => ({ company: "Company", current_designation: "Your title" })),
+    create: vi.fn(async (input: SavedAnswerInput) => {
+      const created = { ...input, variants: input.variants ?? [], id: `a${answerState.length + 1}`, usage_count: 0, created_at: "", updated_at: "" } as SavedAnswer;
+      answerState = [...answerState, created];
+      return created;
+    }),
+    update: vi.fn(async (id: string, input: Partial<SavedAnswerInput>) => {
+      answerState = answerState.map((a) => (a.id === id ? ({ ...a, ...input } as SavedAnswer) : a));
+      return answerState.find((a) => a.id === id)!;
+    }),
+    remove: vi.fn(async (id: string) => {
+      answerState = answerState.filter((a) => a.id !== id);
+    }),
+  } satisfies Services["answers"];
+
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const utils = render(
-    <ServicesProvider services={{ session, auth, resumes, profile, extension, extensionBridge }}>
+    <ServicesProvider services={{ session, auth, resumes, profile, extension, extensionBridge, answers }}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </ServicesProvider>,
   );
-  return { ...utils, auth, resumes, profile, extension, extensionBridge, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
+  return { ...utils, auth, resumes, profile, extension, extensionBridge, answers, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
 }

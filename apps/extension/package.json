@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@copilot/api-types": "workspace:*",
+    "@copilot/shared": "workspace:*",
     "@copilot/ui": "workspace:*",
     "lucide-react": "^1.69.0",
     "react": "^19.3.1",

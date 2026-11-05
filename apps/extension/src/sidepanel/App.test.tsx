@@ -9,8 +9,20 @@ const user = { id: "u1", email: "priya@example.com", full_name: "Priya Raman", c
 const profile = {
   synced_at: "2026-01-01T00:00:00Z",
   primary_resume: null,
+  answers: [
+    {
+      id: "11111111-1111-4111-8111-111111111111", category: "why_company", question_text: "Why do you want to work here?",
+      answer_template: "I'd love to join {company} as a {current_designation}.", variants: ["Short: {company} fits me."],
+      usage_count: 0, created_at: "", updated_at: "",
+    },
+  ],
   profile: {
     personal_information: { first_name: "Priya" },
+    professional_summary: { current_designation: "Senior Engineer" },
+    experience: [],
+    education: [],
+    skills: {},
+    additional_info: {},
     completion: {
       percentage: 80,
       unconfirmed_fields: 2,
@@ -149,5 +161,65 @@ describe("smart autofill section", () => {
     });
     expect(await screen.findByText(/Filled 2 fields\. Review the form, then submit it yourself\./)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Everything ready is filled" })).toBeDisabled();
+  });
+});
+
+describe("answer suggestions", () => {
+  const questionField = {
+    id: "q1", frameId: 0, kind: "textarea", label: "Why do you want to work at Acme?", name: "", htmlId: "", placeholder: "",
+    autocomplete: "", helpText: "", required: true, options: [], currentValue: "", accept: "", maxLength: null, key: null,
+    confidence: 0, status: "question", value: null, optionValue: null,
+  };
+  const otherQuestion = { ...questionField, id: "q2", label: "Describe your favourite data structure and why." };
+
+  async function renderQuestions() {
+    const fake = installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: { "tab:7": { url: job.url, job, analyzedAt: 1 }, "form:7": { url: job.url, updatedAt: 1, fields: [questionField, otherQuestion] } },
+    });
+    render(<App />);
+    await screen.findByText("Answer suggestions");
+    return fake;
+  }
+
+  it("renders the matching saved answer with job and profile values, and inserts it", async () => {
+    const fake = await renderQuestions();
+    const box = screen.getByLabelText(/Why do you want to work at Acme\?/);
+    expect(box).toHaveValue("I'd love to join Acme Corp as a Senior Engineer.");
+    await userEvent.click(screen.getAllByRole("button", { name: "Insert" })[0]!);
+    expect(fake.sendMessage).toHaveBeenCalledWith({
+      type: "INSERT_ANSWER", tabId: 7, field: "0:q1", text: "I'd love to join Acme Corp as a Senior Engineer.",
+      question: "Why do you want to work at Acme?", savedAnswerId: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  it("cycles variants and lets the user edit", async () => {
+    await renderQuestions();
+    await userEvent.click(screen.getByRole("button", { name: "Next variant" }));
+    const box = screen.getByLabelText(/Why do you want to work at Acme\?/);
+    expect(box).toHaveValue("Short: Acme Corp fits me.");
+    await userEvent.clear(box);
+    await userEvent.type(box, "My own words");
+    expect(screen.getAllByRole("button", { name: "Save to library" }).length).toBeGreaterThan(0);
+  });
+
+  it("blocks inserting text that still has placeholders or prompts", async () => {
+    await renderQuestions();
+    const box = screen.getByLabelText(/Why do you want to work at Acme\?/);
+    await userEvent.clear(box);
+    await userEvent.type(box, "I like it because [[your reason]");
+    expect(screen.getByText(/Replace before inserting/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Insert" })[0]).toBeDisabled();
+  });
+
+  it("offers to save new answers when nothing matches", async () => {
+    const fake = await renderQuestions();
+    expect(screen.getByText("No saved answer matches. Write one and save it for next time.")).toBeInTheDocument();
+    const box = screen.getByLabelText(/favourite data structure/);
+    await userEvent.type(box, "A trie, because prefix search is elegant.");
+    await userEvent.click(screen.getByRole("button", { name: "Save to library" }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({
+      type: "SAVE_ANSWER", question: "Describe your favourite data structure and why.", answer: "A trie, because prefix search is elegant.", category: "other",
+    });
   });
 });

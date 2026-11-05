@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.schemas.answers import SavedAnswerRead
 from app.schemas.profile import ProfileRead
 from app.schemas.resume import ResumeRead
 
@@ -12,6 +13,7 @@ class ExtensionProfile(BaseModel):
 
     profile: ProfileRead
     primary_resume: ResumeRead | None
+    answers: list[SavedAnswerRead]
     synced_at: datetime
 
 

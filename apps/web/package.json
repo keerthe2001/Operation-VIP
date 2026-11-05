@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@copilot/api-types": "workspace:*",
+    "@copilot/shared": "workspace:*",
     "@copilot/ui": "workspace:*",
     "@hookform/resolvers": "^7.0.3",
     "@tanstack/react-query": "^5.106.1",

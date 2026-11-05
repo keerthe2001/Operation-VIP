@@ -10,6 +10,7 @@ const NAV = [
   { to: "/", label: "Home", end: true },
   { to: "/profile", label: "Profile" },
   { to: "/resumes", label: "Resumes" },
+  { to: "/answers", label: "Answers" },
 ];
 
 export function initials(name: string | null | undefined, email: string): string {

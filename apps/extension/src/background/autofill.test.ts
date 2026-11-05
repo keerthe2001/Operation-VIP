@@ -18,6 +18,7 @@ function setup() {
     profile: makeProfile(),
     primary_resume: { id: "r1", file_name: "priya.pdf", mime_type: "application/pdf", status: "ready" } as ExtensionProfile["primary_resume"],
     synced_at: "2026-01-01T00:00:00Z",
+    answers: [],
   };
   const local = memoryArea<LocalStore>({ profile: data });
   const session = memoryArea<SessionStore>();
@@ -73,7 +74,7 @@ describe("AutofillCoordinator", () => {
     const { coordinator, local } = setup();
     await coordinator.onFieldsScanned(1, 0, "https://x.test", [field("f1", "Phone", { kind: "tel" })]);
     const profile = makeProfile({ personal_information: {} });
-    await local.set({ profile: { profile, primary_resume: null, synced_at: "" } });
+    await local.set({ profile: { profile, primary_resume: null, synced_at: "", answers: [] } });
     await coordinator.remapAll([1]);
     expect((await coordinator.state(1))!.fields[0]).toMatchObject({ status: "missing", value: null });
   });

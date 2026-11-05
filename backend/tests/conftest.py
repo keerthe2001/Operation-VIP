@@ -59,7 +59,7 @@ async def _clean_state(app: FastAPI) -> AsyncIterator[None]:
         await conn.execute(
             text(
                 "TRUNCATE users, refresh_tokens, resumes, user_profiles, work_experience, "
-                "education, projects, certifications CASCADE"
+                "education, projects, certifications, saved_answers, answer_usages CASCADE"
             )
         )
     await app.state.redis.flushdb()

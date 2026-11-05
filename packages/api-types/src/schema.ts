@@ -4,6 +4,96 @@
  */
 
 export interface paths {
+    "/api/v1/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Answers */
+        get: operations["list_answers_api_v1_answers_get"];
+        put?: never;
+        /** Create Answer */
+        post: operations["create_answer_api_v1_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/answers/placeholders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Placeholders
+         * @description Placeholders an answer can use, e.g. {company}, with a description.
+         */
+        get: operations["placeholders_api_v1_answers_placeholders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/answers/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Starter Templates */
+        get: operations["starter_templates_api_v1_answers_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/answers/usages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Usage */
+        post: operations["record_usage_api_v1_answers_usages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/answers/{answer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Answer */
+        delete: operations["delete_answer_api_v1_answers__answer_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Answer */
+        patch: operations["update_answer_api_v1_answers__answer_id__patch"];
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -348,6 +438,71 @@ export interface components {
             /** Work Authorization */
             work_authorization?: string | null;
         };
+        /** AnswerTemplate */
+        AnswerTemplate: {
+            /** Answer Template */
+            answer_template: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "why_company" | "why_role" | "about_you" | "strengths" | "weaknesses" | "challenging_project" | "career_goals" | "leaving_reason" | "why_hire" | "availability" | "salary" | "relocation" | "other";
+            /** Question Text */
+            question_text: string;
+            /**
+             * Variants
+             * @default []
+             */
+            variants: string[];
+        };
+        /** AnswerUsageCreate */
+        AnswerUsageCreate: {
+            /** Company */
+            company?: string | null;
+            /** Final Answer */
+            final_answer: string;
+            /** Job Title */
+            job_title?: string | null;
+            /** Question Text */
+            question_text: string;
+            /** Saved Answer Id */
+            saved_answer_id?: string | null;
+            /**
+             * Source
+             * @default library
+             * @enum {string}
+             */
+            source: "library" | "manual";
+            /** Url */
+            url?: string | null;
+        };
+        /** AnswerUsageRead */
+        AnswerUsageRead: {
+            /** Company */
+            company: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Final Answer */
+            final_answer: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Title */
+            job_title: string | null;
+            /** Question Text */
+            question_text: string;
+            /** Saved Answer Id */
+            saved_answer_id: string | null;
+            /** Source */
+            source: string;
+            /** Url */
+            url: string | null;
+        };
         /** Body_upload_resume_api_v1_resumes_upload_post */
         Body_upload_resume_api_v1_resumes_upload_post: {
             /**
@@ -459,6 +614,8 @@ export interface components {
          * @description Everything the extension needs to fill forms, fetched in one request.
          */
         ExtensionProfile: {
+            /** Answers */
+            answers: components["schemas"]["SavedAnswerRead"][];
             primary_resume: components["schemas"]["ResumeRead"] | null;
             profile: components["schemas"]["ProfileRead"];
             /**
@@ -890,6 +1047,64 @@ export interface components {
             processed_at: string | null;
             status: components["schemas"]["ResumeStatus"];
         };
+        /** SavedAnswerCreate */
+        SavedAnswerCreate: {
+            /** Answer Template */
+            answer_template: string;
+            /**
+             * Category
+             * @default other
+             * @enum {string}
+             */
+            category: "why_company" | "why_role" | "about_you" | "strengths" | "weaknesses" | "challenging_project" | "career_goals" | "leaving_reason" | "why_hire" | "availability" | "salary" | "relocation" | "other";
+            /** Question Text */
+            question_text: string;
+            /** Variants */
+            variants?: string[];
+        };
+        /** SavedAnswerRead */
+        SavedAnswerRead: {
+            /** Answer Template */
+            answer_template: string;
+            /**
+             * Category
+             * @default other
+             * @enum {string}
+             */
+            category: "why_company" | "why_role" | "about_you" | "strengths" | "weaknesses" | "challenging_project" | "career_goals" | "leaving_reason" | "why_hire" | "availability" | "salary" | "relocation" | "other";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Question Text */
+            question_text: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Usage Count */
+            usage_count: number;
+            /** Variants */
+            variants?: string[];
+        };
+        /** SavedAnswerUpdate */
+        SavedAnswerUpdate: {
+            /** Answer Template */
+            answer_template?: string | null;
+            /** Category */
+            category?: ("why_company" | "why_role" | "about_you" | "strengths" | "weaknesses" | "challenging_project" | "career_goals" | "leaving_reason" | "why_hire" | "availability" | "salary" | "relocation" | "other") | null;
+            /** Question Text */
+            question_text?: string | null;
+            /** Variants */
+            variants?: string[] | null;
+        };
         /** Skills */
         Skills: {
             /**
@@ -994,6 +1209,198 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_answers_api_v1_answers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnswerRead"][];
+                };
+            };
+        };
+    };
+    create_answer_api_v1_answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedAnswerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnswerRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    placeholders_api_v1_answers_placeholders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    starter_templates_api_v1_answers_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerTemplate"][];
+                };
+            };
+        };
+    };
+    record_usage_api_v1_answers_usages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerUsageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerUsageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_answer_api_v1_answers__answer_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_answer_api_v1_answers__answer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedAnswerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnswerRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
