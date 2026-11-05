@@ -78,6 +78,7 @@ class AnswerTemplate(BaseModel):
 
 class AnswerUsageCreate(BaseModel):
     saved_answer_id: uuid.UUID | None = None
+    application_id: uuid.UUID | None = None
     question_text: str = Field(min_length=1, max_length=500)
     final_answer: str = Field(min_length=1, max_length=20_000)
     source: Literal["library", "manual"] = "library"
@@ -91,6 +92,7 @@ class AnswerUsageRead(BaseModel):
 
     id: uuid.UUID
     saved_answer_id: uuid.UUID | None
+    application_id: uuid.UUID | None
     question_text: str
     final_answer: str
     source: str

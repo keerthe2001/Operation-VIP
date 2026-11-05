@@ -4,7 +4,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
-from app.db.models import AnswerSource, AnswerUsage, SavedAnswer
+from app.db.models import AnswerSource, AnswerUsage, Application, SavedAnswer
 from app.schemas.answers import AnswerUsageCreate, SavedAnswerCreate, SavedAnswerUpdate
 
 MAX_ANSWERS = 200
@@ -72,9 +72,15 @@ class AnswerService:
                 .where(SavedAnswer.id == data.saved_answer_id)
                 .values(usage_count=SavedAnswer.usage_count + 1)
             )
+        application_id = data.application_id
+        if application_id is not None:
+            application = await self.session.get(Application, application_id)
+            if application is None or application.user_id != user_id:
+                application_id = None  # never link to someone else's application
         usage = AnswerUsage(
             user_id=user_id,
             saved_answer_id=data.saved_answer_id,
+            application_id=application_id,
             question_text=data.question_text,
             final_answer=data.final_answer,
             source=AnswerSource(data.source),

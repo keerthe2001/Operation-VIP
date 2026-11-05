@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 import type { FormState } from "@/shared/fields";
 import type { PanelMessage, Reply } from "@/shared/messages";
-import { DEFAULT_LOCAL, formKey, tabKey, type LocalStore } from "@/shared/storage";
-import type { TabState } from "@/shared/types";
+import { appKey, DEFAULT_LOCAL, formKey, tabKey, type LocalStore } from "@/shared/storage";
+import type { TabState, TrackedApplication } from "@/shared/types";
 
 /** Live value from chrome.storage.local. */
 export function useLocal<K extends keyof LocalStore>(key: K): LocalStore[K] {
@@ -68,3 +68,5 @@ export async function send<T = unknown>(message: PanelMessage): Promise<Reply<T>
     return { ok: false, error: error instanceof Error ? error.message : "Extension error" };
   }
 }
+export const useTrackedApplication = (tabId: number | null) =>
+  useSessionValue<TrackedApplication>(tabId === null ? null : appKey(tabId));

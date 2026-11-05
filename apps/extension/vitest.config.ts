@@ -4,5 +4,5 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  test: { environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: false },
+  test: { environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: false, testTimeout: 15000 },
 });

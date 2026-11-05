@@ -85,7 +85,7 @@ version), so existing users can be re-parsed later without re-uploading.
 | Backend | Python 3.12+, FastAPI, SQLAlchemy 2 (async, asyncpg), Alembic, Pydantic v2 |
 | Jobs | arq (Redis) |
 | Storage | PostgreSQL, Redis, S3/MinIO |
-| Documents | PyMuPDF, python-docx, LibreOffice headless (`.doc`), Tesseract OCR, ClamAV |
+| Documents | pdfplumber + pypdfium2, python-docx, LibreOffice headless (`.doc`), Tesseract OCR, ClamAV |
 | Auth | Short-lived JWT access token + rotating opaque refresh token (hashed in DB) |
 | Contract | OpenAPI → `openapi-typescript` → `packages/api-types` |
 | Tooling | uv, ruff, mypy, pytest · pnpm workspaces, vitest, Playwright |
@@ -189,14 +189,14 @@ Saved answers with `{company}`, `{job_title}`, `{current_designation}`,
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Monorepo, docker-compose, CI, FastAPI skeleton, Alembic, auth, web login/register | **Done** |
-| 1a | Upload, text PDF + DOCX, rule-based parser, profile review/edit | Next |
-| 1b | Tesseract OCR, images, DOC, ClamAV, duplicates, golden-file tests | |
-| 2 | Extension foundation: side panel, auth handoff, sync, job detection | |
-| 3 | Smart autofill | |
-| 4 | Answer library | |
-| 5 | Application tracker | |
-| Future | AI: LLM parser, LLM answers, mapping fallback, PaddleOCR | |
+| 0 | Monorepo, docker-compose, CI, FastAPI skeleton, Alembic, auth, web login/register | Done |
+| 1a | Upload, text PDF + DOCX, rule-based parser, profile review/edit | Done |
+| 1b | Tesseract OCR, images, DOC, ClamAV, duplicates, golden-file tests | Done |
+| 2 | Extension foundation: side panel, auth handoff, sync, job detection | Done |
+| 3 | Smart autofill | Done |
+| 4 | Answer library | Done |
+| 5 | Application tracker | Done |
+| Future | AI: LLM parser, LLM answers, mapping fallback, PaddleOCR | Planned |
 
 ## 8. Risks
 
@@ -208,3 +208,25 @@ Saved answers with `{company}`, `{job_title}`, `{current_designation}`,
 | Cross-origin iframes | `all_frames` injection + host permission for frame origin |
 | Broad host permissions in store review | Built-in portals + runtime optional permissions for generic sites |
 | MV3 service worker suspension | State persisted in `chrome.storage.session` |
+
+## 9. Decisions made during implementation
+
+| Decision | Why |
+|---|---|
+| **pdfplumber + pypdfium2 instead of PyMuPDF** | PyMuPDF is AGPL-3.0; serving it from a hosted backend can oblige publishing the backend's source. pdfplumber (MIT) and pypdfium2 (Apache/BSD) provide the same font-size/bold data and page rendering for OCR. Swappable behind the extractor interface. |
+| `(cid:N)` glyphs normalized to bullets | pdfminer emits these for unmapped bullet glyphs; left alone they merged bullet lists into one blob. |
+| Rule-based mapping on the client (background worker) | No network round-trip per field and no form data leaves the browser; only the profile is synced. |
+| Answer matching in `packages/shared` | The same code previews answers on the web and suggests them in the extension, offline. |
+| Sensitive fields never auto-filled | Salary, sponsorship, work authorization and demographic answers always need the user's review; EEO questions and consent boxes are never mapped. |
+| Status only moves forward automatically | The extension may set *detected* → *in progress*; *submitted* and later are only ever set by the user. |
+| Extension pages identified by URL | A side panel opened in a tab also has `sender.tab`; routing by URL keeps it from being mistaken for a content script. |
+
+## 10. Extension message flow
+
+```
+content script ──PAGE_ANALYZED / FIELDS_SCANNED──▶ background ──▶ storage.session (tab:<id>, form:<id>, app:<id>)
+side panel ──FILL_FIELDS / INSERT_ANSWER / SAVE_ANSWER / SET_APPLICATION_STATUS──▶ background
+background ──FILL {instructions} (per frame)──▶ content script ──results──▶ background
+web app ──AUTH_HANDOFF (externally_connectable)──▶ background
+side panel ◀── chrome.storage.onChanged (state is read from storage, never pushed)
+```

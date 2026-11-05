@@ -42,6 +42,9 @@ class AnswerUsage(UUIDPrimaryKeyMixin, Base):
     saved_answer_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("saved_answers.id", ondelete="SET NULL")
     )
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("applications.id", ondelete="SET NULL"), index=True
+    )
     question_text: Mapped[str] = mapped_column(String(500))
     final_answer: Mapped[str] = mapped_column(Text)
     source: Mapped[AnswerSource] = mapped_column(

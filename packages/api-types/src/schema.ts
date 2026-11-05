@@ -94,6 +94,60 @@ export interface paths {
         patch: operations["update_answer_api_v1_answers__answer_id__patch"];
         trace?: never;
     };
+    "/api/v1/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Applications */
+        get: operations["list_applications_api_v1_applications_get"];
+        put?: never;
+        /** Create Application */
+        post: operations["create_application_api_v1_applications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/applications/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Application Stats */
+        get: operations["application_stats_api_v1_applications_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/applications/{application_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Application */
+        get: operations["get_application_api_v1_applications__application_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Application */
+        delete: operations["delete_application_api_v1_applications__application_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Application */
+        patch: operations["update_application_api_v1_applications__application_id__patch"];
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -173,6 +227,26 @@ export interface paths {
         put?: never;
         /** Register */
         post: operations["register_api_v1_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/detect-job": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detect Job
+         * @description Track an application page the extension detected (idempotent per job URL).
+         */
+        post: operations["detect_job_api_v1_extension_detect_job_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -457,6 +531,8 @@ export interface components {
         };
         /** AnswerUsageCreate */
         AnswerUsageCreate: {
+            /** Application Id */
+            application_id?: string | null;
             /** Company */
             company?: string | null;
             /** Final Answer */
@@ -478,6 +554,8 @@ export interface components {
         };
         /** AnswerUsageRead */
         AnswerUsageRead: {
+            /** Application Id */
+            application_id: string | null;
             /** Company */
             company: string | null;
             /**
@@ -502,6 +580,183 @@ export interface components {
             source: string;
             /** Url */
             url: string | null;
+        };
+        /** AnswerUsageSummary */
+        AnswerUsageSummary: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Final Answer */
+            final_answer: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Question Text */
+            question_text: string;
+        };
+        /** ApplicationCreate */
+        ApplicationCreate: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Job Description */
+            job_description?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /**
+             * Job Url
+             * Format: uri
+             */
+            job_url: string;
+            /** Notes */
+            notes?: string | null;
+            /** Portal */
+            portal?: string | null;
+            /** Resume Id */
+            resume_id?: string | null;
+            /**
+             * Status
+             * @default in_progress
+             * @enum {string}
+             */
+            status: "detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected";
+        };
+        /** ApplicationDetail */
+        ApplicationDetail: {
+            /** Answers */
+            answers: components["schemas"]["AnswerUsageSummary"][];
+            /** Applied At */
+            applied_at: string | null;
+            /** Company Name */
+            company_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Fields Detected */
+            fields_detected: number;
+            /** Fields Filled */
+            fields_filled: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Description */
+            job_description?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /** Job Url */
+            job_url: string;
+            /** Notes */
+            notes?: string | null;
+            /** Portal */
+            portal?: string | null;
+            /** Resume File Name */
+            resume_file_name: string | null;
+            /** Resume Id */
+            resume_id: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected";
+            /** Status History */
+            status_history: components["schemas"]["StatusEvent"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ApplicationRead */
+        ApplicationRead: {
+            /** Applied At */
+            applied_at: string | null;
+            /** Company Name */
+            company_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Fields Detected */
+            fields_detected: number;
+            /** Fields Filled */
+            fields_filled: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Description */
+            job_description?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /** Job Url */
+            job_url: string;
+            /** Notes */
+            notes?: string | null;
+            /** Portal */
+            portal?: string | null;
+            /** Resume Id */
+            resume_id: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected";
+            /** Status History */
+            status_history: components["schemas"]["StatusEvent"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ApplicationStats */
+        ApplicationStats: {
+            /** Active */
+            active: number;
+            /** By Status */
+            by_status: {
+                [key: string]: number;
+            };
+            /** Response Rate */
+            response_rate: number | null;
+            /** Responses */
+            responses: number;
+            /** Submitted */
+            submitted: number;
+            /** This Week */
+            this_week: number;
+            /** Total */
+            total: number;
+            /** Weekly */
+            weekly: components["schemas"]["WeekCount"][];
+        };
+        /** ApplicationUpdate */
+        ApplicationUpdate: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Job Description */
+            job_description?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Resume Id */
+            resume_id?: string | null;
+            /** Status */
+            status?: ("detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected") | null;
         };
         /** Body_upload_resume_api_v1_resumes_upload_post */
         Body_upload_resume_api_v1_resumes_upload_post: {
@@ -539,6 +794,35 @@ export interface components {
             label: string;
             /** Weight */
             weight: number;
+        };
+        /**
+         * DetectedApplication
+         * @description Sent by the extension when it sees an application page (and after autofill).
+         */
+        DetectedApplication: {
+            /** Company Name */
+            company_name?: string | null;
+            /**
+             * Fields Detected
+             * @default 0
+             */
+            fields_detected: number;
+            /**
+             * Fields Filled
+             * @default 0
+             */
+            fields_filled: number;
+            /** Job Description */
+            job_description?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /**
+             * Job Url
+             * Format: uri
+             */
+            job_url: string;
+            /** Portal */
+            portal?: string | null;
         };
         /**
          * DocumentClass
@@ -1148,6 +1432,24 @@ export interface components {
              */
             tools: string[];
         };
+        /** StatusEvent */
+        StatusEvent: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * By
+             * @enum {string}
+             */
+            by: "user" | "extension";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected";
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -1199,6 +1501,16 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WeekCount */
+        WeekCount: {
+            /** Count */
+            count: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
         };
     };
     responses: never;
@@ -1401,6 +1713,186 @@ export interface operations {
             };
         };
     };
+    list_applications_api_v1_applications_get: {
+        parameters: {
+            query?: {
+                status?: ("detected" | "in_progress" | "ready_to_submit" | "submitted" | "interview" | "offer" | "rejected") | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_application_api_v1_applications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    application_stats_api_v1_applications_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationStats"];
+                };
+            };
+        };
+    };
+    get_application_api_v1_applications__application_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_application_api_v1_applications__application_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_application_api_v1_applications__application_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -1538,6 +2030,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detect_job_api_v1_extension_detect_job_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectedApplication"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationRead"];
                 };
             };
             /** @description Validation Error */

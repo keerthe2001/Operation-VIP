@@ -4,11 +4,12 @@ import { AppShell } from "@/components/AppShell";
 import { GuestOnly, RequireAuth } from "@/features/auth/guards";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
-import { AnswersPage } from "@/features/answers/AnswersPage";
-import { ConnectExtensionPage } from "@/features/extension/ConnectExtensionPage";
 import { HomePage } from "@/features/home/HomePage";
-import { ProfilePage } from "@/features/profile/ProfilePage";
-import { ResumesPage } from "@/features/resumes/ResumesPage";
+
+// Larger pages load on demand so the first screen stays small.
+const lazyPage = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) => async () => ({
+  Component: (await load())[name],
+});
 
 export const routes: RouteObject[] = [
   {
@@ -25,10 +26,14 @@ export const routes: RouteObject[] = [
         element: <AppShell />,
         children: [
           { path: "/", element: <HomePage /> },
-          { path: "/profile", element: <ProfilePage /> },
-          { path: "/resumes", element: <ResumesPage /> },
-          { path: "/answers", element: <AnswersPage /> },
-          { path: "/extension/connect", element: <ConnectExtensionPage /> },
+          { path: "/profile", lazy: lazyPage(() => import("@/features/profile/ProfilePage"), "ProfilePage") },
+          { path: "/resumes", lazy: lazyPage(() => import("@/features/resumes/ResumesPage"), "ResumesPage") },
+          { path: "/answers", lazy: lazyPage(() => import("@/features/answers/AnswersPage"), "AnswersPage") },
+          { path: "/applications", lazy: lazyPage(() => import("@/features/applications/ApplicationsPage"), "ApplicationsPage") },
+          {
+            path: "/extension/connect",
+            lazy: lazyPage(() => import("@/features/extension/ConnectExtensionPage"), "ConnectExtensionPage"),
+          },
         ],
       },
     ],

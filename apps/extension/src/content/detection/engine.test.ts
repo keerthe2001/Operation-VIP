@@ -36,6 +36,15 @@ describe("job detection", () => {
     expect(job.fieldCount).toBe(6);
   });
 
+  it("captures the job description as plain text", () => {
+    const page = PAGES.generic;
+    document.documentElement.innerHTML = page.html.replace(
+      '"title":"Site Reliability Engineer",',
+      '"title":"Site Reliability Engineer","description":"<p>Keep our systems <b>reliable</b>.</p><ul><li>On-call</li></ul>",',
+    );
+    expect(detectJob(document, page.url)!.description).toBe("Keep our systems reliable.\nOn-call");
+  });
+
   it("falls back to form signals and the document title", () => {
     const job = detect("genericNoStructuredData")!;
     expect(job).toMatchObject({ portal: "generic", title: "QA Engineer", company: "Contoso", isApplicationPage: true });

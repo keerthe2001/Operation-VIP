@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { summarize } from "@/sidepanel/autofill-model";
-import { send, useActiveTabId, useFormState, useLocal, useTabState } from "@/sidepanel/chrome-state";
+import { send, useActiveTabId, useFormState, useLocal, useTabState, useTrackedApplication } from "@/sidepanel/chrome-state";
 import { AnswersSection } from "@/sidepanel/components/AnswersSection";
 import { AutofillSection } from "@/sidepanel/components/AutofillSection";
 import { EmptyState } from "@/sidepanel/components/EmptyState";
@@ -19,6 +19,7 @@ export function App() {
   const tabId = useActiveTabId();
   const tab = useTabState(tabId);
   const form = useFormState(tabId);
+  const tracked = useTrackedApplication(tabId);
   const formSummary = useMemo(() => summarize(form), [form]);
   const [settings, setSettings] = useState(false);
   const signedIn = auth.status === "signed_in" && auth.user;
@@ -45,7 +46,12 @@ export function App() {
       <Header user={auth.user!} sync={sync} onSettings={() => setSettings(true)} />
       <main className="grid gap-4 p-4">
         {job ? (
-          <JobCard job={job} onRescan={() => tabId !== null && send({ type: "RESCAN_TAB", tabId })} />
+          <JobCard
+            job={job}
+            tabId={tabId}
+            tracked={tracked?.url === job.url ? tracked : null}
+            onRescan={() => tabId !== null && send({ type: "RESCAN_TAB", tabId })}
+          />
         ) : (
           <EmptyState name={firstName} />
         )}

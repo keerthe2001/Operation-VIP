@@ -2,6 +2,7 @@ import { Alert, Badge, Button, Card, CardContent, CardDescription, CardHeader, C
 import { ArrowRight, Check, Circle, FileText, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 
+import { useApplicationStats } from "@/features/applications/queries";
 import { useExtensionStatus } from "@/features/extension/queries";
 import { useProfile } from "@/features/profile/queries";
 import { useResumes } from "@/features/resumes/queries";
@@ -18,6 +19,7 @@ export function HomePage() {
   const profile = useProfile();
   const firstName = user?.full_name?.split(" ")[0];
   const extension = useExtensionStatus();
+  const applicationStats = useApplicationStats();
 
   if (resumes.isPending) {
     return (
@@ -117,6 +119,30 @@ export function HomePage() {
         </Card>
 
         <Card>
+          <CardHeader>
+            <CardTitle>Applications</CardTitle>
+            <CardDescription>Tracked automatically by the extension.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              {(
+                [
+                  ["In progress", applicationStats.data?.active],
+                  ["Submitted", applicationStats.data?.submitted],
+                  ["This week", applicationStats.data?.this_week],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="rounded-lg bg-muted/60 py-2">
+                  <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                  <dd className="text-lg font-semibold tabular-nums">{value ?? "–"}</dd>
+                </div>
+              ))}
+            </dl>
+            <Button asChild variant="outline" size="sm" className="justify-self-start">
+              <Link to="/applications">View applications</Link>
+            </Button>
+          </CardContent>
+          <div className="border-t" />
           <CardHeader>
             <CardTitle>Primary resume</CardTitle>
             <CardDescription>Used when an application asks for a file.</CardDescription>

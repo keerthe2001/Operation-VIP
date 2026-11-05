@@ -26,6 +26,16 @@ export interface DetectedJob {
   confidence: number;
   signals: string[];
   fieldCount: number;
+  /** Plain-text job description, when the page has one (capped). */
+  description?: string | null;
+}
+
+export type ApplicationStatus = components["schemas"]["ApplicationRead"]["status"];
+
+export interface TrackedApplication {
+  id: string;
+  url: string;
+  status: ApplicationStatus;
 }
 
 export interface TabState {

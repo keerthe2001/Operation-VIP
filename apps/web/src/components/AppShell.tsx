@@ -8,6 +8,7 @@ import { useServices, useSession } from "@/lib/services";
 
 const NAV = [
   { to: "/", label: "Home", end: true },
+  { to: "/applications", label: "Applications" },
   { to: "/profile", label: "Profile" },
   { to: "/resumes", label: "Resumes" },
   { to: "/answers", label: "Answers" },

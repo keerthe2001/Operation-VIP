@@ -2,6 +2,7 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 
 import { AnswerService } from "@/lib/answers/answer-service";
 import { createApiClient } from "@/lib/api/client";
+import { ApplicationService } from "@/lib/applications/application-service";
 import { AuthService } from "@/lib/auth/auth-service";
 import { SessionStore, type SessionState } from "@/lib/auth/session";
 import { chromeBridge, type ExtensionBridge } from "@/lib/extension/bridge";
@@ -18,6 +19,7 @@ export interface Services {
   profile: PublicMethods<ProfileService>;
   extension: PublicMethods<ExtensionService>;
   answers: PublicMethods<AnswerService>;
+  applications: PublicMethods<ApplicationService>;
   extensionBridge: ExtensionBridge;
 }
 
@@ -31,6 +33,7 @@ export function createServices(origin: string = window.location.origin): Service
     profile: new ProfileService(client),
     extension: new ExtensionService(client),
     answers: new AnswerService(client),
+    applications: new ApplicationService(client),
     extensionBridge: chromeBridge,
   };
 }

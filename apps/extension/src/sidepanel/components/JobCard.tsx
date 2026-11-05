@@ -1,9 +1,75 @@
 import { Badge, Button } from "@copilot/ui";
-import { Briefcase, Building2, FormInput, Link2, RefreshCw } from "lucide-react";
+import { Briefcase, Building2, CheckCircle2, ExternalLink, FormInput, Link2, RefreshCw, Send } from "lucide-react";
+import { useState } from "react";
 
-import { PORTAL_NAMES, type DetectedJob } from "@/shared/types";
+import { send } from "@/sidepanel/chrome-state";
+import { WEB_URL } from "@/shared/config";
+import { PORTAL_NAMES, type ApplicationStatus, type DetectedJob, type TrackedApplication } from "@/shared/types";
 
-export function JobCard({ job, onRescan }: { job: DetectedJob; onRescan: () => void }) {
+export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  detected: "Detected",
+  in_progress: "In progress",
+  ready_to_submit: "Ready to submit",
+  submitted: "Submitted",
+  interview: "Interview",
+  offer: "Offer",
+  rejected: "Rejected",
+};
+
+function TrackerRow({ tabId, tracked }: { tabId: number; tracked: TrackedApplication }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const before = ["detected", "in_progress", "ready_to_submit"].includes(tracked.status);
+  return (
+    <div className="mt-3 grid gap-2 border-t pt-3">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">
+          Tracked · <span className="font-medium text-foreground">{STATUS_LABELS[tracked.status]}</span>
+        </span>
+        <a
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          href={`${WEB_URL}/applications?id=${tracked.id}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open tracker <ExternalLink className="size-3" aria-hidden="true" />
+        </a>
+      </div>
+      {before ? (
+        <Button
+          size="sm"
+          variant="outline"
+          loading={busy}
+          onClick={async () => {
+            setBusy(true);
+            const reply = await send({ type: "SET_APPLICATION_STATUS", tabId, status: "submitted" });
+            setBusy(false);
+            setError(reply.ok ? null : reply.error);
+          }}
+        >
+          <Send aria-hidden="true" /> I submitted this application
+        </Button>
+      ) : (
+        <p className="flex items-center gap-1.5 text-xs text-success">
+          <CheckCircle2 className="size-3.5" aria-hidden="true" /> Marked as {STATUS_LABELS[tracked.status].toLowerCase()}
+        </p>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+export function JobCard({
+  job,
+  onRescan,
+  tabId,
+  tracked,
+}: {
+  job: DetectedJob;
+  onRescan: () => void;
+  tabId?: number | null;
+  tracked?: TrackedApplication | null;
+}) {
   return (
     <section aria-labelledby="job-heading" className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
@@ -43,6 +109,7 @@ export function JobCard({ job, onRescan }: { job: DetectedJob; onRescan: () => v
           </div>
         )}
       </dl>
+      {tracked && tabId != null && <TrackerRow tabId={tabId} tracked={tracked} />}
     </section>
   );
 }

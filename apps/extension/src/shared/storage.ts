@@ -1,5 +1,5 @@
 import type { FormState } from "@/shared/fields";
-import type { AuthState, ExtensionProfile, SyncState, TabState } from "@/shared/types";
+import type { AuthState, ExtensionProfile, SyncState, TabState, TrackedApplication } from "@/shared/types";
 
 /**
  * Typed storage layout.
@@ -20,14 +20,18 @@ export interface SessionStore {
   accessExpiresAt: number | null;
   [tabKey: `tab:${number}`]: TabState | undefined;
   [formKey: `form:${number}`]: FormState | undefined;
+  [appKey: `app:${number}`]: TrackedApplication | undefined;
 }
 
 export const tabKey = (tabId: number) => `tab:${tabId}` as const;
 export const formKey = (tabId: number) => `form:${tabId}` as const;
+export const appKey = (tabId: number) => `app:${tabId}` as const;
 
 // Computed keys widen to `string` in TypeScript; these keep session writes typed.
 export const tabEntry = (tabId: number, state: TabState): Partial<SessionStore> =>
   ({ [tabKey(tabId)]: state }) as unknown as Partial<SessionStore>;
+export const appEntry = (tabId: number, app: TrackedApplication): Partial<SessionStore> =>
+  ({ [appKey(tabId)]: app }) as unknown as Partial<SessionStore>;
 export const formEntry = (tabId: number, state: FormState): Partial<SessionStore> =>
   ({ [formKey(tabId)]: state }) as unknown as Partial<SessionStore>;
 

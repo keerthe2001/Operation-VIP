@@ -74,3 +74,67 @@ the cookie. Always succeeds, even without a token.
 
 ### `GET /auth/me` → `200`
 Returns the current `UserRead`.
+
+## Resumes
+
+| Method & path | Description |
+|---|---|
+| `POST /resumes/upload` (multipart `file`) | `202` + `ResumeRead`. PDF, DOC, DOCX, PNG, JPG up to `MAX_UPLOAD_MB` (10). Content is sniffed; a mismatched extension is rejected. Re-uploading an identical file returns `409` with `details.resume_id`. Rate limited. |
+| `GET /resumes` | Newest first. |
+| `GET /resumes/{id}` | Includes `extracted_text`, `extracted_data` (parser output) and `extraction_meta`. |
+| `GET /resumes/{id}/status` | `uploaded → scanning → extracting → parsing → ready` or `failed` with `error_code`/`error_message`. |
+| `GET /resumes/{id}/file` | Original file (`Content-Security-Policy: sandbox`, `nosniff`). |
+| `POST /resumes/{id}/process` | Re-run processing. |
+| `DELETE /resumes/{id}` | Deletes the file; the profile is kept. |
+
+Failure codes: `PASSWORD_PROTECTED`, `CORRUPT_FILE`, `NO_TEXT_FOUND`, `MALWARE_DETECTED`,
+`SCAN_UNAVAILABLE`, `CONVERSION_FAILED`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`.
+
+`ResumeRead` also exposes `ocr_confidence` and `warnings` when OCR was used.
+
+## Profile
+
+| Method & path | Description |
+|---|---|
+| `GET /profile` | Profile (created empty on first read) with `completion`. |
+| `PUT /profile` | Replace everything (`ProfileWrite`). |
+| `PATCH /profile` | Replace only the provided top-level sections. |
+| `GET /profile/completion` | Percentage, per-section status, unconfirmed count. |
+| `POST /profile/import/{resume_id}` | Rebuild the profile from a processed resume (keeps `additional_info`). |
+
+Extracted values carry confidence in `field_meta` (scalars) and per item; everything
+extracted starts with `is_confirmed: false`. Dates are partial ISO strings (`2021` or `2021-03`).
+
+## Answer library
+
+| Method & path | Description |
+|---|---|
+| `GET/POST /answers`, `PATCH/DELETE /answers/{id}` | Saved answers: `category`, `question_text`, `answer_template` with `{placeholders}`, `variants`. |
+| `GET /answers/templates` | Starter answers (profile placeholders + `[prompts]` to personalize). |
+| `GET /answers/placeholders` | Supported placeholders and their meaning. |
+| `POST /answers/usages` | Record an inserted answer (`saved_answer_id`, `application_id` optional). |
+
+## Applications
+
+| Method & path | Description |
+|---|---|
+| `GET /applications?status=&q=` | List, most recently updated first. |
+| `POST /applications` | Manual entry; `409` if the (normalized) job URL is already tracked. |
+| `GET /applications/{id}` | Detail with `status_history`, `resume_file_name`, inserted `answers`. |
+| `PATCH /applications/{id}` | Status, notes, company, title, description, resume. |
+| `DELETE /applications/{id}` | Remove. |
+| `GET /applications/stats` | Counts by status, active, submitted, responses, response rate, last 8 weeks. |
+
+Statuses: `detected`, `in_progress`, `ready_to_submit`, `submitted`, `interview`, `offer`, `rejected`.
+
+## Extension
+
+| Method & path | Description |
+|---|---|
+| `GET /extension/profile` | Profile + primary resume + answer library. Supports `If-None-Match` (`304`). |
+| `POST /extension/handoff` | New extension session for the signed-in web user (refresh token in the body). |
+| `POST /extension/detect-job` | Create/update the application for a detected page (idempotent per URL; never moves status backwards or marks it submitted). |
+
+The originally specified AI endpoints (`/answers/generate`, `/answers/regenerate`,
+`/extension/map-fields`, `/extension/generate-answer`) are intentionally not implemented
+in the no-AI MVP; mapping and answer suggestions run in the extension.

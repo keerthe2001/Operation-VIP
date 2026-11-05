@@ -3,6 +3,7 @@ import { AutofillCoordinator } from "@/background/autofill";
 import { AuthError, AuthManager } from "@/background/auth";
 import { ensureAllSitesScript } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
+import { ApplicationTracker } from "@/background/tracker";
 import { API_URL, WEB_URL } from "@/shared/config";
 import {
   contentMessageSchema,
@@ -11,7 +12,7 @@ import {
   type Reply,
 } from "@/shared/messages";
 import type { FillResult } from "@/shared/fields";
-import { chromeArea, DEFAULT_LOCAL, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
+import { appKey, chromeArea, DEFAULT_LOCAL, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
 import type { DetectedJob, TabState } from "@/shared/types";
 
 const local = chromeArea<LocalStore>(chrome.storage.local);
@@ -19,6 +20,7 @@ const session = chromeArea<SessionStore>(chrome.storage.session);
 const auth = new AuthManager(API_URL, local, session);
 const api = createApi(API_URL, auth);
 const profileSync = new ProfileSync(api, local);
+const tracker = new ApplicationTracker(api, session);
 const autofill = new AutofillCoordinator(local, session, api, async (tabId, frameId, instructions) => {
   const reply = (await chrome.tabs.sendMessage(tabId, { type: "FILL", instructions }, { frameId })) as
     | { ok: true; data: FillResult[] }
@@ -75,11 +77,12 @@ async function recordTab(tabId: number, frameId: number, url: string, job: Detec
   await session.set(tabEntry(tabId, state));
   await chrome.action.setBadgeText({ tabId, text: best?.isApplicationPage ? "●" : "" });
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#4f46e5" });
+  if (best?.isApplicationPage && (await auth.state()).status === "signed_in") void tracker.onDetected(tabId, best);
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   frameReports.delete(tabId);
-  void session.remove([tabKey(tabId), formKey(tabId)]);
+  void session.remove([tabKey(tabId), formKey(tabId), appKey(tabId)]);
 });
 
 // --------------------------------------------------------------------- messaging
@@ -108,18 +111,26 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       case "RESCAN_TAB":
         await chrome.tabs.sendMessage(message.tabId, { type: "ANALYZE_PAGE" }).catch(() => undefined);
         return { ok: true };
-      case "FILL_FIELDS":
-        return { ok: true, data: await autofill.fill(message.tabId, message.fields, message.overwrite) };
+      case "FILL_FIELDS": {
+        const summary = await autofill.fill(message.tabId, message.fields, message.overwrite);
+        const filled = (await autofill.state(message.tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;
+        void tracker.onFilled(message.tabId, (await session.get(tabKey(message.tabId)))?.job, filled);
+        return { ok: true, data: summary };
+      }
+      case "SET_APPLICATION_STATUS":
+        return { ok: true, data: await tracker.setStatus(message.tabId, message.status) };
       case "INSERT_ANSWER": {
         const result = await autofill.insertText(message.tabId, message.field, message.text);
         if (result.status === "filled") {
           const job = (await session.get(tabKey(message.tabId)))?.job;
+          const applicationId = (await tracker.get(message.tabId))?.id ?? null;
           // History only; a failure here must not affect the user's form.
           void api("/api/v1/answers/usages", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               saved_answer_id: message.savedAnswerId,
+              application_id: applicationId,
               question_text: message.question.slice(0, 500) || "Question",
               final_answer: message.text,
               source: message.savedAnswerId ? "library" : "manual",

@@ -9,9 +9,11 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, SessionDep, SettingsDep
 from app.db.models import Resume, TokenClient
 from app.schemas.answers import SavedAnswerRead
+from app.schemas.applications import ApplicationRead, DetectedApplication
 from app.schemas.extension import ExtensionProfile, HandoffResponse
 from app.schemas.resume import ResumeRead
 from app.services.answers import AnswerService
+from app.services.applications import ApplicationService
 from app.services.auth import AuthService
 from app.services.profile import ProfileService
 
@@ -58,3 +60,12 @@ async def handoff(user: CurrentUser, session: SessionDep, settings: SettingsDep)
     """
     issued = await AuthService(session, settings).issue_for(user, client=TokenClient.EXTENSION)
     return HandoffResponse(refresh_token=issued.refresh_token, user_id=user.id)
+
+
+@router.post("/detect-job", response_model=ApplicationRead)
+async def detect_job(
+    payload: DetectedApplication, user: CurrentUser, session: SessionDep
+) -> ApplicationRead:
+    """Track an application page the extension detected (idempotent per job URL)."""
+    application = await ApplicationService(session).record_detection(user.id, payload)
+    return ApplicationRead.model_validate(application)

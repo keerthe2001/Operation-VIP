@@ -223,3 +223,22 @@ describe("answer suggestions", () => {
     });
   });
 });
+
+describe("application tracking", () => {
+  it("shows the tracked status and lets the user mark it submitted", async () => {
+    const fake = installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: {
+        "tab:7": { url: job.url, job, analyzedAt: 1 },
+        "app:7": { id: "a1", url: job.url, status: "in_progress" },
+      },
+    });
+    render(<App />);
+    expect(await screen.findByText("In progress")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open tracker/ })).toHaveAttribute("href", "http://localhost:5173/applications?id=a1");
+    await userEvent.click(screen.getByRole("button", { name: /I submitted this application/ }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "SET_APPLICATION_STATUS", tabId: 7, status: "submitted" });
+    await fake.set("session", { "app:7": { id: "a1", url: job.url, status: "submitted" } });
+    expect(await screen.findByText("Marked as submitted")).toBeInTheDocument();
+  });
+});

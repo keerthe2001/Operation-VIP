@@ -7,6 +7,7 @@ import { vi } from "vitest";
 import { SessionStore } from "@/lib/auth/session";
 import { SKILL_CATEGORIES } from "@/lib/profile/form";
 import type { SavedAnswer, SavedAnswerInput } from "@/lib/answers/answer-service";
+import { STATUSES, type Application, type ApplicationCreate, type ApplicationStats, type ApplicationUpdate } from "@/lib/applications/application-service";
 import type { Profile, ProfileWrite } from "@/lib/profile/profile-service";
 import type { Resume } from "@/lib/resumes/resume-service";
 import { ServicesProvider, type Services } from "@/lib/services";
@@ -63,6 +64,7 @@ interface Options {
   resumes?: Resume[];
   extension?: { installed: boolean; signedIn: boolean };
   answers?: SavedAnswer[];
+  applications?: Application[];
 }
 
 export function renderApp(path: string, options: Options = {}) {
@@ -138,14 +140,61 @@ export function renderApp(path: string, options: Options = {}) {
     }),
   } satisfies Services["answers"];
 
+  let applicationState: Application[] = options.applications ?? [];
+  const statsFor = (): ApplicationStats => {
+    const by: Record<string, number> = Object.fromEntries(STATUSES.map((st) => [st, 0]));
+    for (const a of applicationState) by[a.status] = (by[a.status] ?? 0) + 1;
+    const submitted = (by.submitted ?? 0) + (by.interview ?? 0) + (by.offer ?? 0) + (by.rejected ?? 0);
+    const responses = (by.interview ?? 0) + (by.offer ?? 0) + (by.rejected ?? 0);
+    return {
+      total: applicationState.length, by_status: by, active: (by.detected ?? 0) + (by.in_progress ?? 0) + (by.ready_to_submit ?? 0),
+      submitted, responses, response_rate: submitted ? responses / submitted : null, this_week: applicationState.length,
+      weekly: Array.from({ length: 8 }, (_, i) => ({
+        week_start: new Date(Date.UTC(2026, 8, 14 + i * 7)).toISOString().slice(0, 10),
+        count: i === 7 ? applicationState.length : i % 3,
+      })),
+    };
+  };
+  const applications = {
+    list: vi.fn(async (filters: { status?: string; q?: string } = {}) =>
+      applicationState.filter(
+        (a) => (!filters.status || a.status === filters.status) && (!filters.q || `${a.company_name} ${a.job_title}`.toLowerCase().includes(filters.q.toLowerCase())),
+      ),
+    ),
+    get: vi.fn(async (id: string) => ({ ...applicationState.find((a) => a.id === id)!, resume_file_name: "jane.pdf", answers: [] })),
+    stats: vi.fn(async () => statsFor()),
+    create: vi.fn(async (input: ApplicationCreate) => {
+      const created = makeApplication({ id: `app${applicationState.length + 1}`, job_url: input.job_url, company_name: input.company_name ?? null, job_title: input.job_title ?? null, status: input.status ?? "in_progress", source: "manual" });
+      applicationState = [created, ...applicationState];
+      return created;
+    }),
+    update: vi.fn(async (id: string, input: ApplicationUpdate) => {
+      applicationState = applicationState.map((a) => (a.id === id ? ({ ...a, ...input } as Application) : a));
+      return applicationState.find((a) => a.id === id)!;
+    }),
+    remove: vi.fn(async (id: string) => {
+      applicationState = applicationState.filter((a) => a.id !== id);
+    }),
+  } satisfies Services["applications"];
+
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const utils = render(
-    <ServicesProvider services={{ session, auth, resumes, profile, extension, extensionBridge, answers }}>
+    <ServicesProvider services={{ session, auth, resumes, profile, extension, extensionBridge, answers, applications }}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </ServicesProvider>,
   );
-  return { ...utils, auth, resumes, profile, extension, extensionBridge, answers, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
+  return { ...utils, auth, resumes, profile, extension, extensionBridge, answers, applications, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
+}
+
+export function makeApplication(overrides: Partial<Application> = {}): Application {
+  return {
+    id: "app1", company_name: "Acme Corp", job_title: "Backend Engineer", job_url: "https://boards.greenhouse.io/acme/jobs/1",
+    portal: "greenhouse", job_description: null, notes: null, status: "in_progress",
+    status_history: [{ status: "detected", at: "2026-11-01T10:00:00Z", by: "extension" }], resume_id: null,
+    fields_detected: 10, fields_filled: 7, source: "extension", applied_at: null,
+    created_at: "2026-11-01T10:00:00Z", updated_at: "2026-11-02T10:00:00Z", ...overrides,
+  };
 }

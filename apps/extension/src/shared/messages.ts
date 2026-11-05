@@ -18,6 +18,7 @@ export const detectedJobSchema = z.object({
   confidence: z.number().min(0).max(1),
   signals: z.array(z.string().max(80)).max(30),
   fieldCount: z.number().int().min(0).max(5000),
+  description: z.string().max(20_000).nullable().optional(),
 });
 
 /** Messages sent by content scripts (sender.tab is required). */
@@ -47,6 +48,11 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
     text: z.string().min(1).max(20_000),
     question: z.string().max(500),
     savedAnswerId: z.string().uuid().nullable(),
+  }),
+  z.object({
+    type: z.literal("SET_APPLICATION_STATUS"),
+    tabId: z.number().int(),
+    status: z.enum(["detected", "in_progress", "ready_to_submit", "submitted", "interview", "offer", "rejected"]),
   }),
   z.object({
     type: z.literal("SAVE_ANSWER"),

@@ -250,6 +250,29 @@ try {
   }
   check(used === 1, "usage recorded on the server");
 
+  // 8c. Application tracking.
+  const listApplications = () =>
+    fetch(`${API}/api/v1/applications`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
+  let tracked = [];
+  for (let i = 0; i < 20 && !(tracked[0]?.status === "in_progress"); i++) {
+    tracked = await listApplications();
+    if (!(tracked[0]?.status === "in_progress")) await new Promise((r) => setTimeout(r, 250));
+  }
+  check(tracked.length === 1 && tracked[0].company_name === "Acme Corp", "application recorded in the tracker");
+  check(tracked[0].status === "in_progress" && tracked[0].fields_filled >= 8, `autofill moved it to in progress (${tracked[0].fields_filled} fields filled)`);
+  const detail = await fetch(`${API}/api/v1/applications/${tracked[0].id}`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
+  check(detail.answers.length === 1 && detail.resume_file_name === "priya_raman_resume.pdf", "inserted answer and resume version linked to the application");
+  await panel.getByRole("button", { name: /I submitted this application/ }).click();
+  await panel.getByText("Marked as submitted").waitFor();
+  check((await listApplications())[0].status === "submitted", "user marked the application submitted from the panel");
+  await page.goto(`${WEB}/applications`);
+  await page.getByText("Senior Backend Engineer").waitFor();
+  if (shots) await page.screenshot({ path: `${shots}/web-applications.png`, fullPage: true });
+  await page.getByText("Senior Backend Engineer").click();
+  await page.getByRole("dialog").getByText("Answers you inserted").waitFor();
+  if (shots) await page.screenshot({ path: `${shots}/web-application-detail.png` });
+  check(true, "web tracker shows the application with its timeline and answers");
+
   // 9. Embedded Greenhouse iframe on a company site.
   await context.route(COMPANY_URL, (route) => route.fulfill({ contentType: "text/html", body: COMPANY_HTML }));
   await context.route(EMBED_URL, (route) => route.fulfill({ contentType: "text/html", body: EMBED_HTML }));

@@ -3,6 +3,14 @@ import { clean } from "@/content/detection/text";
 export interface JobPostingData {
   title: string | null;
   company: string | null;
+  description: string | null;
+}
+
+/** Job descriptions in JSON-LD are HTML; keep readable plain text. */
+export function htmlToText(html: string, doc: Document): string {
+  const template = doc.createElement("template");
+  template.innerHTML = html.replace(/<\/(p|li|h\d|div)>|<br\s*\/?>/gi, "$&\n");
+  return (template.content.textContent ?? "").replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n\n").trim();
 }
 
 function* walk(node: unknown): Generator<Record<string, unknown>> {
@@ -30,7 +38,8 @@ export function readJobPosting(doc: Document): JobPostingData | null {
       if (!isPosting) continue;
       const org = item.hiringOrganization as Record<string, unknown> | string | undefined;
       const company = typeof org === "string" ? org : (org?.name as string | undefined);
-      return { title: clean(item.title as string | undefined), company: clean(company) };
+      const description = typeof item.description === "string" ? htmlToText(item.description, doc).slice(0, 20_000) : null;
+      return { title: clean(item.title as string | undefined), company: clean(company), description: description || null };
     }
   }
   return null;

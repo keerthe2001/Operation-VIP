@@ -14,6 +14,24 @@ export const ADAPTERS: PortalAdapter[] = [greenhouse, lever, workday, ashby, lin
 /** A page is reported as a job page from this confidence upwards. */
 export const JOB_THRESHOLD = 0.5;
 
+const DESCRIPTION_SELECTORS = [
+  "#content .job-post-content", "#content", ".job__description", // Greenhouse
+  "[data-qa='job-description']", ".posting-page .section-wrapper", // Lever
+  "[data-automation-id='jobPostingDescription']", // Workday
+  "[class*='descriptionText']", "[class*='job-description']", "[class*='jobDescription']", // Ashby / generic
+  ".jobs-description__content", // LinkedIn
+];
+
+function pageDescription(doc: Document): string | null {
+  for (const selector of DESCRIPTION_SELECTORS) {
+    const el = doc.querySelector(selector);
+    const text = (el as HTMLElement | null)?.innerText ?? el?.textContent ?? "";
+    const cleaned = text.replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n\n").trim();
+    if (cleaned.length >= 200) return cleaned.slice(0, 20_000);
+  }
+  return null;
+}
+
 /**
  * Generic detection with portal-specific adapters layered on top. Adapters only
  * improve title/company extraction and certainty; the generic signals (structured
@@ -75,5 +93,6 @@ export function detectJob(doc: Document, href: string): DetectedJob | null {
     confidence: Math.round(confidence * 100) / 100,
     signals,
     fieldCount: forms.fieldCount,
+    description: posting?.description ?? pageDescription(doc),
   };
 }

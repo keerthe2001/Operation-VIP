@@ -35,6 +35,8 @@ jobs:
       TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
+      - name: OCR engine (LibreOffice and ClamAV tests are skipped when not installed)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
