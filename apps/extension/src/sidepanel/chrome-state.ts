@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
+import type { FormState } from "@/shared/fields";
 import type { PanelMessage, Reply } from "@/shared/messages";
-import { DEFAULT_LOCAL, tabKey, type LocalStore } from "@/shared/storage";
+import { DEFAULT_LOCAL, formKey, tabKey, type LocalStore } from "@/shared/storage";
 import type { TabState } from "@/shared/types";
 
 /** Live value from chrome.storage.local. */
@@ -39,24 +40,26 @@ export function useActiveTabId(): number | null {
   return tabId;
 }
 
-export function useTabState(tabId: number | null): TabState | null {
-  const [state, setState] = useState<TabState | null>(null);
+function useSessionValue<T>(key: string | null): T | null {
+  const [state, setState] = useState<T | null>(null);
   useEffect(() => {
-    if (tabId === null) return;
-    const key = tabKey(tabId);
+    if (key === null) return;
     let active = true;
-    void chrome.storage.session.get(key).then((r) => active && setState((r[key] as TabState) ?? null));
+    void chrome.storage.session.get(key).then((r) => active && setState((r[key] as T) ?? null));
     const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === "session" && key in changes) setState((changes[key]!.newValue as TabState) ?? null);
+      if (area === "session" && key in changes) setState((changes[key]!.newValue as T) ?? null);
     };
     chrome.storage.onChanged.addListener(listener);
     return () => {
       active = false;
       chrome.storage.onChanged.removeListener(listener);
     };
-  }, [tabId]);
+  }, [key]);
   return state;
 }
+
+export const useTabState = (tabId: number | null) => useSessionValue<TabState>(tabId === null ? null : tabKey(tabId));
+export const useFormState = (tabId: number | null) => useSessionValue<FormState>(tabId === null ? null : formKey(tabId));
 
 export async function send<T = unknown>(message: PanelMessage): Promise<Reply<T>> {
   try {

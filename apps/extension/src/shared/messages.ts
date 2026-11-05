@@ -5,6 +5,8 @@
  */
 import { z } from "zod";
 
+import { fieldDescriptorSchema, FIELD_KINDS } from "@/shared/fields";
+
 const portal = z.enum(["greenhouse", "lever", "workday", "ashby", "linkedin", "generic"]);
 
 export const detectedJobSchema = z.object({
@@ -21,6 +23,7 @@ export const detectedJobSchema = z.object({
 /** Messages sent by content scripts (sender.tab is required). */
 export const contentMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PAGE_ANALYZED"), job: detectedJobSchema.nullable(), url: z.string().max(2048) }),
+  z.object({ type: z.literal("FIELDS_SCANNED"), url: z.string().max(2048), fields: z.array(fieldDescriptorSchema).max(300) }),
 ]);
 
 /** Messages sent by the side panel (an extension page). */
@@ -30,6 +33,13 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("SYNC_PROFILE"), force: z.boolean().optional() }),
   z.object({ type: z.literal("RESCAN_TAB"), tabId: z.number().int() }),
   z.object({ type: z.literal("ENABLE_ALL_SITES") }),
+  z.object({
+    type: z.literal("FILL_FIELDS"),
+    tabId: z.number().int(),
+    /** Field keys ("frameId:fieldId") to fill. */
+    fields: z.array(z.string().max(60)).max(300),
+    overwrite: z.boolean(),
+  }),
 ]);
 
 /** Messages accepted from the web app (externally_connectable). */
@@ -39,7 +49,20 @@ export const externalMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 /** Messages the background sends to content scripts. */
-export const toContentSchema = z.discriminatedUnion("type", [z.object({ type: z.literal("ANALYZE_PAGE") })]);
+const fillInstructionSchema = z.object({
+  id: z.string().max(40),
+  kind: z.enum(FIELD_KINDS),
+  value: z.string().max(20_000).nullable(),
+  optionValue: z.string().max(300).nullable(),
+  checked: z.boolean().optional(),
+  file: z.object({ name: z.string().max(255), type: z.string().max(127), base64: z.string().max(20_000_000) }).optional(),
+  overwrite: z.boolean(),
+});
+
+export const toContentSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("ANALYZE_PAGE") }),
+  z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300) }),
+]);
 
 export type ContentMessage = z.infer<typeof contentMessageSchema>;
 export type PanelMessage = z.infer<typeof panelMessageSchema>;

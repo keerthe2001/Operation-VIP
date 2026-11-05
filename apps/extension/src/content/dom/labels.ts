@@ -4,7 +4,9 @@ export type FormControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectEle
 
 /** Finds the human-readable label for a form control using the usual HTML patterns. */
 export function labelFor(el: Element): string {
-  const doc = el.ownerDocument;
+  // Fields inside a shadow root are labelled by elements in that same root.
+  const root = el.getRootNode() as Document | ShadowRoot;
+  const doc = typeof root.getElementById === "function" ? root : el.ownerDocument;
   const labelledBy = el.getAttribute("aria-labelledby");
   if (labelledBy) {
     const joined = labelledBy

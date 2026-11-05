@@ -1,3 +1,4 @@
+import type { FormState } from "@/shared/fields";
 import type { AuthState, ExtensionProfile, SyncState, TabState } from "@/shared/types";
 
 /**
@@ -18,9 +19,17 @@ export interface SessionStore {
   accessToken: string | null;
   accessExpiresAt: number | null;
   [tabKey: `tab:${number}`]: TabState | undefined;
+  [formKey: `form:${number}`]: FormState | undefined;
 }
 
 export const tabKey = (tabId: number) => `tab:${tabId}` as const;
+export const formKey = (tabId: number) => `form:${tabId}` as const;
+
+// Computed keys widen to `string` in TypeScript; these keep session writes typed.
+export const tabEntry = (tabId: number, state: TabState): Partial<SessionStore> =>
+  ({ [tabKey(tabId)]: state }) as unknown as Partial<SessionStore>;
+export const formEntry = (tabId: number, state: FormState): Partial<SessionStore> =>
+  ({ [formKey(tabId)]: state }) as unknown as Partial<SessionStore>;
 
 export const DEFAULT_LOCAL: LocalStore = {
   refreshToken: null,

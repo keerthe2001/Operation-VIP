@@ -86,3 +86,68 @@ describe("side panel", () => {
     expect(fake.sendMessage).toHaveBeenCalledWith({ type: "ENABLE_ALL_SITES" });
   });
 });
+
+describe("smart autofill section", () => {
+  function mapped(id: string, label: string, status: string, value: string | null, extra: Record<string, unknown> = {}) {
+    return {
+      id, frameId: 0, kind: "text", label, name: "", htmlId: "", placeholder: "", autocomplete: "", helpText: "",
+      required: false, options: [], currentValue: "", accept: "", maxLength: null, key: status === "unmapped" ? null : "k",
+      confidence: status === "auto" ? 0.97 : 0.7, status, value, optionValue: null, ...extra,
+    };
+  }
+  const form = {
+    url: job.url,
+    updatedAt: 1,
+    fields: [
+      mapped("f1", "First Name", "auto", "Priya"),
+      mapped("f2", "Email", "auto", "priya@example.com"),
+      mapped("f3", "Will you require sponsorship?", "review", "No"),
+      mapped("f4", "Phone", "missing", null, { required: true }),
+      mapped("f5", "Why do you want to work at Acme?", "question", null, { kind: "textarea", required: true }),
+      mapped("f6", "How did you hear about us?", "unmapped", null),
+    ],
+  };
+
+  async function renderWithForm() {
+    const fake = installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: { "tab:7": { url: job.url, job, analyzedAt: 1 }, "form:7": form },
+    });
+    render(<App />);
+    await screen.findByText("Smart autofill");
+    return fake;
+  }
+
+  it("shows counts and fills only high-confidence fields with Autofill", async () => {
+    const fake = await renderWithForm();
+    expect(screen.getByText("Detected").nextSibling).toHaveTextContent("6");
+    expect(screen.getByText("Application progress")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Autofill 2 fields" }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FILL_FIELDS", tabId: 7, fields: ["0:f1", "0:f2"], overwrite: false });
+  });
+
+  it("lets the user review, approve medium-confidence fields and exclude others", async () => {
+    const fake = await renderWithForm();
+    await userEvent.click(screen.getByRole("button", { name: "Review & fill" }));
+    expect(screen.getByText("Missing from your profile")).toBeInTheDocument();
+    expect(screen.getByText("Questions to answer")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText(/Will you require sponsorship/));
+    await userEvent.click(screen.getByLabelText(/^Email/));
+    await userEvent.click(screen.getByLabelText("Replace values already on the page"));
+    await userEvent.click(screen.getByRole("button", { name: "Fill selected (2)" }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FILL_FIELDS", tabId: 7, fields: ["0:f1", "0:f3"], overwrite: true });
+  });
+
+  it("shows the fill summary and per-field results", async () => {
+    const fake = await renderWithForm();
+    await fake.set("session", {
+      "form:7": {
+        ...form,
+        lastFill: { at: 2, filled: 2, skipped: 0, failed: 0 },
+        fields: form.fields.map((f) => (f.status === "auto" ? { ...f, result: "filled", currentValue: f.value } : f)),
+      },
+    });
+    expect(await screen.findByText(/Filled 2 fields\. Review the form, then submit it yourself\./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Everything ready is filled" })).toBeDisabled();
+  });
+});

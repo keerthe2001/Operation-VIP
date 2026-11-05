@@ -1,4 +1,5 @@
 import { createApi } from "@/background/api";
+import { AutofillCoordinator } from "@/background/autofill";
 import { AuthError, AuthManager } from "@/background/auth";
 import { ensureAllSitesScript } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
@@ -9,7 +10,8 @@ import {
   panelMessageSchema,
   type Reply,
 } from "@/shared/messages";
-import { chromeArea, DEFAULT_LOCAL, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
+import type { FillResult } from "@/shared/fields";
+import { chromeArea, DEFAULT_LOCAL, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
 import type { DetectedJob, TabState } from "@/shared/types";
 
 const local = chromeArea<LocalStore>(chrome.storage.local);
@@ -17,6 +19,23 @@ const session = chromeArea<SessionStore>(chrome.storage.session);
 const auth = new AuthManager(API_URL, local, session);
 const api = createApi(API_URL, auth);
 const profileSync = new ProfileSync(api, local);
+const autofill = new AutofillCoordinator(local, session, api, async (tabId, frameId, instructions) => {
+  const reply = (await chrome.tabs.sendMessage(tabId, { type: "FILL", instructions }, { frameId })) as
+    | { ok: true; data: FillResult[] }
+    | { ok: false; error: string }
+    | undefined;
+  if (!reply?.ok) throw new Error(reply && !reply.ok ? reply.error : "No response from page");
+  return reply.data;
+});
+
+// Keep every open form's mapping current when the profile changes.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !("profile" in changes)) return;
+  void chrome.storage.session.get(null).then((all) => {
+    const tabIds = Object.keys(all).filter((k) => k.startsWith("form:")).map((k) => Number(k.slice(5)));
+    return autofill.remapAll(tabIds);
+  });
+});
 
 const SYNC_ALARM = "profile-sync";
 
@@ -53,14 +72,14 @@ async function recordTab(tabId: number, frameId: number, url: string, job: Detec
     .filter((j): j is DetectedJob => j !== null)
     .sort((a, b) => Number(b.isApplicationPage) - Number(a.isApplicationPage) || b.confidence - a.confidence)[0];
   const state: TabState = { url, job: best ?? null, analyzedAt: Date.now() };
-  await session.set({ [tabKey(tabId)]: state });
+  await session.set(tabEntry(tabId, state));
   await chrome.action.setBadgeText({ tabId, text: best?.isApplicationPage ? "●" : "" });
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#4f46e5" });
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   frameReports.delete(tabId);
-  void session.remove([tabKey(tabId)]);
+  void session.remove([tabKey(tabId), formKey(tabId)]);
 });
 
 // --------------------------------------------------------------------- messaging
@@ -89,6 +108,8 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       case "RESCAN_TAB":
         await chrome.tabs.sendMessage(message.tabId, { type: "ANALYZE_PAGE" }).catch(() => undefined);
         return { ok: true };
+      case "FILL_FIELDS":
+        return { ok: true, data: await autofill.fill(message.tabId, message.fields, message.overwrite) };
       case "ENABLE_ALL_SITES": {
         const enabled = await ensureAllSitesScript();
         await local.set({ allSitesEnabled: enabled });
@@ -109,8 +130,12 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
   const fromExtensionPage = sender.url?.startsWith(chrome.runtime.getURL("")) ?? false;
   if (!fromExtensionPage && sender.tab?.id !== undefined) {
     const parsed = contentMessageSchema.safeParse(raw);
-    if (parsed.success) {
-      void recordTab(sender.tab.id, sender.frameId ?? 0, sender.tab.url ?? parsed.data.url, parsed.data.job);
+    if (!parsed.success) return false;
+    const frameId = sender.frameId ?? 0;
+    if (parsed.data.type === "PAGE_ANALYZED") {
+      void recordTab(sender.tab.id, frameId, sender.tab.url ?? parsed.data.url, parsed.data.job);
+    } else {
+      void autofill.onFieldsScanned(sender.tab.id, frameId, sender.tab.url ?? parsed.data.url, parsed.data.fields);
     }
     return false;
   }
