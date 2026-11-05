@@ -1,0 +1,14 @@
+{
+  "name": "operation-vip",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev:web": "pnpm --filter @copilot/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "api-types": "cd backend && uv run python -m scripts.export_openapi ../packages/api-types/openapi.json && cd .. && pnpm --filter @copilot/api-types generate"
+  }
+}
