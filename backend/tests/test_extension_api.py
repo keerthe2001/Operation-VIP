@@ -53,6 +53,10 @@ async def test_extension_endpoints_require_auth(client: AsyncClient):
 async def test_etag_changes_when_only_list_items_change(client: AsyncClient):
     headers = await auth_headers(client)
     etag = (await client.get("/api/v1/extension/profile", headers=headers)).headers["etag"]
-    await client.patch("/api/v1/profile", headers=headers, json={"experience": [{"company_name": "Acme"}]})
-    again = await client.get("/api/v1/extension/profile", headers={**headers, "If-None-Match": etag})
+    await client.patch(
+        "/api/v1/profile", headers=headers, json={"experience": [{"company_name": "Acme"}]}
+    )
+    again = await client.get(
+        "/api/v1/extension/profile", headers={**headers, "If-None-Match": etag}
+    )
     assert again.status_code == 200
