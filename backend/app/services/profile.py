@@ -5,6 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
+from app.db.base import utcnow
 from app.db.models import (
     Certification,
     Education,
@@ -133,6 +134,8 @@ class ProfileService:
         profile.skills = data.skills.model_dump(mode="json")
         profile.additional_info = data.additional_info.model_dump(mode="json")
         profile.field_meta = {k: v.model_dump(mode="json") for k, v in data.field_meta.items()}
+        # Child rows change without touching this row; bump explicitly (extension ETag uses it).
+        profile.updated_at = utcnow()
         for attr, (model, _schema) in ITEM_MODELS.items():
             await self.session.execute(delete(model).where(model.profile_id == profile.id))
             items = getattr(data, attr)

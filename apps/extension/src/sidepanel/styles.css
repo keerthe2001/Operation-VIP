@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "@copilot/ui/styles.css";
+
+@source "../../../../packages/ui/src";
+@source "./";
+
+body {
+  min-width: 300px;
+}

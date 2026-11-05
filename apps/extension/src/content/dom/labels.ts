@@ -1,0 +1,30 @@
+import { text } from "@/content/dom/visibility";
+
+export type FormControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+/** Finds the human-readable label for a form control using the usual HTML patterns. */
+export function labelFor(el: Element): string {
+  const doc = el.ownerDocument;
+  const labelledBy = el.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const joined = labelledBy
+      .split(/\s+/)
+      .map((id) => text(doc.getElementById(id)))
+      .filter(Boolean)
+      .join(" ");
+    if (joined) return joined;
+  }
+  const aria = el.getAttribute("aria-label");
+  if (aria?.trim()) return aria.trim();
+  if (el.id) {
+    const explicit = doc.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+    if (explicit && text(explicit)) return text(explicit);
+  }
+  const wrapping = el.closest("label");
+  if (wrapping && text(wrapping)) return text(wrapping);
+  // Common pattern: <div><label>Name</label><input></div> without for/id.
+  const container = el.closest("div, li, fieldset, p");
+  const sibling = container?.querySelector("label, legend, .label, [class*='label']");
+  if (sibling && !sibling.contains(el) && text(sibling)) return text(sibling);
+  return el.getAttribute("placeholder")?.trim() || el.getAttribute("name") || "";
+}

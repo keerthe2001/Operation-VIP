@@ -491,6 +491,36 @@
         "title": "ExperienceItem",
         "type": "object"
       },
+      "ExtensionProfile": {
+        "description": "Everything the extension needs to fill forms, fetched in one request.",
+        "properties": {
+          "primary_resume": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResumeRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileRead"
+          },
+          "synced_at": {
+            "format": "date-time",
+            "title": "Synced At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile",
+          "primary_resume",
+          "synced_at"
+        ],
+        "title": "ExtensionProfile",
+        "type": "object"
+      },
       "FieldMeta": {
         "properties": {
           "confidence": {
@@ -534,6 +564,25 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HandoffResponse": {
+        "properties": {
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token",
+          "user_id"
+        ],
+        "title": "HandoffResponse",
         "type": "object"
       },
       "HealthResponse": {
@@ -2003,6 +2052,63 @@
         "summary": "Register",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/extension/handoff": {
+      "post": {
+        "description": "Issue an extension session for the signed-in web user.\n\nThe web app passes the returned refresh token straight to the extension through\nChrome's `externally_connectable` messaging; it is never stored by the web app.",
+        "operationId": "handoff_api_v1_extension_handoff_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Handoff",
+        "tags": [
+          "extension"
+        ]
+      }
+    },
+    "/api/v1/extension/profile": {
+      "get": {
+        "description": "Profile + primary resume. Supports `If-None-Match` so polling is cheap.",
+        "operationId": "extension_profile_api_v1_extension_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Unchanged"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Extension Profile",
+        "tags": [
+          "extension"
         ]
       }
     },

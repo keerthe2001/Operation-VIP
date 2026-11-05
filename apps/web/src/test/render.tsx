@@ -60,6 +60,7 @@ interface Options {
   authenticated?: boolean;
   profile?: Profile;
   resumes?: Resume[];
+  extension?: { installed: boolean; signedIn: boolean };
 }
 
 export function renderApp(path: string, options: Options = {}) {
@@ -108,14 +109,20 @@ export function renderApp(path: string, options: Options = {}) {
     importResume: vi.fn(async () => profileState),
   } satisfies Services["profile"];
 
+  const extension = { handoffToken: vi.fn(async () => "refresh-token-for-extension-xxxxxxxx") } satisfies Services["extension"];
+  const extensionBridge = {
+    status: vi.fn(async () => options.extension ?? { installed: false, signedIn: false }),
+    connect: vi.fn(async () => ({ ok: true })),
+  } satisfies Services["extensionBridge"];
+
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const utils = render(
-    <ServicesProvider services={{ session, auth, resumes, profile }}>
+    <ServicesProvider services={{ session, auth, resumes, profile, extension, extensionBridge }}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </ServicesProvider>,
   );
-  return { ...utils, auth, resumes, profile, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
+  return { ...utils, auth, resumes, profile, extension, extensionBridge, session, router, setResumes: (r: Resume[]) => (resumeState = r) };
 }

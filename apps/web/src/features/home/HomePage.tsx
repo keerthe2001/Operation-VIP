@@ -2,6 +2,7 @@ import { Alert, Badge, Button, Card, CardContent, CardDescription, CardHeader, C
 import { ArrowRight, Check, Circle, FileText, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 
+import { useExtensionStatus } from "@/features/extension/queries";
 import { useProfile } from "@/features/profile/queries";
 import { useResumes } from "@/features/resumes/queries";
 import { ResumeDropzone } from "@/features/resumes/ResumeDropzone";
@@ -16,6 +17,7 @@ export function HomePage() {
   const processing = !!latest && isProcessing(latest.status);
   const profile = useProfile();
   const firstName = user?.full_name?.split(" ")[0];
+  const extension = useExtensionStatus();
 
   if (resumes.isPending) {
     return (
@@ -135,6 +137,24 @@ export function HomePage() {
               <Link to="/resumes">Manage resumes</Link>
             </Button>
           </CardContent>
+          <div className="border-t" />
+          <CardHeader>
+            <CardTitle>Browser extension</CardTitle>
+            <CardDescription>
+              {extension.data?.signedIn
+                ? "Connected. Open the side panel on any job application."
+                : extension.data?.installed
+                  ? "Installed but not connected to this account."
+                  : "Fills applications on Greenhouse, Lever, Workday, Ashby, LinkedIn and more."}
+            </CardDescription>
+          </CardHeader>
+          {!extension.data?.signedIn && (
+            <CardContent>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/extension/connect">{extension.data?.installed ? "Connect extension" : "Set up extension"}</Link>
+              </Button>
+            </CardContent>
+          )}
         </Card>
       </div>
     </div>

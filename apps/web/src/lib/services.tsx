@@ -3,6 +3,8 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import { createApiClient } from "@/lib/api/client";
 import { AuthService } from "@/lib/auth/auth-service";
 import { SessionStore, type SessionState } from "@/lib/auth/session";
+import { chromeBridge, type ExtensionBridge } from "@/lib/extension/bridge";
+import { ExtensionService } from "@/lib/extension/extension-service";
 import { ProfileService } from "@/lib/profile/profile-service";
 import { ResumeService } from "@/lib/resumes/resume-service";
 
@@ -13,6 +15,8 @@ export interface Services {
   auth: Pick<AuthService, "login" | "register" | "logout" | "restore">;
   resumes: PublicMethods<ResumeService>;
   profile: PublicMethods<ProfileService>;
+  extension: PublicMethods<ExtensionService>;
+  extensionBridge: ExtensionBridge;
 }
 
 export function createServices(origin: string = window.location.origin): Services {
@@ -23,6 +27,8 @@ export function createServices(origin: string = window.location.origin): Service
     auth: new AuthService(client, session, refresh, origin),
     resumes: new ResumeService(client, session, refresh, origin),
     profile: new ProfileService(client),
+    extension: new ExtensionService(client),
+    extensionBridge: chromeBridge,
   };
 }
 

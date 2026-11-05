@@ -69,6 +69,12 @@ class AuthService:
         await self.session.commit()
         return issued
 
+    async def issue_for(self, user: User, *, client: TokenClient) -> IssuedTokens:
+        """Start a new session (token family) for an already-authenticated user."""
+        issued = await self._issue(user, client=client, family_id=uuid.uuid4())
+        await self.session.commit()
+        return issued
+
     async def refresh(self, raw_token: str) -> IssuedTokens:
         now = datetime.now(UTC)
         token = await self.tokens.get_by_hash_for_update(hash_refresh_token(raw_token))

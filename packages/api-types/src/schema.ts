@@ -89,6 +89,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handoff
+         * @description Issue an extension session for the signed-in web user.
+         *
+         *     The web app passes the returned refresh token straight to the extension through
+         *     Chrome's `externally_connectable` messaging; it is never stored by the web app.
+         */
+        post: operations["handoff_api_v1_extension_handoff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Extension Profile
+         * @description Profile + primary resume. Supports `If-None-Match` so polling is cheap.
+         */
+        get: operations["extension_profile_api_v1_extension_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -411,6 +454,19 @@ export interface components {
              */
             technologies: string[];
         };
+        /**
+         * ExtensionProfile
+         * @description Everything the extension needs to fill forms, fetched in one request.
+         */
+        ExtensionProfile: {
+            primary_resume: components["schemas"]["ResumeRead"] | null;
+            profile: components["schemas"]["ProfileRead"];
+            /**
+             * Synced At
+             * Format: date-time
+             */
+            synced_at: string;
+        };
         /** FieldMeta */
         FieldMeta: {
             /** Confidence */
@@ -427,6 +483,16 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HandoffResponse */
+        HandoffResponse: {
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -1075,6 +1141,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    handoff_api_v1_extension_handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffResponse"];
+                };
+            };
+        };
+    };
+    extension_profile_api_v1_extension_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtensionProfile"];
+                };
+            };
+            /** @description Unchanged */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
