@@ -1,6 +1,528 @@
 {
   "components": {
     "schemas": {
+      "AdditionalInfo": {
+        "description": "Answers to common application questions that resumes rarely contain.",
+        "properties": {
+          "current_salary": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Salary"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "expected_salary": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Salary"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "languages": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
+          },
+          "notice_period": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Period"
+          },
+          "preferred_locations": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferred Locations",
+            "type": "array"
+          },
+          "pronouns": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pronouns"
+          },
+          "requires_sponsorship": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Sponsorship"
+          },
+          "willing_to_relocate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Willing To Relocate"
+          },
+          "work_authorization": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Authorization"
+          }
+        },
+        "title": "AdditionalInfo",
+        "type": "object"
+      },
+      "Body_upload_resume_api_v1_resumes_upload_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PDF, DOC, DOCX, PNG or JPG",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_resume_api_v1_resumes_upload_post",
+        "type": "object"
+      },
+      "CertificationItem": {
+        "properties": {
+          "certification_name": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certification Name"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "credential_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Url"
+          },
+          "is_confirmed": {
+            "default": false,
+            "title": "Is Confirmed",
+            "type": "boolean"
+          },
+          "issue_date": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}(-\\d{2})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Date"
+          },
+          "issuing_organization": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuing Organization"
+          }
+        },
+        "title": "CertificationItem",
+        "type": "object"
+      },
+      "CompletionItem": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "done",
+          "weight"
+        ],
+        "title": "CompletionItem",
+        "type": "object"
+      },
+      "DocumentClass": {
+        "enum": [
+          "text_pdf",
+          "scanned_pdf",
+          "image",
+          "docx",
+          "doc"
+        ],
+        "title": "DocumentClass",
+        "type": "string"
+      },
+      "EducationItem": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "degree": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degree"
+          },
+          "grade": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
+          "graduation_year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 1900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graduation Year"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
+          },
+          "is_confirmed": {
+            "default": false,
+            "title": "Is Confirmed",
+            "type": "boolean"
+          },
+          "specialization": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialization"
+          },
+          "start_year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 1900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Year"
+          }
+        },
+        "title": "EducationItem",
+        "type": "object"
+      },
+      "ExperienceItem": {
+        "properties": {
+          "achievements": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Achievements",
+            "type": "array"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation"
+          },
+          "employment_type": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employment Type"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}(-\\d{2})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "is_confirmed": {
+            "default": false,
+            "title": "Is Confirmed",
+            "type": "boolean"
+          },
+          "is_current": {
+            "default": false,
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "responsibilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Responsibilities",
+            "type": "array"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}(-\\d{2})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "technologies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Technologies",
+            "type": "array"
+          }
+        },
+        "title": "ExperienceItem",
+        "type": "object"
+      },
+      "FieldMeta": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "is_confirmed": {
+            "default": false,
+            "title": "Is Confirmed",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "confidence"
+        ],
+        "title": "FieldMeta",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -67,6 +589,612 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "PersonalInformation": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "github": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Github"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "linkedin": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio"
+          }
+        },
+        "title": "PersonalInformation",
+        "type": "object"
+      },
+      "ProfessionalSummary": {
+        "properties": {
+          "current_designation": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Designation"
+          },
+          "employment_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "employed",
+                  "not_employed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employment Status"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "total_experience_years": {
+            "anyOf": [
+              {
+                "maximum": 70.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Experience Years"
+          }
+        },
+        "title": "ProfessionalSummary",
+        "type": "object"
+      },
+      "ProfileCompletion": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "integer"
+          },
+          "sections": {
+            "additionalProperties": {
+              "enum": [
+                "complete",
+                "incomplete",
+                "missing"
+              ],
+              "type": "string"
+            },
+            "title": "Sections",
+            "type": "object"
+          },
+          "unconfirmed_fields": {
+            "title": "Unconfirmed Fields",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "percentage",
+          "sections",
+          "items",
+          "unconfirmed_fields"
+        ],
+        "title": "ProfileCompletion",
+        "type": "object"
+      },
+      "ProfilePatch": {
+        "description": "Partial update: only the provided top-level sections are replaced.",
+        "properties": {
+          "additional_info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Info"
+          },
+          "certifications": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certifications"
+          },
+          "education": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Education"
+          },
+          "experience": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experience"
+          },
+          "field_meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Meta"
+          },
+          "personal_information": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Personal Information"
+          },
+          "professional_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Professional Summary"
+          },
+          "projects": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projects"
+          },
+          "skills": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skills"
+          }
+        },
+        "title": "ProfilePatch",
+        "type": "object"
+      },
+      "ProfileRead": {
+        "properties": {
+          "additional_info": {
+            "$ref": "#/components/schemas/AdditionalInfo",
+            "default": {
+              "languages": [],
+              "preferred_locations": []
+            }
+          },
+          "certifications": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CertificationItem"
+            },
+            "title": "Certifications",
+            "type": "array"
+          },
+          "completion": {
+            "$ref": "#/components/schemas/ProfileCompletion"
+          },
+          "education": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EducationItem"
+            },
+            "title": "Education",
+            "type": "array"
+          },
+          "experience": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExperienceItem"
+            },
+            "title": "Experience",
+            "type": "array"
+          },
+          "field_meta": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldMeta"
+            },
+            "default": {},
+            "title": "Field Meta",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "personal_information": {
+            "$ref": "#/components/schemas/PersonalInformation",
+            "default": {}
+          },
+          "professional_summary": {
+            "$ref": "#/components/schemas/ProfessionalSummary",
+            "default": {}
+          },
+          "projects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProjectItem"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "skills": {
+            "$ref": "#/components/schemas/Skills",
+            "default": {
+              "ai_ml": [],
+              "cloud": [],
+              "databases": [],
+              "frameworks": [],
+              "other": [],
+              "programming_languages": [],
+              "soft_skills": [],
+              "tools": []
+            }
+          },
+          "source_resume_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Resume Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source_resume_id",
+          "updated_at",
+          "completion"
+        ],
+        "title": "ProfileRead",
+        "type": "object"
+      },
+      "ProfileWrite": {
+        "description": "Full profile as edited by the user (PUT replaces everything).",
+        "properties": {
+          "additional_info": {
+            "$ref": "#/components/schemas/AdditionalInfo",
+            "default": {
+              "languages": [],
+              "preferred_locations": []
+            }
+          },
+          "certifications": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CertificationItem"
+            },
+            "title": "Certifications",
+            "type": "array"
+          },
+          "education": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EducationItem"
+            },
+            "title": "Education",
+            "type": "array"
+          },
+          "experience": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExperienceItem"
+            },
+            "title": "Experience",
+            "type": "array"
+          },
+          "field_meta": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldMeta"
+            },
+            "default": {},
+            "title": "Field Meta",
+            "type": "object"
+          },
+          "personal_information": {
+            "$ref": "#/components/schemas/PersonalInformation",
+            "default": {}
+          },
+          "professional_summary": {
+            "$ref": "#/components/schemas/ProfessionalSummary",
+            "default": {}
+          },
+          "projects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProjectItem"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "skills": {
+            "$ref": "#/components/schemas/Skills",
+            "default": {
+              "ai_ml": [],
+              "cloud": [],
+              "databases": [],
+              "frameworks": [],
+              "other": [],
+              "programming_languages": [],
+              "soft_skills": [],
+              "tools": []
+            }
+          }
+        },
+        "title": "ProfileWrite",
+        "type": "object"
+      },
+      "ProjectItem": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_confirmed": {
+            "default": false,
+            "title": "Is Confirmed",
+            "type": "boolean"
+          },
+          "outcomes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "technologies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Technologies",
+            "type": "array"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "ProjectItem",
+        "type": "object"
+      },
       "RefreshRequest": {
         "description": "Extension clients send the refresh token in the body; web clients use the cookie.",
         "properties": {
@@ -126,6 +1254,389 @@
           "password"
         ],
         "title": "RegisterRequest",
+        "type": "object"
+      },
+      "ResumeDetail": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doc_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "extracted_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Data"
+          },
+          "extracted_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Text"
+          },
+          "extraction_meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Meta"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResumeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "file_name",
+          "mime_type",
+          "size_bytes",
+          "doc_class",
+          "status",
+          "error_code",
+          "error_message",
+          "page_count",
+          "is_primary",
+          "created_at",
+          "processed_at",
+          "extracted_text",
+          "extracted_data",
+          "extraction_meta"
+        ],
+        "title": "ResumeDetail",
+        "type": "object"
+      },
+      "ResumeRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doc_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResumeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "file_name",
+          "mime_type",
+          "size_bytes",
+          "doc_class",
+          "status",
+          "error_code",
+          "error_message",
+          "page_count",
+          "is_primary",
+          "created_at",
+          "processed_at"
+        ],
+        "title": "ResumeRead",
+        "type": "object"
+      },
+      "ResumeStatus": {
+        "enum": [
+          "uploaded",
+          "scanning",
+          "extracting",
+          "parsing",
+          "ready",
+          "failed"
+        ],
+        "title": "ResumeStatus",
+        "type": "string"
+      },
+      "ResumeStatusRead": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResumeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "error_code",
+          "error_message",
+          "processed_at"
+        ],
+        "title": "ResumeStatusRead",
+        "type": "object"
+      },
+      "Skills": {
+        "properties": {
+          "ai_ml": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Ai Ml",
+            "type": "array"
+          },
+          "cloud": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Cloud",
+            "type": "array"
+          },
+          "databases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Databases",
+            "type": "array"
+          },
+          "frameworks": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Frameworks",
+            "type": "array"
+          },
+          "other": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Other",
+            "type": "array"
+          },
+          "programming_languages": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Programming Languages",
+            "type": "array"
+          },
+          "soft_skills": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Soft Skills",
+            "type": "array"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "title": "Skills",
         "type": "object"
       },
       "TokenResponse": {
@@ -475,6 +1986,495 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "operationId": "get_profile_api_v1_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Profile",
+        "tags": [
+          "profile"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_profile_api_v1_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Patch Profile",
+        "tags": [
+          "profile"
+        ]
+      },
+      "put": {
+        "operationId": "replace_profile_api_v1_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace Profile",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/v1/profile/completion": {
+      "get": {
+        "operationId": "get_completion_api_v1_profile_completion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCompletion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Completion",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/v1/profile/import/{resume_id}": {
+      "post": {
+        "description": "Replace the profile with the data extracted from one of the user's resumes.",
+        "operationId": "import_from_resume_api_v1_profile_import__resume_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import From Resume",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/v1/resumes": {
+      "get": {
+        "operationId": "list_resumes_api_v1_resumes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumeRead"
+                  },
+                  "title": "Response List Resumes Api V1 Resumes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Resumes",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/v1/resumes/upload": {
+      "post": {
+        "operationId": "upload_resume_api_v1_resumes_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_v1_resumes_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/v1/resumes/{resume_id}": {
+      "delete": {
+        "operationId": "delete_resume_api_v1_resumes__resume_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Resume",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "get": {
+        "operationId": "get_resume_api_v1_resumes__resume_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/v1/resumes/{resume_id}/file": {
+      "get": {
+        "operationId": "download_resume_api_v1_resumes__resume_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/v1/resumes/{resume_id}/process": {
+      "post": {
+        "operationId": "reprocess_resume_api_v1_resumes__resume_id__process_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reprocess Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/v1/resumes/{resume_id}/status": {
+      "get": {
+        "operationId": "get_resume_status_api_v1_resumes__resume_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resume_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resume Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeStatusRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Resume Status",
+        "tags": [
+          "resumes"
         ]
       }
     }

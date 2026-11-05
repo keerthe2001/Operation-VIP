@@ -1,4 +1,5 @@
-# Local development stack. Object storage (S3-compatible) is added in Phase 1.
+# Local development stack. Resume files use a local volume; set STORAGE_BACKEND=s3
+# (plus S3_* variables) to use any S3-compatible service instead.
 # Usage (from repo root):
 #   cp infra/.env.example infra/.env   # then set JWT_SECRET
 #   docker compose -f infra/docker-compose.yml up --build
@@ -36,6 +37,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in infra/.env}
       COOKIE_SECURE: "true"
+      RESUME_PROCESSING_MODE: queue
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_ROOT: /data/storage
+    volumes: [resume-files:/data/storage]
     ports: ["${API_PORT:-8000}:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -46,5 +51,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Processes uploaded resumes (text extraction, OCR, parsing) off the request path.
+  worker:
+    build: ../backend
+    command: ["arq", "app.workers.resume_worker.WorkerSettings"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+asyncpg://copilot:copilot@postgres:5432/copilot
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in infra/.env}
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_ROOT: /data/storage
+    volumes: [resume-files:/data/storage]
+    depends_on:
+      api: { condition: service_healthy }
+
 volumes:
   postgres-data:
+  resume-files:

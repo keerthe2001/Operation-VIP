@@ -26,7 +26,7 @@ describe("authentication flow", () => {
     await userEvent.type(screen.getByLabelText("Password"), "correct-horse-battery");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("heading", { name: "Welcome, Jane" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Welcome, Jane/ })).toBeInTheDocument();
     expect(auth.login).toHaveBeenCalledWith({ email: "jane@example.com", password: "correct-horse-battery" });
     expect(router.state.location.pathname).toBe("/");
   });
@@ -71,7 +71,7 @@ describe("authentication flow", () => {
 
   it("keeps authenticated users away from the login page", async () => {
     const { router } = renderApp("/login", { authenticated: true });
-    expect(await screen.findByText("Getting started")).toBeInTheDocument();
+    expect(await screen.findByText("Drag and drop your resume here")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
   });
 });

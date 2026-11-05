@@ -13,7 +13,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
-RUN useradd --create-home --uid 10001 app && chown -R app /app
+RUN useradd --create-home --uid 10001 app && mkdir -p /data/storage && chown -R app /app /data/storage
 USER app
 
 ENV PATH="/app/.venv/bin:$PATH"

@@ -106,10 +106,323 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_api_v1_profile_get"];
+        /** Replace Profile */
+        put: operations["replace_profile_api_v1_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Profile */
+        patch: operations["patch_profile_api_v1_profile_patch"];
+        trace?: never;
+    };
+    "/api/v1/profile/completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Completion */
+        get: operations["get_completion_api_v1_profile_completion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/import/{resume_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import From Resume
+         * @description Replace the profile with the data extracted from one of the user's resumes.
+         */
+        post: operations["import_from_resume_api_v1_profile_import__resume_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Resumes */
+        get: operations["list_resumes_api_v1_resumes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Resume */
+        post: operations["upload_resume_api_v1_resumes_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/{resume_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume */
+        get: operations["get_resume_api_v1_resumes__resume_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Resume */
+        delete: operations["delete_resume_api_v1_resumes__resume_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/{resume_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Resume */
+        get: operations["download_resume_api_v1_resumes__resume_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/{resume_id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reprocess Resume */
+        post: operations["reprocess_resume_api_v1_resumes__resume_id__process_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/{resume_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume Status */
+        get: operations["get_resume_status_api_v1_resumes__resume_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AdditionalInfo
+         * @description Answers to common application questions that resumes rarely contain.
+         */
+        AdditionalInfo: {
+            /** Current Salary */
+            current_salary?: string | null;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Expected Salary */
+            expected_salary?: string | null;
+            /** Gender */
+            gender?: string | null;
+            /**
+             * Languages
+             * @default []
+             */
+            languages: string[];
+            /** Nationality */
+            nationality?: string | null;
+            /** Notice Period */
+            notice_period?: string | null;
+            /**
+             * Preferred Locations
+             * @default []
+             */
+            preferred_locations: string[];
+            /** Pronouns */
+            pronouns?: string | null;
+            /** Requires Sponsorship */
+            requires_sponsorship?: boolean | null;
+            /** Willing To Relocate */
+            willing_to_relocate?: boolean | null;
+            /** Work Authorization */
+            work_authorization?: string | null;
+        };
+        /** Body_upload_resume_api_v1_resumes_upload_post */
+        Body_upload_resume_api_v1_resumes_upload_post: {
+            /**
+             * File
+             * @description PDF, DOC, DOCX, PNG or JPG
+             */
+            file: string;
+        };
+        /** CertificationItem */
+        CertificationItem: {
+            /** Certification Name */
+            certification_name?: string | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Credential Url */
+            credential_url?: string | null;
+            /**
+             * Is Confirmed
+             * @default false
+             */
+            is_confirmed: boolean;
+            /** Issue Date */
+            issue_date?: string | null;
+            /** Issuing Organization */
+            issuing_organization?: string | null;
+        };
+        /** CompletionItem */
+        CompletionItem: {
+            /** Done */
+            done: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /**
+         * DocumentClass
+         * @enum {string}
+         */
+        DocumentClass: "text_pdf" | "scanned_pdf" | "image" | "docx" | "doc";
+        /** EducationItem */
+        EducationItem: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Degree */
+            degree?: string | null;
+            /** Grade */
+            grade?: string | null;
+            /** Graduation Year */
+            graduation_year?: number | null;
+            /** Institution */
+            institution?: string | null;
+            /**
+             * Is Confirmed
+             * @default false
+             */
+            is_confirmed: boolean;
+            /** Specialization */
+            specialization?: string | null;
+            /** Start Year */
+            start_year?: number | null;
+        };
+        /** ExperienceItem */
+        ExperienceItem: {
+            /**
+             * Achievements
+             * @default []
+             */
+            achievements: string[];
+            /** Company Name */
+            company_name?: string | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Designation */
+            designation?: string | null;
+            /** Employment Type */
+            employment_type?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /**
+             * Is Confirmed
+             * @default false
+             */
+            is_confirmed: boolean;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
+            /** Location */
+            location?: string | null;
+            /**
+             * Responsibilities
+             * @default []
+             */
+            responsibilities: string[];
+            /** Start Date */
+            start_date?: string | null;
+            /**
+             * Technologies
+             * @default []
+             */
+            technologies: string[];
+        };
+        /** FieldMeta */
+        FieldMeta: {
+            /** Confidence */
+            confidence: number;
+            /**
+             * Is Confirmed
+             * @default false
+             */
+            is_confirmed: boolean;
+            /** Source */
+            source?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -140,6 +453,245 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** PersonalInformation */
+        PersonalInformation: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Github */
+            github?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Linkedin */
+            linkedin?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Portfolio */
+            portfolio?: string | null;
+        };
+        /** ProfessionalSummary */
+        ProfessionalSummary: {
+            /** Current Designation */
+            current_designation?: string | null;
+            /** Employment Status */
+            employment_status?: ("employed" | "not_employed") | null;
+            /** Summary */
+            summary?: string | null;
+            /** Total Experience Years */
+            total_experience_years?: number | null;
+        };
+        /** ProfileCompletion */
+        ProfileCompletion: {
+            /** Items */
+            items: components["schemas"]["CompletionItem"][];
+            /** Percentage */
+            percentage: number;
+            /** Sections */
+            sections: {
+                [key: string]: "complete" | "incomplete" | "missing";
+            };
+            /** Unconfirmed Fields */
+            unconfirmed_fields: number;
+        };
+        /**
+         * ProfilePatch
+         * @description Partial update: only the provided top-level sections are replaced.
+         */
+        ProfilePatch: {
+            /** Additional Info */
+            additional_info?: {
+                [key: string]: unknown;
+            } | null;
+            /** Certifications */
+            certifications?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Education */
+            education?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Experience */
+            experience?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Field Meta */
+            field_meta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Personal Information */
+            personal_information?: {
+                [key: string]: unknown;
+            } | null;
+            /** Professional Summary */
+            professional_summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Projects */
+            projects?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Skills */
+            skills?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ProfileRead */
+        ProfileRead: {
+            /**
+             * @default {
+             *       "languages": [],
+             *       "preferred_locations": []
+             *     }
+             */
+            additional_info: components["schemas"]["AdditionalInfo"];
+            /**
+             * Certifications
+             * @default []
+             */
+            certifications: components["schemas"]["CertificationItem"][];
+            completion: components["schemas"]["ProfileCompletion"];
+            /**
+             * Education
+             * @default []
+             */
+            education: components["schemas"]["EducationItem"][];
+            /**
+             * Experience
+             * @default []
+             */
+            experience: components["schemas"]["ExperienceItem"][];
+            /**
+             * Field Meta
+             * @default {}
+             */
+            field_meta: {
+                [key: string]: components["schemas"]["FieldMeta"];
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** @default {} */
+            personal_information: components["schemas"]["PersonalInformation"];
+            /** @default {} */
+            professional_summary: components["schemas"]["ProfessionalSummary"];
+            /**
+             * Projects
+             * @default []
+             */
+            projects: components["schemas"]["ProjectItem"][];
+            /**
+             * @default {
+             *       "ai_ml": [],
+             *       "cloud": [],
+             *       "databases": [],
+             *       "frameworks": [],
+             *       "other": [],
+             *       "programming_languages": [],
+             *       "soft_skills": [],
+             *       "tools": []
+             *     }
+             */
+            skills: components["schemas"]["Skills"];
+            /** Source Resume Id */
+            source_resume_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * ProfileWrite
+         * @description Full profile as edited by the user (PUT replaces everything).
+         */
+        ProfileWrite: {
+            /**
+             * @default {
+             *       "languages": [],
+             *       "preferred_locations": []
+             *     }
+             */
+            additional_info: components["schemas"]["AdditionalInfo"];
+            /**
+             * Certifications
+             * @default []
+             */
+            certifications: components["schemas"]["CertificationItem"][];
+            /**
+             * Education
+             * @default []
+             */
+            education: components["schemas"]["EducationItem"][];
+            /**
+             * Experience
+             * @default []
+             */
+            experience: components["schemas"]["ExperienceItem"][];
+            /**
+             * Field Meta
+             * @default {}
+             */
+            field_meta: {
+                [key: string]: components["schemas"]["FieldMeta"];
+            };
+            /** @default {} */
+            personal_information: components["schemas"]["PersonalInformation"];
+            /** @default {} */
+            professional_summary: components["schemas"]["ProfessionalSummary"];
+            /**
+             * Projects
+             * @default []
+             */
+            projects: components["schemas"]["ProjectItem"][];
+            /**
+             * @default {
+             *       "ai_ml": [],
+             *       "cloud": [],
+             *       "databases": [],
+             *       "frameworks": [],
+             *       "other": [],
+             *       "programming_languages": [],
+             *       "soft_skills": [],
+             *       "tools": []
+             *     }
+             */
+            skills: components["schemas"]["Skills"];
+        };
+        /** ProjectItem */
+        ProjectItem: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Confirmed
+             * @default false
+             */
+            is_confirmed: boolean;
+            /**
+             * Outcomes
+             * @default []
+             */
+            outcomes: string[];
+            /** Project Name */
+            project_name?: string | null;
+            /** Role */
+            role?: string | null;
+            /**
+             * Technologies
+             * @default []
+             */
+            technologies: string[];
+            /** Url */
+            url?: string | null;
+        };
         /**
          * RefreshRequest
          * @description Extension clients send the refresh token in the body; web clients use the cookie.
@@ -165,6 +717,141 @@ export interface components {
             full_name?: string | null;
             /** Password */
             password: string;
+        };
+        /** ResumeDetail */
+        ResumeDetail: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            doc_class: components["schemas"]["DocumentClass"] | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Extracted Data */
+            extracted_data: {
+                [key: string]: unknown;
+            } | null;
+            /** Extracted Text */
+            extracted_text: string | null;
+            /** Extraction Meta */
+            extraction_meta: {
+                [key: string]: unknown;
+            } | null;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Primary */
+            is_primary: boolean;
+            /** Mime Type */
+            mime_type: string;
+            /** Page Count */
+            page_count: number | null;
+            /** Processed At */
+            processed_at: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["ResumeStatus"];
+        };
+        /** ResumeRead */
+        ResumeRead: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            doc_class: components["schemas"]["DocumentClass"] | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Primary */
+            is_primary: boolean;
+            /** Mime Type */
+            mime_type: string;
+            /** Page Count */
+            page_count: number | null;
+            /** Processed At */
+            processed_at: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["ResumeStatus"];
+        };
+        /**
+         * ResumeStatus
+         * @enum {string}
+         */
+        ResumeStatus: "uploaded" | "scanning" | "extracting" | "parsing" | "ready" | "failed";
+        /** ResumeStatusRead */
+        ResumeStatusRead: {
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Processed At */
+            processed_at: string | null;
+            status: components["schemas"]["ResumeStatus"];
+        };
+        /** Skills */
+        Skills: {
+            /**
+             * Ai Ml
+             * @default []
+             */
+            ai_ml: string[];
+            /**
+             * Cloud
+             * @default []
+             */
+            cloud: string[];
+            /**
+             * Databases
+             * @default []
+             */
+            databases: string[];
+            /**
+             * Frameworks
+             * @default []
+             */
+            frameworks: string[];
+            /**
+             * Other
+             * @default []
+             */
+            other: string[];
+            /**
+             * Programming Languages
+             * @default []
+             */
+            programming_languages: string[];
+            /**
+             * Soft Skills
+             * @default []
+             */
+            soft_skills: string[];
+            /**
+             * Tools
+             * @default []
+             */
+            tools: string[];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -393,6 +1080,347 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_profile_api_v1_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileRead"];
+                };
+            };
+        };
+    };
+    replace_profile_api_v1_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_profile_api_v1_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_completion_api_v1_profile_completion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileCompletion"];
+                };
+            };
+        };
+    };
+    import_from_resume_api_v1_profile_import__resume_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_resumes_api_v1_resumes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeRead"][];
+                };
+            };
+        };
+    };
+    upload_resume_api_v1_resumes_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_resume_api_v1_resumes_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_api_v1_resumes__resume_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_api_v1_resumes__resume_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_resume_api_v1_resumes__resume_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reprocess_resume_api_v1_resumes__resume_id__process_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_status_api_v1_resumes__resume_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeStatusRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

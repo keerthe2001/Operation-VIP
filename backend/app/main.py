@@ -10,6 +10,8 @@ from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db.session import Database
+from app.resume_pipeline.pipeline import ResumeProcessor
+from app.storage.factory import create_storage
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -19,6 +21,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
+        pool = getattr(app.state, "arq_pool", None)
+        if pool is not None:
+            await pool.aclose()
         await app.state.redis.aclose()
         await app.state.db.dispose()
 
@@ -32,6 +37,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db = Database(settings.database_url)
     app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.storage = create_storage(settings)
+    app.state.resume_processor = ResumeProcessor(
+        app.state.db.sessionmaker, app.state.storage, settings
+    )
 
     app.add_middleware(RequestContextMiddleware)
     if settings.cors_origins:

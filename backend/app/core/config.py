@@ -31,6 +31,24 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = []
 
     rate_limit_auth_per_minute: int = Field(default=10, ge=1)
+    rate_limit_upload_per_minute: int = Field(default=10, ge=1)
+
+    # File storage: "local" (directory on disk) or "s3" (any S3-compatible service).
+    storage_backend: Literal["local", "s3"] = "local"
+    storage_local_root: str = "./var/storage"
+    s3_bucket: str = "copilot-resumes"
+    s3_endpoint_url: str | None = None
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+
+    # Resume processing: "inline" runs after the response in the API process (dev),
+    # "queue" hands the job to the arq worker (production).
+    resume_processing_mode: Literal["inline", "queue"] = "inline"
+    max_upload_mb: int = Field(default=10, ge=1, le=50)
+    # Pluggable engines (see docs/architecture.md). Only rule-based engines exist today.
+    resume_parser: Literal["rules"] = "rules"
+    default_phone_region: str = "US"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -3,16 +3,27 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import { createApiClient } from "@/lib/api/client";
 import { AuthService } from "@/lib/auth/auth-service";
 import { SessionStore, type SessionState } from "@/lib/auth/session";
+import { ProfileService } from "@/lib/profile/profile-service";
+import { ResumeService } from "@/lib/resumes/resume-service";
+
+type PublicMethods<T> = { [K in keyof T as T[K] extends (...args: never[]) => unknown ? K : never]: T[K] };
 
 export interface Services {
   session: SessionStore;
   auth: Pick<AuthService, "login" | "register" | "logout" | "restore">;
+  resumes: PublicMethods<ResumeService>;
+  profile: PublicMethods<ProfileService>;
 }
 
 export function createServices(origin: string = window.location.origin): Services {
   const session = new SessionStore();
   const { client, refresh } = createApiClient(session, origin);
-  return { session, auth: new AuthService(client, session, refresh, origin) };
+  return {
+    session,
+    auth: new AuthService(client, session, refresh, origin),
+    resumes: new ResumeService(client, session, refresh, origin),
+    profile: new ProfileService(client),
+  };
 }
 
 const ServicesContext = createContext<Services | null>(null);

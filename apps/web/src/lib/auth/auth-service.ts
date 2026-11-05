@@ -1,26 +1,11 @@
 import type { LoginRequest, RegisterRequest, UserRead } from "@copilot/api-types";
 
 import type { ApiClient } from "@/lib/api/client";
-import { networkError, toApiError } from "@/lib/api/errors";
+import { call } from "@/lib/api/call";
 import type { SessionStore } from "@/lib/auth/session";
 
 type Credentials = Pick<LoginRequest, "email" | "password">;
 type Registration = Pick<RegisterRequest, "email" | "password" | "full_name">;
-
-async function call<T>(
-  request: () => Promise<{ data?: T; error?: unknown; response: Response }>,
-): Promise<T> {
-  let result: Awaited<ReturnType<typeof request>>;
-  try {
-    result = await request();
-  } catch {
-    throw networkError();
-  }
-  if (result.error !== undefined || result.data === undefined) {
-    throw toApiError(result.error, result.response);
-  }
-  return result.data;
-}
 
 /** Authentication use-cases. UI components call these; they never call the API directly. */
 export class AuthService {

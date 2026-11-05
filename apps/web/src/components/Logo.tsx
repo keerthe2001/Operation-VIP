@@ -1,4 +1,4 @@
-export function Logo({ withText = true }: { withText?: boolean }) {
+export function Logo({ withText = true, textClassName }: { withText?: boolean; textClassName?: string }) {
   return (
     <span className="inline-flex items-center gap-2 font-semibold tracking-tight">
       <span className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
@@ -6,7 +6,7 @@ export function Logo({ withText = true }: { withText?: boolean }) {
           <path d="M8 17.5l5 5 11-12" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      {withText && <span>Copilot</span>}
+      {withText && <span className={textClassName}>Copilot</span>}
     </span>
   );
 }
