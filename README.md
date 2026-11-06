@@ -55,7 +55,7 @@ docs/                 Architecture, API, testing
 
 ```bash
 # 1. Services
-cp infra/.env.example infra/.env            # set JWT_SECRET
+cp infra/.env.example infra/.env            # set JWT_SECRET (Compose checks it even for postgres/redis)
 docker compose -f infra/docker-compose.yml up -d postgres redis
 
 # 2. API (processes resumes in-process by default)
