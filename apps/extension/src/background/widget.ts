@@ -12,7 +12,7 @@ export function readyKeys(fields: MappedField[]): string[] {
   return fields.filter((f) => f.status === "auto" && !hasValue(f)).map((f) => `${f.frameId}:${f.id}`);
 }
 
-function quickProfile(data: ExtensionProfile | null): WidgetState["profile"] {
+export function quickProfile(data: ExtensionProfile | null): WidgetState["profile"] {
   if (!data) return [];
   const { profile } = data;
   const p = profile.personal_information;

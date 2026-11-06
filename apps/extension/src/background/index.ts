@@ -49,7 +49,6 @@ chrome.runtime.onInstalled.addListener(async () => {
       await local.set({ [key]: value } as Partial<LocalStore>);
     }
   }
-  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
   await chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 30 });
 });
 
@@ -85,6 +84,7 @@ async function recordTab(tabId: number, frameId: number, url: string, job: Detec
 chrome.tabs.onRemoved.addListener((tabId) => {
   frameReports.delete(tabId);
   void session.remove([tabKey(tabId), formKey(tabId), appKey(tabId)]);
+  void chrome.storage.session.remove(`embed:${tabId}`);
 });
 
 /**
@@ -113,6 +113,30 @@ async function forceScan(tabId: number): Promise<Reply> {
   }
 }
 
+/** Codes for the panel embedded in each tab's drawer (only our drawer script gets them). Kept in
+ * session storage because the service worker can be stopped between requests. */
+const embedKey = (tabId: number) => `embed:${tabId}`;
+
+// The toolbar icon opens the drawer on the current page, and closes it on the next click.
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id === undefined) return;
+  const tabId = tab.id;
+  void (async () => {
+    try {
+      await chrome.tabs.sendMessage(tabId, { type: "WIDGET_TOGGLE" }, { frameId: 0 });
+    } catch {
+      // Not on this page yet (a site outside the job portals): the click grants access.
+      try {
+        await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] });
+        await chrome.scripting.executeScript({ target: { tabId }, files: ["widget.js"] });
+        await chrome.tabs.sendMessage(tabId, { type: "WIDGET_TOGGLE" }, { frameId: 0 });
+      } catch {
+        // Browser pages (chrome://, the Web Store) can't host the drawer.
+      }
+    }
+  })();
+});
+
 /** Requests from the floating in-page assistant. */
 async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<unknown>> {
   const parsed = widgetMessageSchema.safeParse(raw);
@@ -139,10 +163,11 @@ async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<u
         const saved = await tracker.save(tabId, job);
         return saved ? { ok: true, data: saved } : { ok: false, error: "Couldn't save the job. Are you signed in?" };
       }
-      case "WIDGET_OPEN_PANEL":
-        // Allowed because the click in the page is a user gesture.
-        await chrome.sidePanel.open({ tabId, windowId: tab.windowId });
-        return { ok: true };
+      case "WIDGET_EMBED": {
+        const nonce = crypto.randomUUID();
+        await chrome.storage.session.set({ [embedKey(tabId)]: nonce });
+        return { ok: true, data: { tabId, nonce } };
+      }
       case "WIDGET_THEME":
         await local.set({ theme: message.theme });
         return { ok: true };
@@ -187,6 +212,17 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         return { ok: true };
       case "FORCE_SCAN":
         return await forceScan(message.tabId);
+      case "VERIFY_EMBED":
+        return { ok: true, data: (await chrome.storage.session.get(embedKey(message.tabId)))[embedKey(message.tabId)] === message.nonce };
+      case "SAVE_JOB": {
+        const job = (await session.get(tabKey(message.tabId)))?.job;
+        if (!job) return { ok: false, error: "No job on this page." };
+        const saved = await tracker.save(message.tabId, job);
+        return saved ? { ok: true, data: saved } : { ok: false, error: "Couldn't save. Are you signed in?" };
+      }
+      case "COLLAPSE_EMBED":
+        await chrome.tabs.sendMessage(message.tabId, { type: "WIDGET_COLLAPSE" }, { frameId: 0 }).catch(() => undefined);
+        return { ok: true };
       case "SET_THEME":
         await local.set({ theme: message.theme });
         return { ok: true };
@@ -257,7 +293,8 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
 
   // Extension pages (side panel, or the panel opened in a tab) are identified by
   // their URL; anything else with a tab is a content script running in a web page.
-  const fromExtensionPage = sender.url?.startsWith(chrome.runtime.getURL("")) ?? false;
+  // (The panel embedded in a page's drawer has a per-session extension address, so match the scheme.)
+  const fromExtensionPage = sender.url?.startsWith("chrome-extension://") ?? false;
   if (!fromExtensionPage && sender.tab?.id !== undefined) {
     const parsed = contentMessageSchema.safeParse(raw);
     if (!parsed.success) {

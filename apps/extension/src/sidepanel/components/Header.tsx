@@ -1,5 +1,7 @@
 import { Button, cn } from "@copilot/ui";
-import { Settings } from "lucide-react";
+import { ChevronsRight, Moon, Settings, Sun } from "lucide-react";
+
+import { send, useLocal } from "@/sidepanel/chrome-state";
 
 import { Logo } from "@/sidepanel/components/Logo";
 import type { SyncState, UserRead } from "@/shared/types";
@@ -18,8 +20,21 @@ function initials(user: UserRead) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
-export function Header({ user, sync, onSettings }: { user: UserRead; sync: SyncState; onSettings: () => void }) {
+export function Header({
+  user,
+  sync,
+  onSettings,
+  onClose,
+}: {
+  user: UserRead;
+  sync: SyncState;
+  onSettings: () => void;
+  /** Shown when the panel is docked in the page: collapses it to the edge tab. */
+  onClose?: () => void;
+}) {
   const status = STATUS[sync.state];
+  const theme = useLocal("theme");
+  const dark = document.documentElement.classList.contains("dark");
   return (
     <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/90 px-4 py-3 backdrop-blur">
       <Logo />
@@ -30,9 +45,25 @@ export function Header({ user, sync, onSettings }: { user: UserRead; sync: SyncS
       <span className="grid size-7 place-items-center rounded-full bg-secondary text-[11px] font-medium" title={user.email}>
         {initials(user)}
       </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        aria-label={dark ? "Light theme" : "Dark theme"}
+        title={dark ? "Light theme" : "Dark theme"}
+        data-theme={theme}
+        onClick={() => send({ type: "SET_THEME", theme: dark ? "light" : "dark" })}
+      >
+        {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+      </Button>
       <Button variant="ghost" size="icon" className="size-8" onClick={onSettings} aria-label="Settings">
         <Settings aria-hidden="true" />
       </Button>
+      {onClose && (
+        <Button variant="ghost" size="icon" className="size-8" onClick={onClose} aria-label="Close" title="Close">
+          <ChevronsRight aria-hidden="true" />
+        </Button>
+      )}
     </header>
   );
 }

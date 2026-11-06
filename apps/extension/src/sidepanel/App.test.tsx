@@ -276,3 +276,24 @@ describe("job description", () => {
     expect(await screen.findByText("No job description found on this page.")).toBeInTheDocument();
   });
 });
+
+describe("panel tabs and embedding", () => {
+  it("shows the job match and profile values", async () => {
+    installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: { "tab:7": { url: job.url, job: { ...job, description: "Location: Bengaluru. 3+ years of experience with Python, Kubernetes and Snowflake." }, analyzedAt: 1 } },
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: /Match/ }));
+    expect(screen.getByText("Snowflake")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Profile/ }));
+    expect(screen.getByRole("button", { name: "Copy Current title" })).toBeInTheDocument();
+  });
+
+  it("switches the theme from the header", async () => {
+    const fake = installFakeChrome({ local: { auth: { status: "signed_in", user }, profile } });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /theme$/ }));
+    expect(fake.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "SET_THEME" }));
+  });
+});

@@ -384,40 +384,44 @@ try {
   await panel.getByText(/Filled 1 field/).waitFor();
   check((await weak.inputValue("input[type=email]")) === "priya.raman@example.com", "\"Fill this page anyway\" fills an unrecognised form");
 
-  // 10c. Floating assistant: a bubble on job postings, auto-open + one-click fill on forms.
+  // 10c. In-page drawer with the full Copilot panel (no Chrome side panel).
   const widget = (p) => p.locator("copilot-assistant");
+  const panelIn = (p) => widget(p).locator("iframe").contentFrame();
+  const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
+  check(!manifest.side_panel && !manifest.permissions.includes("sidePanel"), "Chrome's side panel is gone; the drawer is the only panel");
   await context.route(NAUKRI_URL, (route) => route.fulfill({ contentType: "text/html", body: NAUKRI_HTML }));
   const naukri = await context.newPage();
   await naukri.goto(NAUKRI_URL);
   const bubble = widget(naukri).getByRole("button", { name: "Open Copilot" });
   await bubble.waitFor({ timeout: 15000 });
-  check(true, "assistant edge tab shown on a Naukri job posting");
+  check(true, "edge tab shown on a Naukri job posting");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-bubble.png` });
   await bubble.click();
   await widget(naukri).locator(".drawer.open").waitFor();
+  await panelIn(naukri).getByRole("heading", { name: "Data Scientist" }).waitFor({ timeout: 15000 });
   await naukri.waitForTimeout(400); // slide-in animation
   const drawer = await widget(naukri).locator(".drawer").boundingBox();
   const viewport = naukri.viewportSize();
-  check(Math.round(drawer.x + drawer.width) === viewport.width && Math.round(drawer.height) === viewport.height, "drawer slides in full-height from the right edge");
+  check(Math.round(drawer.x + drawer.width) === viewport.width && Math.round(drawer.height) === viewport.height, "drawer docks full-height on the right with the Copilot panel inside");
   const pageWidth = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
   check(Math.abs(pageWidth - (viewport.width - 380)) < 2, `page shrinks to make room for the drawer (${pageWidth}px)`);
-  await widget(naukri).getByRole("tab", { name: /Match/ }).click();
-  await widget(naukri).getByText(/^Missing \(/).waitFor();
-  const missingSkills = await widget(naukri).locator(".pill.warn").allInnerTexts();
-  check(missingSkills.includes("Snowflake"), `job match lists skills missing from the profile (${missingSkills.join(", ")})`);
+  await panelIn(naukri).getByRole("tab", { name: /Match/ }).click();
+  await panelIn(naukri).getByText(/^Missing \(/).waitFor();
+  check(await panelIn(naukri).getByText("Snowflake").isVisible(), "Match tab lists skills missing from the profile");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
-  await widget(naukri).getByRole("tab", { name: /Autofill/ }).click();
-  await widget(naukri).getByRole("button", { name: "Save job" }).click();
-  await widget(naukri).getByText("Saved", { exact: true }).first().waitFor();
-  check(true, "job saved to the tracker from the assistant");
-  // Theme switch, then close and drag the edge tab down; it stays on the edge and remembers it.
-  await widget(naukri).getByRole("button", { name: /theme$/ }).click();
+  await panelIn(naukri).getByRole("tab", { name: /Autofill/ }).click();
+  await panelIn(naukri).getByRole("tab", { name: /Autofill/, selected: true }).waitFor();
+  await panelIn(naukri).getByRole("button", { name: "Save job" }).click();
+  await panelIn(naukri).getByText(/^Tracked/).waitFor();
+  check(true, "job saved to the tracker from the panel");
+  await panelIn(naukri).getByRole("button", { name: /theme$/ }).click();
   const theme = await worker.evaluate(async () => (await chrome.storage.local.get("theme")).theme);
   check(theme === "light" || theme === "dark", `theme switch saved (${theme})`);
-  await widget(naukri).getByRole("button", { name: "Close", exact: true }).click();
-  await widget(naukri).locator(".drawer.open").waitFor({ state: "detached" });
+  // The panel's close button collapses the drawer to the edge tab.
+  await panelIn(naukri).getByRole("button", { name: "Close", exact: true }).click();
+  await bubble.waitFor();
   const restored = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
-  check(Math.abs(restored - viewport.width) < 2, "page returns to full width when the drawer closes");
+  check(Math.abs(restored - viewport.width) < 2, "close collapses it and the page returns to full width");
   const box = await bubble.boundingBox();
   await naukri.mouse.move(box.x + 20, box.y + 20);
   await naukri.mouse.down();
@@ -426,19 +430,36 @@ try {
   const tabBox = await bubble.boundingBox();
   const savedY = await worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.y);
   check(Math.round(tabBox.x + tabBox.width) === viewport.width && Math.abs(savedY - tabBox.y) < 2 && savedY > box.y, "edge tab drags vertically, stays on the edge, position saved");
+  // Toolbar icon: the same toggle message the icon's click handler sends.
+  const naukriTab = await worker.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, NAUKRI_URL);
+  const toggle = (tabId) => worker.evaluate(async (id) => chrome.tabs.sendMessage(id, { type: "WIDGET_TOGGLE" }, { frameId: 0 }), tabId);
+  await toggle(naukriTab);
+  await widget(naukri).locator(".drawer.open").waitFor();
+  await toggle(naukriTab);
+  await bubble.waitFor();
+  check(true, "toolbar icon opens the drawer, and closes it on the next click");
+  // Another website can't load the panel without the drawer's one-time code.
+  const forged = await naukri.evaluate(async (base) => {
+    const frame = document.createElement("iframe");
+    frame.src = `${base}sidepanel/index.html?tab=1&embed=1&nonce=guess`;
+    document.body.append(frame);
+    await new Promise((r) => setTimeout(r, 1500));
+    try { return frame.contentDocument?.body?.innerText ?? "blocked"; } catch { return "blocked"; }
+  }, `chrome-extension://${extensionId}/`);
+  check(forged === "blocked" || !/Autofill|Profile/.test(forged), "other websites can't embed the panel");
 
   await context.route(WIDGET_FORM_URL, (route) => route.fulfill({ contentType: "text/html", body: WIDGET_FORM_HTML }));
   const form = await context.newPage();
   await form.goto(WIDGET_FORM_URL);
-  const fillButton = widget(form).getByRole("button", { name: /^Autofill \d+ fields$/ });
+  const fillButton = panelIn(form).getByRole("button", { name: /^Autofill \d+ fields$/ });
   await fillButton.waitFor({ timeout: 15000 });
   if (shots) await form.screenshot({ path: `${shots}/widget-autofill.png` });
   await fillButton.click();
-  await widget(form).getByText(/^Filled \d+$/).waitFor();
+  await panelIn(form).getByText(/Filled \d+ fields/).waitFor();
   const formValues = await form.evaluate(() => ["a", "b", "c", "d", "e", "f"].map((id) => document.getElementById(id).value));
   check(
     formValues[0] === "Priya" && formValues[2] === "priya.raman@example.com" && formValues[4] !== "" && formValues[5] !== "",
-    `assistant opened by itself and filled the form in one click (${formValues.join(" | ")})`,
+    `drawer opened by itself on the form and filled it (${formValues.join(" | ")})`,
   );
   if (shots) await form.screenshot({ path: `${shots}/widget-filled.png` });
 
@@ -447,16 +468,17 @@ try {
   await context.route(ACCOUNT_URL, (route) => route.fulfill({ contentType: "text/html", body: ACCOUNT_HTML }));
   const account = await context.newPage();
   await account.goto(ACCOUNT_URL);
-  const accountFill = widget(account).getByRole("button", { name: /^Autofill \d+ fields$/ });
+  const accountFill = panelIn(account).getByRole("button", { name: /^Autofill \d+ fields$/ });
   await accountFill.waitFor({ timeout: 15000 });
   await accountFill.click();
-  await widget(account).getByText(/^Filled \d+$/).waitFor();
+  await panelIn(account).getByText(/Filled \d+ fields/).waitFor();
   const creds = await account.evaluate(() => [document.getElementById("em").value, document.getElementById("pw").value, document.getElementById("pw2").value]);
   check(creds[0] === "priya.raman@example.com" && creds[1] === "Str0ng!Pass" && creds[2] === "Str0ng!Pass", "create-account page: email and both password boxes filled");
   const shellRight = await account.evaluate(() => document.getElementById("shell").getBoundingClientRect().right);
   check(Math.abs(shellRight - (account.viewportSize().width - 380)) < 2, `full-screen app layer (Workday-style) moves out from under the drawer (right edge ${shellRight})`);
   const sessionDump = await worker.evaluate(async () => JSON.stringify(await chrome.storage.session.get(null)));
   check(!sessionDump.includes("Str0ng!Pass"), "the password never lands in the tab state");
+  if (shots) await account.screenshot({ path: `${shots}/widget-account.png` });
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

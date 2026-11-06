@@ -79,11 +79,8 @@ function WidgetSettings() {
   const autoId = useId();
   return (
     <section className="grid gap-2">
-      <h2 className="text-sm font-semibold">Floating assistant</h2>
-      <p className="text-xs text-muted-foreground">
-        A small Copilot button on job pages. Drag it anywhere; it docks to the nearest side. Click it to autofill, check your
-        match or copy profile details.
-      </p>
+      <h2 className="text-sm font-semibold">Copilot tab on pages</h2>
+      <p className="text-xs text-muted-foreground">The tab on the right edge opens this panel. The toolbar icon opens it on any page.</p>
       <label htmlFor={modeId} className="text-xs font-medium">
         Show it
       </label>
@@ -103,7 +100,7 @@ function WidgetSettings() {
           checked={widget.autoOpen}
           onChange={(e) => send({ type: "SET_WIDGET_PREFS", prefs: { autoOpen: e.target.checked } })}
         />
-        Open it automatically when an application form is found
+        Open automatically on application forms
       </label>
       {widget.hiddenHosts.length > 0 && (
         <Button

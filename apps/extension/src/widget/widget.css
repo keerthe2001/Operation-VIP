@@ -139,3 +139,6 @@ svg { flex-shrink: 0; }
 .copy-row:hover { background: var(--surface); }
 .copy-row .row-sub { white-space: nowrap; }
 .copy-icon { color: var(--muted); }
+
+.panel-frame { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: var(--bg); color-scheme: normal; }
+.loading { flex: 1; display: grid; place-items: center; color: var(--accent); }

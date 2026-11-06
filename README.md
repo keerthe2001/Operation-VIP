@@ -34,7 +34,7 @@ an interface so AI can be added later (see [`docs/architecture.md`](docs/archite
 ```
 backend/              FastAPI API, resume pipeline, arq worker, Alembic, tests
 apps/web/             React web app (profile, resumes, answers, applications)
-apps/extension/       Chrome MV3 extension (background, content script, side panel)
+apps/extension/       Chrome MV3 extension (background, content script, in-page drawer panel)
 packages/ui/          Shared shadcn/ui components and design tokens
 packages/shared/      Shared logic (answer matching and templates)
 packages/api-types/   TypeScript types generated from the OpenAPI schema

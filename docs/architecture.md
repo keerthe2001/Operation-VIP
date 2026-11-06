@@ -222,7 +222,8 @@ Saved answers with `{company}`, `{job_title}`, `{current_designation}`,
 | Projects are name, role, link and a list of points | Technologies and outcomes duplicated the points and weren't used; every multi-line item is edited one point per field. |
 | Achievements only when the resume labels them | Classifying bullets by numbers ("30%") guessed wrong; bullets go to responsibilities unless under an "Achievements" sub-heading. |
 | Synthetic corpus with ground truth | Real resumes can't be committed; the generator covers layout variety and turns parser regressions into failing tests. |
-| Extension pages identified by URL | A side panel opened in a tab also has `sender.tab`; routing by URL keeps it from being mistaken for a content script. |
+| Extension pages identified by URL | The panel runs inside the page's drawer (an iframe, so it has `sender.tab`); routing by its `chrome-extension://` URL keeps it from being mistaken for a content script. |
+| One panel, in the page | No Chrome side panel. The toolbar icon toggles an in-page drawer that docks on the right (the page narrows to make room) and embeds the panel page. The panel is a web-accessible resource with a per-session URL (`use_dynamic_url`) and only runs with a one-time code the background gives the drawer script, so other sites can't frame it. |
 
 ## 10. Extension message flow
 

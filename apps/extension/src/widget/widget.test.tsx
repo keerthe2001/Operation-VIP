@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -8,7 +9,7 @@ import { memoryArea, type LocalStore, type SessionStore } from "@/shared/storage
 import type { DetectedJob, WidgetState } from "@/shared/types";
 import { makeProfile } from "@/test/profile-fixture";
 import { clampY } from "@/widget/position";
-import { Widget } from "@/widget/Widget";
+import { Widget, type WidgetHandle } from "@/widget/Widget";
 
 const job: DetectedJob = {
   portal: "generic", company: "Acme Corp", title: "Data Engineer", url: "https://acme.example/careers/1",
@@ -61,10 +62,8 @@ describe("widgetState", () => {
 function makeState(overrides: Partial<WidgetState> = {}): WidgetState {
   return {
     signedIn: true, firstName: "Priya", job, tracked: null,
-    form: { detected: 4, ready: 3, review: 1, missing: 0, questions: 0, filled: 0, hasCoverLetterField: false, hasResumeField: true, needsPassword: true },
-    resumeName: "priya.pdf",
-    match: { score: 72, matched: ["Python"], missing: ["Docker"], requiredYears: 3, haveYears: 7, experienceOk: true, location: "Bengaluru", locationOk: true },
-    profile: [{ label: "Email", value: "priya.raman@example.com" }],
+    form: { detected: 4, ready: 3, review: 1, missing: 0, questions: 0, filled: 0, hasCoverLetterField: false, hasResumeField: true, needsPassword: false },
+    resumeName: "priya.pdf", match: null, profile: [],
     prefs: { mode: "job_pages", autoOpen: true, y: 160, hidden: false, theme: "light" },
     ...overrides,
   };
@@ -73,57 +72,54 @@ function makeState(overrides: Partial<WidgetState> = {}): WidgetState {
 function setup(state: WidgetState) {
   const send = vi.fn(async (message: Record<string, unknown>) => {
     if (message.type === "WIDGET_STATE") return { ok: true as const, data: state };
-    if (message.type === "WIDGET_FILL") return { ok: true as const, data: { filled: 3, skipped: 0, failed: 0 } };
+    if (message.type === "WIDGET_EMBED") return { ok: true as const, data: { tabId: 7, nonce: "n1" } };
     return { ok: true as const };
   });
-  render(<Widget send={send as never} url={() => job.url} />);
-  return send;
+  const handle = createRef<WidgetHandle>();
+  render(<Widget send={send as never} url={() => job.url} panelUrl={(tab, nonce) => `chrome-extension://x/sidepanel/index.html?tab=${tab}&embed=1&nonce=${nonce}`} handle={handle} />);
+  return { send, handle };
 }
 
-describe("floating assistant", () => {
-  it("opens by itself on an application and autofills in one click", async () => {
-    const send = setup(makeState());
-    await userEvent.click(await screen.findByRole("button", { name: "Autofill 3 fields" }));
-    expect(send).toHaveBeenCalledWith({ type: "WIDGET_FILL" });
-    expect(await screen.findByText("Filled 3")).toBeInTheDocument();
-    expect(screen.getByText("No field")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Set account password/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Dark theme" }));
-    expect(send).toHaveBeenCalledWith({ type: "WIDGET_THEME", theme: "dark" });
-    expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
-  });
+const drawerOpen = () => document.querySelector(".drawer.open") !== null;
 
-  it("shows the job match and copies profile values", async () => {
-    const writeText = vi.fn(async () => undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+describe("in-page drawer", () => {
+  it("opens by itself on an application and shows the Copilot panel", async () => {
     setup(makeState());
-    await userEvent.click(await screen.findByRole("tab", { name: /Match/ }));
-    expect(await screen.findByText("Strong match")).toBeInTheDocument();
-    expect(screen.getByText("Docker")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: /Profile/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Copy Email" }));
-    expect(writeText).toHaveBeenCalledWith("priya.raman@example.com");
+    const frame = await screen.findByTitle("Copilot panel");
+    expect(frame).toHaveAttribute("src", "chrome-extension://x/sidepanel/index.html?tab=7&embed=1&nonce=n1");
+    expect(drawerOpen()).toBe(true);
+    expect(screen.queryByRole("button", { name: "Open Copilot" })).not.toBeInTheDocument();
   });
 
-  it("starts closed on job posts, slides open from the edge tab and can be hidden on the site", async () => {
-    const send = setup(makeState({ job: { ...job, isApplicationPage: false } }));
+  it("starts as an edge tab on job posts and opens on a click", async () => {
+    setup(makeState({ job: { ...job, isApplicationPage: false } }));
     const tab = await screen.findByRole("button", { name: "Open Copilot" });
-    expect(document.querySelector(".drawer.open")).toBeNull();
+    expect(drawerOpen()).toBe(false);
     await act(async () => {
       tab.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 200 }));
       tab.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, clientX: 10, clientY: 200 }));
     });
-    expect(document.querySelector(".drawer.open")).not.toBeNull();
-    expect(screen.getByText("Job post", { selector: ".row-title" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    await userEvent.click(screen.getByRole("button", { name: "Hide Copilot on this site" }));
-    expect(send).toHaveBeenCalledWith({ type: "WIDGET_PREFS", prefs: { hideOnHost: location.hostname } });
-    expect(screen.queryByRole("button", { name: "Open Copilot" })).not.toBeInTheDocument();
+    expect(drawerOpen()).toBe(true);
   });
 
-  it("stays out of the way on pages without a job", async () => {
-    const send = setup(makeState({ job: null }));
-    await vi.waitFor(() => expect(send).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: /Copilot/ })).not.toBeInTheDocument();
+  it("toolbar icon opens it anywhere and closes it on the next click", async () => {
+    const { send, handle } = setup(makeState({ job: null }));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith({ type: "WIDGET_STATE" }));
+    expect(screen.queryByRole("button", { name: "Open Copilot" })).not.toBeInTheDocument();
+    act(() => handle.current!.toggle());
+    expect(await screen.findByTitle("Copilot panel")).toBeInTheDocument();
+    expect(drawerOpen()).toBe(true);
+    act(() => handle.current!.toggle());
+    expect(drawerOpen()).toBe(false);
+    act(() => handle.current!.toggle());
+    act(() => handle.current!.collapse());
+    expect(drawerOpen()).toBe(false);
+  });
+
+  it("can be hidden on a site", async () => {
+    const { send } = setup(makeState({ job: { ...job, isApplicationPage: false } }));
+    await userEvent.click(await screen.findByRole("button", { name: "Hide Copilot on this site" }));
+    expect(send).toHaveBeenCalledWith({ type: "WIDGET_PREFS", prefs: { hideOnHost: location.hostname } });
+    expect(screen.queryByRole("button", { name: "Open Copilot" })).not.toBeInTheDocument();
   });
 });

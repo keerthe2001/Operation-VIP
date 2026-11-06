@@ -122,9 +122,13 @@ const manifest = {
   minimum_chrome_version: "116",
   icons: { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" },
   action: { default_title: "Open Copilot", default_icon: { 16: "icons/16.png", 32: "icons/32.png" } },
-  side_panel: { default_path: "sidepanel/index.html" },
   background: { service_worker: "background.js", type: "module" },
-  permissions: ["storage", "sidePanel", "alarms", "scripting", "activeTab"],
+  permissions: ["storage", "alarms", "scripting", "activeTab"],
+  // The in-page drawer shows the Copilot panel in an iframe. use_dynamic_url gives it a
+  // per-session address, and the panel also checks a one-time code from the background.
+  web_accessible_resources: [
+    { resources: ["sidepanel/index.html", "assets/*", "icons/*"], matches: ["<all_urls>"], use_dynamic_url: true },
+  ],
   host_permissions: [`${apiOrigin}/*`, ...PORTALS],
   optional_host_permissions: ["https://*/*", "http://*/*"],
   content_scripts: [

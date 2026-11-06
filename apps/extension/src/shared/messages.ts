@@ -33,7 +33,8 @@ export const widgetMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("WIDGET_FILL") }),
   z.object({ type: z.literal("WIDGET_FORCE") }),
   z.object({ type: z.literal("WIDGET_SAVE_JOB") }),
-  z.object({ type: z.literal("WIDGET_OPEN_PANEL") }),
+  /** The drawer asks which tab it is in and for a one-time code for the embedded panel. */
+  z.object({ type: z.literal("WIDGET_EMBED") }),
   z.object({ type: z.literal("WIDGET_THEME"), theme: z.enum(["light", "dark"]) }),
   z.object({
     type: z.literal("WIDGET_PREFS"),
@@ -56,6 +57,9 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("FORCE_SCAN"), tabId: z.number().int() }),
   z.object({ type: z.literal("ENABLE_ALL_SITES") }),
   z.object({ type: z.literal("SET_THEME"), theme: z.enum(["system", "light", "dark"]) }),
+  z.object({ type: z.literal("VERIFY_EMBED"), tabId: z.number().int(), nonce: z.string().max(100) }),
+  z.object({ type: z.literal("COLLAPSE_EMBED"), tabId: z.number().int() }),
+  z.object({ type: z.literal("SAVE_JOB"), tabId: z.number().int() }),
   z.object({ type: z.literal("SET_ACCOUNT_PASSWORD"), password: z.string().max(128).nullable() }),
   z.object({
     type: z.literal("SET_WIDGET_PREFS"),
@@ -119,3 +123,9 @@ export type ToContentMessage = z.infer<typeof toContentSchema>;
 export type WidgetMessage = z.infer<typeof widgetMessageSchema>;
 
 export type Reply<T = undefined> = { ok: true; data?: T } | { ok: false; error: string; code?: string };
+
+/** Background → drawer script in the page's top frame. */
+export const toWidgetSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("WIDGET_TOGGLE") }),
+  z.object({ type: z.literal("WIDGET_COLLAPSE") }),
+]);

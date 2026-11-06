@@ -18,11 +18,7 @@ function set(saved: Saved[], el: HTMLElement, prop: string, value: string) {
   el.style.setProperty(prop, value, "important");
 }
 
-export function shrinkPage(
-  width: number,
-  doc: Document = document,
-  host?: Element,
-): () => void {
+export function shrinkPage(width: number, doc: Document = document, host?: Element): () => void {
   const win = doc.defaultView!;
   const saved: Saved[] = [];
   const handled = new WeakSet<Element>();
@@ -43,25 +39,16 @@ export function shrinkPage(
     let checked = 0;
     for (const el of doc.body?.querySelectorAll<HTMLElement>("*") ?? []) {
       if (++checked > MAX_ELEMENTS) break;
-      if (handled.has(el) || (host && (el === host || host.contains(el))))
-        continue;
+      if (handled.has(el) || (host && (el === host || host.contains(el)))) continue;
       const style = win.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
       const rect = el.getBoundingClientRect();
       // Layers pinned to the viewport's right edge: headers, app shells, cookie bars.
-      if (
-        style.position === "fixed" &&
-        rect.width > viewport * 0.4 &&
-        rect.right >= viewport - 2
-      ) {
+      if (style.position === "fixed" && rect.width > viewport * 0.4 && rect.right >= viewport - 2) {
         if (rect.left <= 2) set(saved, el, "width", `calc(100vw - ${width}px)`);
         set(saved, el, "right", `${width}px`);
         set(saved, el, "max-width", `calc(100vw - ${width}px)`);
-      } else if (
-        style.position !== "fixed" &&
-        rect.width >= viewport - 2 &&
-        rect.width > viewport - width + 4
-      ) {
+      } else if (style.position !== "fixed" && rect.width >= viewport - 2 && rect.width > viewport - width + 4) {
         // 100vw boxes that would still run under the drawer.
         set(saved, el, "max-width", "100%");
       } else continue;

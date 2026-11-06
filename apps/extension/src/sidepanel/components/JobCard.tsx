@@ -1,6 +1,6 @@
 import { matchJobSkills } from "@copilot/shared";
 import { Badge, Button } from "@copilot/ui";
-import { Briefcase, Building2, CheckCircle2, ExternalLink, FormInput, Link2, RefreshCw, Send } from "lucide-react";
+import { Bookmark, Briefcase, Building2, CheckCircle2, ExternalLink, FormInput, Link2, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 
 import { send } from "@/sidepanel/chrome-state";
@@ -139,6 +139,28 @@ export function JobCard({
       </dl>
       {skills && <MatchingSkills description={job.description} skills={skills} />}
       {tracked && tabId != null && <TrackerRow tabId={tabId} tracked={tracked} />}
+      {!tracked && tabId != null && <SaveJobButton tabId={tabId} />}
     </section>
+  );
+}
+
+function SaveJobButton({ tabId }: { tabId: number }) {
+  const [state, setState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  return (
+    <div className="mt-4 grid gap-1 border-t pt-3">
+      <Button
+        variant="outline"
+        size="sm"
+        loading={state.busy}
+        onClick={async () => {
+          setState({ busy: true, error: null });
+          const reply = await send({ type: "SAVE_JOB", tabId });
+          setState({ busy: false, error: reply.ok ? null : reply.error });
+        }}
+      >
+        <Bookmark aria-hidden="true" /> Save job
+      </Button>
+      {state.error && <p className="text-xs text-destructive">{state.error}</p>}
+    </div>
   );
 }
