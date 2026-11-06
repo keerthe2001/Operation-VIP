@@ -38,6 +38,8 @@ export const contentMessageSchema = z.discriminatedUnion("type", [
     action: z.string().max(80).nullable().optional(),
     actionKind: z.enum(["continue", "account", "submit"]).nullable().optional(),
     accountExists: z.boolean().optional(),
+    /** Page-level error messages (a "please fix the errors" banner). */
+    pageErrors: z.array(z.string().max(300)).max(20).optional(),
   }),
   /** One field done while filling one by one. */
   z.object({ type: z.literal("FILL_PROGRESS"), id: z.string().max(40), status: z.enum(["filling", "filled", "skipped", "failed"]), message: z.string().max(300).optional() }),
@@ -84,6 +86,7 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("FOCUS_FIELD"), tabId: z.number().int(), key: z.string().max(60) }),
   z.object({ type: z.literal("SET_SETTINGS"), settings: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal("DISMISS_WHATS_NEW") }),
+  z.object({ type: z.literal("CLEAR_MEMORY") }),
   z.object({ type: z.literal("SET_ACCOUNT_PASSWORD"), password: z.string().max(128).nullable() }),
   z.object({
     type: z.literal("SET_WIDGET_PREFS"),
@@ -133,6 +136,7 @@ const fillInstructionSchema = z.object({
   file: z.object({ name: z.string().max(255), type: z.string().max(127), base64: z.string().max(20_000_000) }).optional(),
   overwrite: z.boolean(),
   multi: z.boolean().optional(),
+  typing: z.boolean().optional(),
 });
 
 export const toContentSchema = z.discriminatedUnion("type", [

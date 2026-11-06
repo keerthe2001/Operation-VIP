@@ -27,6 +27,10 @@ export const fieldDescriptorSchema = z.object({
   maxLength: z.number().int().nullable(),
   /** Heading of the form section the field is in ("Work Experience", "Education"…). */
   section: z.string().max(200).optional(),
+  /** Workday's data-automation-id (on the control or its formField wrapper). */
+  automationId: z.string().max(200).optional(),
+  /** Error message the page shows for this field (after validation). */
+  error: z.string().max(300).optional(),
 });
 export type FieldDescriptor = z.infer<typeof fieldDescriptorSchema>;
 
@@ -62,12 +66,18 @@ export interface FillInstruction {
   overwrite: boolean;
   /** A search box that takes one value at a time (Workday "Type to Add Skills"). */
   multi?: boolean;
+  /** Type the value key by key (for widgets that ignore a pasted value). */
+  typing?: boolean;
 }
 
 export const fillResultSchema = z.object({
   id: z.string().max(40),
   status: z.enum(["filled", "skipped", "failed"]),
   message: z.string().max(300).optional(),
+  /** What the control holds after the fill, read back from the page. */
+  current: z.string().max(2000).optional(),
+  /** The page's error for the control after the fill ("" when none). */
+  error: z.string().max(300).optional(),
 });
 export type FillResult = z.infer<typeof fillResultSchema>;
 
@@ -85,6 +95,8 @@ export interface FormState {
   accountExists?: boolean;
   /** Everything is filled and the next button submits the application: waiting for the user's OK. */
   awaitingSubmit?: boolean;
+  /** Page-level error messages after pressing the page's button. */
+  pageErrors?: string[];
 }
 
 /** What the page's main button does. */

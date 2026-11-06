@@ -1,5 +1,6 @@
 import { createApi } from "@/background/api";
-import { AutofillCoordinator } from "@/background/autofill";
+import { activeError, AutofillCoordinator, holdsValue } from "@/background/autofill";
+import { fieldLabel } from "@/mapping/engine";
 import { AuthError, AuthManager } from "@/background/auth";
 import { ensureAllSitesScript } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
@@ -81,6 +82,27 @@ async function expandSections(tabId: number): Promise<number> {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Fills fields, then checks each one took its value (the page re-renders after a fill, so the
+ * check reads the rescan). Fields that didn't take it, or show an error, are filled once more
+ * by typing; what still fails goes to "needs you" with the reason.
+ */
+async function fillAndVerify(tabId: number, keys: string[], overwrite: boolean) {
+  const summary = await autofill.fill(tabId, keys, overwrite);
+  await sleep(900);
+  const retry = await autofill.unverified(tabId, keys);
+  if (retry.length) {
+    await log(tabId, `Re-checking ${retry.length} field${retry.length === 1 ? "" : "s"} that didn't take the value`);
+    await autofill.fill(tabId, retry, true, { typing: true });
+    await sleep(900);
+    const stuck = await autofill.unverified(tabId, retry);
+    await autofill.markFailed(tabId, stuck, "Didn't take the value. Please check it.");
+    summary.failed += stuck.length;
+    summary.filled -= stuck.length;
+  }
+  return summary;
+}
+
 /** Fills every ready field on the page. */
 async function fillReady(tabId: number) {
   if (filling.has(tabId)) return { filled: 0, skipped: 0, failed: 0 };
@@ -88,7 +110,7 @@ async function fillReady(tabId: number) {
   try {
     const state = await autofill.state(tabId);
     const keys = readyKeys(state?.fields ?? []);
-    const summary = keys.length ? await autofill.fill(tabId, keys, false) : { filled: 0, skipped: 0, failed: 0 };
+    const summary = keys.length ? await fillAndVerify(tabId, keys, false) : { filled: 0, skipped: 0, failed: 0 };
     const after = await autofill.state(tabId);
     const filled = after?.fields.filter((f) => f.result === "filled").length ?? 0;
     void tracker.onFilled(tabId, (await session.get(tabKey(tabId)))?.job, filled);
@@ -107,7 +129,7 @@ const handledSteps = new Map<number, Set<string>>();
 const flowTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
 const needsYou = (state: FormState) =>
-  state.fields.filter((f) => f.required && !hasValue(f) && f.result !== "filled");
+  state.fields.filter((f) => (f.required && !hasValue(f) && f.result !== "filled") || (f.result === "failed" && !f.currentValue.trim()) || !!activeError(f));
 const hasValue = (f: MappedField) => f.currentValue.trim() !== "" || f.result === "filled";
 
 /** Called whenever a page step changes: fill it, then move to the next step on its own. */
@@ -152,21 +174,71 @@ async function runFlow(tabId: number) {
     return;
   }
 
-  const missing = needsYou((await autofill.state(tabId)) ?? state);
+  // Fields the page marks as wrong get one more try, typed, before asking the user.
+  const latest = (await autofill.state(tabId)) ?? state;
+  const clicks = [1, 2, 3].filter((n) => done.has(`click#${n}|${step}`)).length;
+  const erroring = latest.fields.filter((f) => activeError(f) && f.value && f.result !== "failed");
+  if (erroring.length && !done.has(`fix|${step}`)) {
+    done.add(`fix|${step}`);
+    done.add(`refill#${clicks}|${step}`);
+    await log(tabId, `Fixing ${erroring.length} field${erroring.length === 1 ? "" : "s"} the page flagged`);
+    filling.add(tabId);
+    try {
+      await autofill.fill(tabId, erroring.map((f) => `${f.frameId}:${f.id}`), true, { typing: true });
+    } finally {
+      filling.delete(tabId);
+    }
+    scheduleFlow(tabId);
+    return;
+  }
+
+  const missing = needsYou(latest);
   if (missing.length > 0) {
     await log(tabId, `${missing.length} field${missing.length === 1 ? "" : "s"} need${missing.length === 1 ? "s" : ""} you`, "need");
     return;
   }
 
   const kind = state.actionKind;
-  if (!kind || !state.action || done.has(`click|${step}`)) return;
+  if (!kind || !state.action) return;
+  if (clicks > 0) {
+    // Still on the same step after pressing the button: the page refused. Read its errors,
+    // put back what it rejected or cleared, then press again (three tries at most).
+    const errors = [...(latest.pageErrors ?? []), ...latest.fields.filter((f) => activeError(f)).map((f) => `${fieldLabel(f)}: ${activeError(f)}`)];
+    const lost = latest.fields.filter((f) => f.value && f.result === "filled" && !holdsValue(f));
+    const refilled = done.has(`refill#${clicks}|${step}`);
+    if (!refilled && !errors.length && !lost.length) return; // the next step is still loading
+    if (clicks >= 3) {
+      if (!done.has(`stuck|${step}`)) {
+        done.add(`stuck|${step}`);
+        await log(tabId, `The page didn't continue: ${(errors[0] ?? "a field was cleared").slice(0, 120)}`, "need");
+      }
+      return;
+    }
+    if (!refilled) {
+      done.add(`refill#${clicks}|${step}`);
+      await log(tabId, `The page didn't continue (${(errors[0] ?? "a field was cleared").slice(0, 100)}). Fixing it`);
+      const keys = [...lost, ...latest.fields.filter((f) => activeError(f) && f.value)].map((f) => `${f.frameId}:${f.id}`);
+      if (keys.length) {
+        filling.add(tabId);
+        try {
+          await autofill.fill(tabId, [...new Set(keys)], true, { typing: true });
+        } finally {
+          filling.delete(tabId);
+        }
+      }
+      scheduleFlow(tabId); // re-read the page, then press again if nothing needs the user
+      return;
+    }
+  }
   if (kind === "submit") {
     await log(tabId, "Everything is filled. Ready to submit", "need");
     return; // the final Submit always waits for the user's OK
   }
-  done.add(`click|${step}`);
-  await log(tabId, kind === "account" ? `${state.action}…` : `${state.action} → next page`);
+  done.add(`click#${clicks + 1}|${step}`);
+  await log(tabId, kind === "account" ? `${state.action}…` : clicks ? `${state.action} (try ${clicks + 1})` : `${state.action} → next page`);
   await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", kinds: [kind] }, { frameId: 0 }).catch(() => undefined);
+  // If the page doesn't move on, look again for its errors.
+  setTimeout(() => scheduleFlow(tabId), 3500);
 }
 
 const promptedSubmission = new Set<string>();
@@ -404,7 +476,7 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
           const fresh = await autofill.state(message.tabId);
           fields = [...new Set([...fields, ...readyKeys(fresh?.fields ?? [])])];
         }
-        const summary = await autofill.fill(message.tabId, fields, message.overwrite);
+        const summary = await fillAndVerify(message.tabId, fields, message.overwrite);
         const state = await autofill.state(message.tabId);
         const filled = state?.fields.filter((f) => f.result === "filled").length ?? 0;
         void tracker.onFilled(message.tabId, (await session.get(tabKey(message.tabId)))?.job, filled);
@@ -442,6 +514,9 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         await local.set({ settings: next });
         return { ok: true };
       }
+      case "CLEAR_MEMORY":
+        await local.set({ memory: {} });
+        return { ok: true };
       case "DISMISS_WHATS_NEW":
         await local.set({ seenVersion: chrome.runtime.getManifest().version });
         return { ok: true };
@@ -515,7 +590,7 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     } else if (message.type === "FIELDS_SCANNED") {
       const url = sender.tab.url ?? message.url;
       void autofill
-        .onFieldsScanned(tabId, frameId, url, message.fields, message.action, message.actionKind, message.accountExists)
+        .onFieldsScanned(tabId, frameId, url, message.fields, message.action, message.actionKind, message.accountExists, message.pageErrors)
         .then(() => {
           if (!filling.has(tabId)) scheduleFlow(tabId);
         });

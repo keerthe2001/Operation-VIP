@@ -80,3 +80,33 @@ describe("AutofillCoordinator", () => {
     expect((await coordinator.state(1))!.fields[0]).toMatchObject({ status: "missing", value: null });
   });
 });
+
+describe("memory", () => {
+  it("remembers answers the user gives or corrects, and reuses them next time", async () => {
+    const { coordinator, local } = setup();
+    const url = "https://acme.wd1.myworkdayjobs.com/apply/step1";
+    await coordinator.onFieldsScanned(1, 0, url, [field("f1", "City"), field("f2", "Board of 12th standard")]);
+    await coordinator.fill(1, ["0:f1"], false);
+    // The user changes Copilot's city and fills the question Copilot didn't know.
+    await coordinator.onFieldsScanned(1, 0, url, [field("f1", "City", { currentValue: "Bangalore Urban" }), field("f2", "Board of 12th standard", { currentValue: "CBSE" })]);
+    const memory = (await local.get("memory")) ?? {};
+    expect(memory["acme.wd1.myworkdayjobs.com|city"]?.value).toBe("Bangalore Urban");
+    expect(memory["*|board of 12th standard"]?.value).toBe("CBSE");
+
+    // Next application on the same site: both come back filled from memory.
+    const next = await coordinator.onFieldsScanned(2, 0, "https://acme.wd1.myworkdayjobs.com/apply/other", [field("g1", "City"), field("g2", "Board of 12th standard")]);
+    expect(next.fields.map((f) => [f.value, f.status])).toEqual([["Bangalore Urban", "auto"], ["CBSE", "auto"]]);
+    // On another site the profile still wins where it has an answer; memory fills the gap.
+    const other = await coordinator.onFieldsScanned(3, 0, "https://jobs.lever.co/x", [field("h1", "City"), field("h2", "Board of 12th standard")]);
+    expect(other.fields.map((f) => f.value)).toEqual(["Bengaluru", "CBSE"]);
+  });
+
+  it("never remembers passwords or what Copilot itself filled", async () => {
+    const { coordinator, local } = setup();
+    const url = "https://x.test/apply";
+    await coordinator.onFieldsScanned(1, 0, url, [field("f1", "First name"), field("p", "Password", { kind: "password" })]);
+    await coordinator.fill(1, ["0:f1"], false);
+    await coordinator.onFieldsScanned(1, 0, url, [field("f1", "First name", { currentValue: "Priya" }), field("p", "Password", { kind: "password", currentValue: "••••••••" })]);
+    expect(Object.keys((await local.get("memory")) ?? {})).toEqual([]);
+  });
+});

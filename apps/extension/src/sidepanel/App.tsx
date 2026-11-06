@@ -111,7 +111,8 @@ function Panel() {
         </main>
       ) : (
         <main className="grid gap-4 p-4">
-            {job?.isApplicationPage && tabId !== null && <GuidedFlow tabId={tabId} form={form} />}
+          {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
+          {job?.isApplicationPage && tabId !== null && <GuidedFlow tabId={tabId} form={form} />}
           {job ? (
             <JobCard
               job={job}
@@ -124,10 +125,9 @@ function Panel() {
             <EmptyState name={firstName} tabId={tabId} />
           )}
           {job && !job.isApplicationPage && <ForceScanButton tabId={tabId} variant="outline" />}
-          {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
-            {job?.isApplicationPage && tabId !== null && form?.action && form.actionKind !== "submit" && (
-              <PageAction tabId={tabId} label={form.action} />
-            )}
+          {job?.isApplicationPage && tabId !== null && form?.action && form.actionKind !== "submit" && (
+            <PageAction tabId={tabId} label={form.action} />
+          )}
           {job?.isApplicationPage && tabId !== null && (
             <AnswersSection questions={formSummary.questions} tabId={tabId} job={job} data={profile} />
           )}

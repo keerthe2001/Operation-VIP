@@ -19,6 +19,8 @@ export interface LocalStore {
   accountPassword: string | null;
   theme: "system" | "light" | "dark";
   settings: AutofillSettings;
+  /** Answers the user gave or corrected, by "site|question" and "*|question". This device only. */
+  memory: Record<string, { value: string; at: number }>;
   /** Last version whose "What's new" note was dismissed. */
   seenVersion: string | null;
 }
@@ -69,6 +71,7 @@ export const DEFAULT_LOCAL: LocalStore = {
   accountPassword: null,
   theme: "system",
   settings: DEFAULT_SETTINGS,
+  memory: {},
   seenVersion: null,
 };
 

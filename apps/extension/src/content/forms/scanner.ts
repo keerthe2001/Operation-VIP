@@ -157,6 +157,8 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       accept: (el.getAttribute("accept") ?? "").slice(0, 200),
       maxLength: input.maxLength > 0 ? input.maxLength : null,
       section: section.slice(0, 200),
+      automationId: automationIdOf(el).slice(0, 200),
+      error: fieldError(el).slice(0, 300) || undefined,
     });
   }
 
@@ -256,4 +258,35 @@ function groupLabelFor(el: Element): string {
     if (label && !label.contains(el) && text(label) && !/^(month|year|day)$/i.test(text(label))) return text(label).replace(/\*\s*$/, "").trim();
   }
   return "";
+}
+
+/** Workday names fields with data-automation-id, on the control or its "formField-…" wrapper. */
+function automationIdOf(el: Element): string {
+  const own = el.getAttribute("data-automation-id") ?? "";
+  const wrapper = el.closest("[data-automation-id^='formField-']")?.getAttribute("data-automation-id")?.replace(/^formField-/, "") ?? "";
+  return [wrapper, own].filter(Boolean).join(" ");
+}
+
+const ERROR_SELECTOR =
+  "[data-automation-id='errorMessage'], [data-automation-id='inputError'], [role='alert'], .error, .errors, .error-message, .field-error, .invalid-feedback, .help-block.error, [class*='error-text'], [class*='errorMessage']";
+
+/** The error message shown for a field: its aria-describedby error, or one inside its wrapper. */
+export function fieldError(el: Element): string {
+  const invalid = el.getAttribute("aria-invalid") === "true";
+  for (const id of (el.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean)) {
+    const node = el.ownerDocument.getElementById(id);
+    if (node && (invalid || node.matches(ERROR_SELECTOR) || /error|invalid|required/i.test(node.id + node.className)) && isVisible(node) && text(node)) return text(node);
+  }
+  const wrapper = el.closest("[data-automation-id^='formField-'], .field, .form-group, .form-field, .application-question, fieldset, li");
+  const message = wrapper ? [...wrapper.querySelectorAll(ERROR_SELECTOR)].find((node) => isVisible(node) && text(node)) : null;
+  if (message) return text(message);
+  return invalid ? "This field has an error" : "";
+}
+
+/** Page-level errors (Workday's "Errors Found" banner, form-wide alerts). */
+export function pageErrors(root: Document = document): string[] {
+  return deepQueryAll(root, "[data-automation-id='errorBanner'], [data-automation-id='errorHeading'], form [role='alert'], .alert-danger, .form-errors")
+    .filter((node) => isVisible(node) && text(node) && !node.closest("copilot-assistant"))
+    .map((node) => text(node).slice(0, 300))
+    .slice(0, 10);
 }

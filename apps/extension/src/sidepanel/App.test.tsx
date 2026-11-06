@@ -314,7 +314,14 @@ describe("guided flow", () => {
       },
     });
     render(<App />);
+    // Autofill comes first; Needs you and Activity stay folded until the user opens them.
+    const needsRow = await screen.findByRole("button", { name: /Needs you/ });
+    expect(needsRow).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /Why Acme\?/ })).not.toBeInTheDocument();
+    expect(await screen.findByText("2 fields need you")).toBeInTheDocument(); // latest activity, in the folded row
+    await userEvent.click(screen.getByRole("button", { name: /Activity/ }));
     expect(await screen.findByText("Filled 6 fields")).toBeInTheDocument();
+    await userEvent.click(needsRow);
     fireEvent.mouseDown(screen.getByRole("button", { name: /Why Acme\?/ }));
     expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FOCUS_FIELD", tabId: 7, key: "0:q1" });
     // The user fills it on the page: Copilot takes them to the next one.
@@ -322,6 +329,19 @@ describe("guided flow", () => {
       "form:7": { url: job.url, updatedAt: 2, action: "Save and Continue", actionKind: "continue", fields: [field("q1", "Why Acme?", { currentValue: "Because" }), field("q2", "Notice period")] },
     });
     await vi.waitFor(() => expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FOCUS_FIELD", tabId: 7, key: "0:q2" }));
+  });
+
+  it("shows why the page rejected a field", async () => {
+    installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: {
+        "tab:7": { url: job.url, job, analyzedAt: 1 },
+        "form:7": { url: job.url, updatedAt: 1, action: "Save and Continue", actionKind: "continue", fields: [field("q1", "From", { currentValue: "13/2020", error: "Enter a valid month" })] },
+      },
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Needs you/ }));
+    expect(screen.getByText("Enter a valid month")).toBeInTheDocument();
   });
 
   it("asks before the final submit", async () => {

@@ -1,4 +1,5 @@
 import type { Api } from "@/background/api";
+import { bestOption } from "@/content/autofill/writer";
 import { bestGuess } from "@/mapping/best-guess";
 import { fieldLabel, mapFields } from "@/mapping/engine";
 import { DEFAULT_SETTINGS } from "@/shared/settings";
@@ -60,13 +61,52 @@ export class AutofillCoordinator {
   }
 
   /** Applies the user's settings and rule-based answers on top of the profile mapping. */
-  private async adjust(tabId: number, fields: MappedField[], context: Awaited<ReturnType<AutofillCoordinator["profileContext"]>>) {
+  /**
+   * Memory: when the user changes a value Copilot filled, or fills a field Copilot left, the
+   * answer is remembered for that site and question (and for the question anywhere).
+   */
+  private async learn(url: string, fields: FieldDescriptor[], before: Map<string, MappedField>) {
+    const host = hostOf(url);
+    const learned: Record<string, { value: string; at: number }> = {};
+    for (const field of fields) {
+      const previous = [...before.values()].find((f) => f.id === field.id);
+      const value = field.currentValue.trim();
+      if (!previous || !value || !rememberable(field) || value === previous.currentValue.trim()) continue;
+      const ours = previous.result === "filled" && squash(previous.value ?? "") === squash(value);
+      if (ours) continue; // what Copilot itself put in
+      const corrected = previous.result === "filled" && !!previous.value;
+      const filledByUser = !previous.currentValue.trim() && previous.status !== "auto";
+      if (!corrected && !filledByUser) continue;
+      const question = memoryKey(field);
+      if (!question) continue;
+      learned[`${host}|${question}`] = { value, at: Date.now() };
+      learned[`*|${question}`] = { value, at: Date.now() };
+    }
+    if (Object.keys(learned).length === 0) return;
+    const memory = { ...((await this.local.get("memory")) ?? {}), ...learned };
+    // Keep the most recent 500 answers.
+    const entries = Object.entries(memory).sort((a, b) => b[1].at - a[1].at).slice(0, 500);
+    await this.local.set({ memory: Object.fromEntries(entries) });
+  }
+
+  private async adjust(tabId: number, fields: MappedField[], context: Awaited<ReturnType<AutofillCoordinator["profileContext"]>>, url?: string) {
     const { hasPassword, settings, profile } = context;
+    const memory = (await this.local.get("memory")) ?? {};
+    const host = url ? hostOf(url) : "";
     const off = new Set(settings.disabledFields);
     let adjusted = fields.map((f): MappedField => {
       // Password boxes are ready only when the user saved an account password.
       if (f.key === "account_password" && !hasPassword) return { ...f, status: "missing", value: null };
       if (f.key === "email" && settings.applicationEmail && f.value) return { ...f, value: settings.applicationEmail };
+      // The user's own earlier answer: on this site it wins over the profile; elsewhere it
+      // fills only what the profile couldn't.
+      const question = rememberable(f) ? memoryKey(f) : "";
+      const remembered = question ? (memory[`${host}|${question}`] ?? (f.value ? undefined : memory[`*|${question}`])) : undefined;
+      if (remembered) {
+        const option = f.options.length ? bestOption(f.options.map((o) => ({ ...o, text: o.label })), remembered.value) : null;
+        if (f.options.length && !option) return f;
+        return { ...f, key: f.key ?? "remembered", status: "auto", value: option?.label ?? remembered.value, optionValue: option?.value ?? null };
+      }
       return f;
     });
     if (settings.bestGuessAnswers) {
@@ -88,6 +128,7 @@ export class AutofillCoordinator {
     action?: string | null,
     actionKind?: ActionKind | null,
     accountExists?: boolean,
+    pageErrors?: string[],
   ): Promise<FormState> {
     const previous = await this.state(tabId);
     // A new top-level page starts a new form; other frames keep their fields.
@@ -96,7 +137,8 @@ export class AutofillCoordinator {
       : [];
     const results = new Map(previous?.fields.map((f) => [fieldKey(f), f]) ?? []);
     const context = await this.profileContext();
-    const adjusted = await this.adjust(tabId, mapFields(fields, frameId, context.profile, context.resumeName), context);
+    await this.learn(url, fields, results);
+    const adjusted = await this.adjust(tabId, mapFields(fields, frameId, context.profile, context.resumeName), context, url);
     const mapped = adjusted.map((next) => {
       const before = results.get(fieldKey(next));
       return before?.result ? { ...next, result: before.result, resultMessage: before.resultMessage } : next;
@@ -109,6 +151,7 @@ export class AutofillCoordinator {
       action: action !== undefined && (frameId === 0 || action) ? action : previous?.action,
       actionKind: action !== undefined && (frameId === 0 || action) ? (actionKind ?? null) : previous?.actionKind,
       accountExists: frameId === 0 ? !!accountExists : previous?.accountExists,
+      pageErrors: frameId === 0 ? (pageErrors ?? []) : previous?.pageErrors,
     };
     await this.session.set(formEntry(tabId, state));
     return state;
@@ -126,6 +169,7 @@ export class AutofillCoordinator {
         tabId,
         frames.flatMap((frameId) => mapFields(state.fields.filter((f) => f.frameId === frameId), frameId, profile, resumeName)),
         context,
+        state.url,
       );
       const before = new Map(state.fields.map((f) => [fieldKey(f), f]));
       state.fields = remapped.map((f) => ({ ...f, result: before.get(fieldKey(f))?.result, resultMessage: before.get(fieldKey(f))?.resultMessage }));
@@ -197,7 +241,23 @@ export class AutofillCoordinator {
     return result;
   }
 
-  async fill(tabId: number, keys: string[], overwrite: boolean): Promise<FillSummary> {
+  /** Fields that were filled but don't hold the value (or show an error): candidates for a retry. */
+  async unverified(tabId: number, keys: string[]): Promise<string[]> {
+    const state = await this.state(tabId);
+    const wanted = new Set(keys);
+    return (state?.fields ?? []).filter((f) => wanted.has(fieldKey(f)) && f.result === "filled" && (!!activeError(f) || !holdsValue(f))).map(fieldKey);
+  }
+
+  /** Marks fields as not filled, with the reason shown to the user. */
+  async markFailed(tabId: number, keys: string[], fallback: string) {
+    const state = await this.state(tabId);
+    if (!state || keys.length === 0) return;
+    const bad = new Set(keys);
+    state.fields = state.fields.map((f) => (bad.has(fieldKey(f)) ? { ...f, result: "failed", resultMessage: f.error || fallback } : f));
+    await this.session.set(formEntry(tabId, state));
+  }
+
+  async fill(tabId: number, keys: string[], overwrite: boolean, options: { typing?: boolean } = {}): Promise<FillSummary> {
     const state = await this.state(tabId);
     if (!state) return { filled: 0, skipped: 0, failed: 0 };
     const wanted = new Set(keys);
@@ -214,6 +274,7 @@ export class AutofillCoordinator {
       };
       if (field.kind === "checkbox") instruction.checked = field.optionValue === "true";
       if (field.key === "skills" && field.kind === "combobox") instruction.multi = true;
+      if (options.typing) instruction.typing = true;
       if (field.key === "account_password") {
         const password = await this.local.get("accountPassword");
         if (!password) continue;
@@ -246,7 +307,9 @@ export class AutofillCoordinator {
     const latest = (await this.state(tabId)) ?? state;
     latest.fields = latest.fields.map((f) => {
       const result = results.get(fieldKey(f));
-      return result ? { ...f, result: result.status, resultMessage: result.message } : f;
+      if (!result) return f;
+      const readBack = result.current !== undefined ? { currentValue: result.current, error: result.error || undefined } : {};
+      return { ...f, ...readBack, result: result.status, resultMessage: result.message };
     });
     const summary: FillSummary = { filled: 0, skipped: 0, failed: 0 };
     for (const result of results.values()) summary[result.status] += 1;
@@ -259,4 +322,58 @@ export class AutofillCoordinator {
     this.onDone?.(tabId, items);
     return summary;
   }
+}
+
+const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/** The field's error, ignoring a stale "required" message once it holds a value. */
+export function activeError(field: MappedField): string {
+  if (!field.error) return "";
+  if (field.currentValue.trim() && /required|must have a value|can'?t be (blank|empty)|please (fill|enter)/i.test(field.error)) return "";
+  return field.error;
+}
+
+/** Does the control now hold what Copilot put in (allowing for the page's own formatting)? */
+export function holdsValue(field: MappedField): boolean {
+  const current = field.currentValue.trim();
+  const value = (field.value ?? "").trim();
+  if (field.kind === "checkbox") return true;
+  // A multi-entry search box (Workday skills) empties itself after each pick; the picks are chips.
+  if (field.key === "skills" && field.kind === "combobox") return true;
+  if (!current) return false;
+  if (["file", "password", "combobox"].includes(field.kind) || !value) return true;
+  const a = squash(current);
+  const b = squash(value);
+  if (!a || !b) return true;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  // Dates and numbers: same digits ("07/2024" vs "2024-07", "+91 98765" vs "98765").
+  const digits = (t: string) => t.replace(/\D/g, "");
+  if (digits(current) && (digits(current) === digits(value) || digits(value).endsWith(digits(current)))) return true;
+  // Choices: the chosen option shares a word with the intended answer ("India (+91)" vs "India").
+  if (["select", "radio", "listbox"].includes(field.kind)) {
+    const words = new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1));
+    return current.toLowerCase().split(/[^a-z0-9]+/).some((w) => words.has(w));
+  }
+  return false;
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+};
+
+/** Which fields' answers are worth remembering: short, typed or chosen, never secrets or files. */
+function rememberable(field: FieldDescriptor): boolean {
+  if (["password", "file", "contenteditable"].includes(field.kind)) return false;
+  if (field.kind === "textarea" && field.currentValue.length > 300) return false;
+  return field.currentValue.length <= 300;
+}
+
+/** The question a field asks, normalised so the same question matches across visits. */
+function memoryKey(field: FieldDescriptor): string {
+  const label = (field.label || field.placeholder || field.name).toLowerCase().replace(/[*✱]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  return label.length >= 2 ? `${field.section ? field.section.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() + "/" : ""}${label}`.slice(0, 160) : "";
 }

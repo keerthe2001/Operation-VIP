@@ -67,6 +67,29 @@ const f = {
   },
 };
 
+/** Workday's real "My Experience" markup: automation ids, MM / YYYY spinbuttons, error text. */
+const wdx = {
+  input(auto: string, label: string, r = true, extra = "") {
+    const i = id();
+    return `<div data-automation-id="formField-${auto}"><label for="${i}">${label}${req(r)}</label><input type="text" id="${i}" data-automation-id="${auto}" ${r ? 'aria-required="true"' : ""} ${extra}></div>`;
+  },
+  button(auto: string, label: string) {
+    const i = id();
+    return `<div data-automation-id="formField-${auto}"><label id="l${i}">${label}${req(true)}</label><button type="button" aria-haspopup="listbox" aria-label="${label} Select One Required" id="${i}" data-automation-id="${auto}">Select One</button></div>`;
+  },
+  date(auto: string, label: string, error = "") {
+    const i = id();
+    const err = error ? `<div data-automation-id="errorMessage" id="e${i}" role="alert">${error}</div>` : "";
+    return `<div data-automation-id="formField-${auto}"><label id="l${i}">${label}${req(true)}</label><div data-automation-id="dateInputWrapper" role="group" aria-labelledby="l${i}">
+      <input type="text" role="spinbutton" aria-label="Month" aria-valuetext="MM" placeholder="MM" data-automation-id="dateSectionMonth-input" ${error ? `aria-invalid="true" aria-describedby="e${i}"` : ""}>
+      <input type="text" role="spinbutton" aria-label="Year" aria-valuetext="YYYY" placeholder="YYYY" data-automation-id="dateSectionYear-input"></div>${err}</div>`;
+  },
+  check(auto: string, label: string) {
+    const i = id();
+    return `<div data-automation-id="formField-${auto}"><input type="checkbox" id="${i}" data-automation-id="${auto}"><label for="${i}">${label}</label></div>`;
+  },
+};
+
 export const SAMPLES: Sample[] = [
   {
     name: "Workday · My Information",
@@ -101,6 +124,27 @@ export const SAMPLES: Sample[] = [
       ${wd.select("Veteran Status")}${wd.select("Please select one of the options below regarding disability")}
       ${wd.check("I have read and consent to the terms and conditions *")}`,
     expect: [["Gender", "gender"], ["Ethnicity", "ethnicity"], ["Hispanic", "hispanic"], ["Veteran", "veteran_status"], ["Disability", "disability_status"], ["Consent", null]],
+  },
+  {
+    name: "Workday · My Experience (automation ids, MM/YYYY dates, errors)",
+    html: `<h2>My Experience</h2>
+      <div data-automation-id="workExperienceSection"><div role="group" aria-labelledby="we1"><h4 id="we1">Work Experience 1</h4>
+        ${wdx.input("jobTitle", "Job Title")}${wdx.input("company", "Company")}${wdx.input("location", "Location", false)}
+        ${wdx.check("currentlyWorkHere", "I currently work here")}${wdx.date("startDate", "From", "Error: The month must be between 1 and 12")}${wdx.date("endDate", "To")}
+        ${wdx.input("roleDescription", "Role Description", false)}</div></div>
+      <div data-automation-id="educationSection"><div role="group" aria-labelledby="ed1"><h4 id="ed1">Education 1</h4>
+        ${wdx.input("school", "School or University")}${wdx.button("degree", "Degree")}${wdx.input("fieldOfStudy", "Field of Study", false)}
+        ${wdx.input("gradeAverage", "Overall Result (GPA)", false)}</div></div>
+      <div data-automation-id="skillsSection"><h3>Skills</h3>${wdx.input("skills", "Type to Add Skills", false, 'data-uxi-widget-type="selectinput"')}</div>
+      <div data-automation-id="resumeSection"><h3>Resume/CV</h3><input type="file" data-automation-id="file-upload-input-ref" aria-label="Upload a file"></div>
+      <div data-automation-id="websiteSection"><h3>Websites</h3>${wdx.input("url", "URL", false)}</div>
+      <h3>Social Network URLs</h3>${wdx.input("linkedin", "LinkedIn", false)}`,
+    expect: [
+      ["Job Title", "current_title"], ["Company", "current_company"], ["Location", "job_location"], ["I currently work here", "currently_working"],
+      ["From · Month", "employment_start"], ["From · Year", "employment_start"], ["To · Month", "employment_end"], ["To · Year", "employment_end"],
+      ["Role Description", "role_description"], ["School", "school"], ["Degree", "degree"], ["Field of Study", "discipline"], ["GPA", "gpa"],
+      ["Skills", "skills"], ["Resume", "resume"], ["Website", "website_item"], ["LinkedIn", "linkedin"],
+    ],
   },
   {
     name: "Greenhouse",

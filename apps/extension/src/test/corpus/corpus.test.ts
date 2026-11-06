@@ -30,3 +30,14 @@ describe("recognition across ATS and career-page samples", () => {
     expect(total).toBeGreaterThan(100);
   });
 });
+
+describe("Workday validation errors", () => {
+  it("reads the error under a date and the page's error banner", async () => {
+    const { pageErrors } = await import("@/content/forms/scanner");
+    const sample = SAMPLES.find((s) => s.name.startsWith("Workday · My Experience"))!;
+    document.body.innerHTML = `<div data-automation-id="errorBanner"><h2 data-automation-id="errorHeading">Errors Found</h2></div>${sample.html}`;
+    const from = scanFields().find((f) => f.automationId?.includes("dateSectionMonth") && f.error);
+    expect(from?.error).toContain("month must be between 1 and 12");
+    expect(pageErrors().join(" ")).toContain("Errors Found");
+  });
+});

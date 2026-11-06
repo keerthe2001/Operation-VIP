@@ -1,7 +1,7 @@
 import { Button, Input, NativeSelect, cn } from "@copilot/ui";
 import { useId, useState, type ReactNode } from "react";
 
-import { send, useSettings, useWidgetPrefs } from "@/sidepanel/chrome-state";
+import { send, useLocal, useSettings, useWidgetPrefs } from "@/sidepanel/chrome-state";
 import { FIELD_GROUPS, type AutofillSettings as Settings } from "@/shared/settings";
 
 const save = (settings: Partial<Settings>) => send({ type: "SET_SETTINGS", settings });
@@ -165,6 +165,8 @@ export function AutofillSettings() {
         )}
       </Setting>
 
+      <MemorySetting />
+
       <FieldToggles disabled={settings.disabledFields} />
     </section>
   );
@@ -217,6 +219,29 @@ function FieldToggles({ disabled }: { disabled: string[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Answers Copilot learned from the user's own corrections (kept on this device). */
+function MemorySetting() {
+  const memory = useLocal("memory");
+  const count = Object.keys(memory ?? {}).filter((k) => !k.startsWith("*|")).length;
+  return (
+    <div className="grid gap-1.5">
+      <p className="text-sm font-medium">Remembered answers</p>
+      <div className="flex items-center justify-between gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+        <span>
+          {count
+            ? `${count} answer${count === 1 ? "" : "s"} you gave or corrected. Copilot reuses them next time.`
+            : "When you correct a field or fill one Copilot missed, it remembers your answer."}
+        </span>
+        {count > 0 && (
+          <Button size="sm" variant="outline" onClick={() => send({ type: "CLEAR_MEMORY" })}>
+            Clear
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

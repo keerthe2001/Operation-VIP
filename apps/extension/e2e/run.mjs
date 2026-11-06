@@ -216,7 +216,10 @@ const EXP_HTML = `<!doctype html><html><head><title>My Experience</title></head>
       <label for="c\${n}">Company</label><input id="c\${n}" class="company">
       <label><input type="checkbox" class="current"> I currently work here</label>
       <div role="group" aria-labelledby="fl\${n}"><span id="fl\${n}">From</span>
-        <input aria-label="Month" class="fm" placeholder="MM"><input aria-label="Year" class="fy" placeholder="YYYY"></div>
+        <input aria-label="Month" class="fm keyed" role="spinbutton" data-automation-id="dateSectionMonth-input" placeholder="MM">
+        <input aria-label="Year" class="fy keyed" role="spinbutton" data-automation-id="dateSectionYear-input" placeholder="YYYY"></div>
+      <div role="group" aria-labelledby="tl\${n}"><span id="tl\${n}">To</span>
+        <input aria-label="Month" class="tm keyed" placeholder="MM"><input aria-label="Year" class="ty keyed" placeholder="YYYY"></div>
       <label for="d\${n}">Role Description</label><textarea id="d\${n}" class="desc"></textarea></div>\`;
     return \`<div class="entry"><label for="s\${n}">School or University</label><input id="s\${n}" class="school">
       <label for="g\${n}">Degree</label><input id="g\${n}" class="degree"></div>\`;
@@ -241,9 +244,28 @@ const EXP_HTML = `<!doctype html><html><head><title>My Experience</title></head>
     }
     document.body.append(list);
   });
+  // Like Workday's date sections: only keystrokes change the value; a pasted value is dropped.
+  document.addEventListener("focusin", (e) => { if (e.target.classList?.contains("keyed")) e.target.__keys = false; }, true);
+  document.addEventListener("keydown", (e) => { if (e.target.classList?.contains("keyed")) e.target.__keys = true; }, true);
+  document.addEventListener("input", (e) => { const t = e.target; if (t.classList?.contains("keyed") && !t.__keys) t.value = ""; }, true);
   window.__atContinue = null;
+  window.__attempts = 0;
   document.getElementById("next").addEventListener("click", () => {
+    // First press: the page refuses, clears Company and shows Workday's error banner.
+    if (window.__attempts++ === 0) {
+      const company = document.querySelector(".company");
+      company.value = "";
+      company.setAttribute("aria-invalid", "true");
+      company.setAttribute("aria-describedby", "company-error");
+      company.insertAdjacentHTML("afterend", '<div id="company-error" data-automation-id="errorMessage" role="alert">Error: Company is required</div>');
+      document.body.insertAdjacentHTML("afterbegin", '<div data-automation-id="errorBanner"><h2 data-automation-id="errorHeading">Errors Found</h2></div>');
+      company.addEventListener("input", () => { company.removeAttribute("aria-invalid"); document.getElementById("company-error")?.remove(); }, { once: true });
+      return;
+    }
     window.__atContinue = {
+      attempts: window.__attempts,
+      toMonths: [...document.querySelectorAll(".tm")].map((i) => i.value),
+      toYears: [...document.querySelectorAll(".ty")].map((i) => i.value),
       titles: [...document.querySelectorAll(".title")].map((i) => i.value),
       companies: [...document.querySelectorAll(".company")].map((i) => i.value),
       months: [...document.querySelectorAll(".fm")].map((i) => i.value),
@@ -693,8 +715,11 @@ try {
   check(signedIn.clicks[0] === "Create Account" && signedIn.clicks.includes("signin-link"), `auto: created the account, saw it exists and switched to Sign In (${signedIn.clicks.join(" → ")})`);
   check(signedIn.creds[0] === "priya.raman@example.com" && signedIn.creds[1] === "Str0ng!Pass", "auto: signed in with the saved email and password");
   await flow.waitForFunction(() => document.getElementById("ln")?.value === "Raman", null, { timeout: 20000 });
+  const needsRow = panelIn(flow).getByRole("button", { name: /^Needs you/ });
+  await needsRow.waitFor({ timeout: 15000 });
+  check((await needsRow.getAttribute("aria-expanded")) === "false", "Needs you stays folded until the user opens it");
   const needItem = panelIn(flow).getByRole("button", { name: /Why do you want to join Acme/ });
-  await needItem.waitFor({ timeout: 15000 });
+  await clickUntil(needsRow, () => needItem.waitFor({ timeout: 3000 }).then(() => true));
   check(true, "auto: filled the next page and stopped at the question that needs the user");
   if (shots) await flow.screenshot({ path: `${shots}/flow-needs-you.png` });
   const focusedWhy = async () => flow.waitForFunction(() => document.activeElement?.id === "why", null, { timeout: 10000 }).then(() => true, () => false);
@@ -728,7 +753,7 @@ try {
   await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "auto", fillProgress: "off" } }));
   const expCounts = await worker.evaluate(async () => {
     const p = (await chrome.storage.local.get("profile")).profile.profile;
-    return { jobs: p.experience.length, schools: p.education.length, first: p.experience.find((e) => e.is_current) ?? p.experience[0], school: p.education[0]?.institution };
+    return { jobs: p.experience.length, schools: p.education.length, first: p.experience.find((e) => e.is_current) ?? p.experience[0], school: p.education[0]?.institution, past: p.experience.findIndex((e) => !e.is_current && e.end_date) };
   });
   await context.route(EXP_URL, (route) => route.fulfill({ contentType: "text/html", body: EXP_HTML }));
   const exp = await context.newPage();
@@ -739,6 +764,11 @@ try {
   check(atContinue.titles.length === expCounts.jobs && atContinue.schools.length === expCounts.schools, `pressed Add for each job and school in the profile (${atContinue.titles.length} jobs, ${atContinue.schools.length} schools)`);
   check(atContinue.titles[0] === expCounts.first.designation && atContinue.companies[0] === expCounts.first.company_name, `work experience filled before continuing (${atContinue.titles[0]} at ${atContinue.companies[0]})`);
   check(/^\d{2}$/.test(atContinue.months[0]) && /^\d{4}$/.test(atContinue.years[0]), `split From date filled as month and year (${atContinue.months[0]}/${atContinue.years[0]})`);
+  check(atContinue.attempts === 2, `Save and Continue refused once ("Errors Found", Company cleared): Copilot read the error, refilled and pressed again (${atContinue.attempts} presses)`);
+  if (expCounts.past >= 0) {
+    const i = expCounts.past;
+    check(/^\d{2}$/.test(atContinue.toMonths[i]) && /^\d{4}$/.test(atContinue.toYears[i]), `To date that ignores pasted values was re-typed after verification (${atContinue.toMonths[i]}/${atContinue.toYears[i]})`);
+  }
   check(atContinue.schools[0] === expCounts.school, `education filled (${atContinue.schools[0]})`);
   check(atContinue.chips.length >= 3, `skills entered one at a time in the search box (${atContinue.chips.join(", ")})`);
   check(atContinue.cv === "Priya_Raman_Resume.pdf" && atContinue.linkedin.includes("linkedin.com"), "resume uploaded under its section heading, LinkedIn filled");
@@ -769,6 +799,12 @@ try {
   check(after === null, "sign out clears the stored session");
   console.log("\nAll extension E2E checks passed.");
 } catch (error) {
+  const dump = await context.serviceWorkers()[0]?.evaluate(async () => {
+    const all = await chrome.storage.session.get(null);
+    return Object.entries(all).filter(([k]) => k.startsWith("activity:") || k.startsWith("form:")).map(([k, v]) =>
+      k.startsWith("activity:") ? `${k}\n  ${v.map((e) => e.text).join("\n  ")}` : `${k} ${v.url}\n  ${v.fields.map((f) => `${f.label}=${f.currentValue}|${f.key}|${f.result ?? ""}|${f.error ?? ""}`).join("\n  ")}`);
+  }).catch(() => []);
+  if (process.env.E2E_DEBUG) console.log((dump ?? []).join("\n"));
   for (const p of context.pages()) {
     console.log(`--- ${p.url()}\n${(await p.locator("body").innerText().catch(() => "")).slice(0, 600)}`);
   }

@@ -6,7 +6,7 @@
 import { fillFields } from "@/content/autofill/writer";
 import { expandSections } from "@/content/forms/sections";
 import { detectJob, forcedJob } from "@/content/detection/engine";
-import { accountExists, actionKind, actionText, findAction, findField, findSignIn, scanFields } from "@/content/forms/scanner";
+import { accountExists, actionKind, actionText, findAction, findField, findSignIn, pageErrors, scanFields } from "@/content/forms/scanner";
 import { toContentSchema } from "@/shared/messages";
 
 // Confirmation pages after applying.
@@ -51,10 +51,11 @@ function report(force = false) {
   const action = actionEl ? actionText(actionEl).slice(0, 80) : null;
   const kind = action ? actionKind(action) : null;
   const exists = !!job?.isApplicationPage && accountExists();
-  const fieldsPayload = JSON.stringify({ fields, action, exists });
+  const errors = job?.isApplicationPage ? pageErrors() : [];
+  const fieldsPayload = JSON.stringify({ fields, action, exists, errors });
   if (force || fieldsPayload !== lastFields) {
     lastFields = fieldsPayload;
-    post({ type: "FIELDS_SCANNED", url: location.href, fields, action, actionKind: kind, accountExists: exists });
+    post({ type: "FIELDS_SCANNED", url: location.href, fields, action, actionKind: kind, accountExists: exists, pageErrors: errors });
   }
 }
 
@@ -165,7 +166,19 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     interactive: parsed.data.interactive,
     onProgress: (id, status, message) => post({ type: "FILL_PROGRESS", id, status, message }),
   })
-    .then((results) => sendResponse({ ok: true, data: results }))
+    .then(async (results) => {
+      // Read back what each control now holds, so the fill can be verified right away
+      // (some widgets drop a value moments after it's set).
+      await new Promise((r) => setTimeout(r, 250));
+      const now = new Map(scanFields().map((f) => [f.id, f]));
+      sendResponse({
+        ok: true,
+        data: results.map((r) => {
+          const f = now.get(r.id);
+          return f ? { ...r, current: f.currentValue.slice(0, 2000), error: f.error?.slice(0, 300) ?? "" } : r;
+        }),
+      });
+    })
     .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }))
     .finally(() => {
       filling = false;

@@ -4,6 +4,7 @@ import { splitLocation } from "@/mapping/location";
 import { attrWords, norm } from "@/mapping/normalize";
 import { matchBoolean, matchNumber, matchText } from "@/mapping/options";
 import { RULES, RULES_BY_KEY } from "@/mapping/taxonomy";
+import { workdayKey } from "@/mapping/workday";
 import type { FieldDescriptor, FieldStatus, MappedField } from "@/shared/fields";
 import type { ExtensionProfile } from "@/shared/types";
 
@@ -55,7 +56,9 @@ export function isQuestion(field: FieldDescriptor): boolean {
 /** Which part of a split date a box takes ("From" → Month / Year boxes on Workday). */
 export function datePart(field: FieldDescriptor): "month" | "year" | null {
   const text = `${field.label} ${field.placeholder} ${field.name} ${field.htmlId}`.toLowerCase();
-  const id = field.htmlId.toLowerCase();
+  const id = `${field.htmlId} ${field.automationId ?? ""}`.toLowerCase();
+  // A single "MM/YYYY" box takes the whole date; only separate boxes are parts.
+  if (/mm\s*\/\s*yyyy/i.test(`${field.placeholder} ${field.label}`)) return null;
   if (/\b(month|mm)\b/.test(text) || /datesectionmonth/.test(id)) return "month";
   if (/\b(year|yyyy|yy)\b/.test(text) || /datesectionyear/.test(id)) return "year";
   return null;
@@ -69,6 +72,9 @@ const DATE_KEYS = new Set(["employment_start", "employment_end", "graduation_yea
  */
 export function classify(field: FieldDescriptor): Classification {
   const section = (field.section ?? "").toLowerCase();
+  // Workday's own field ids are exact; date boxes still go through the label/section rules.
+  const wd = datePart(field) ? undefined : workdayKey(field.automationId, section);
+  if (wd !== undefined) return wd ? { key: wd, confidence: 0.97, question: false } : { key: null, confidence: 0, question: false };
   const part = datePart(field);
   // Match "From Month" as "From".
   const base = part ? { ...field, label: field.label.replace(/\b(month|year|day|mm|yyyy|dd)\b/gi, " ").trim() } : field;
@@ -303,7 +309,7 @@ function formatDate(raw: string, field: FieldDescriptor): string {
   const [y, m, d] = iso ? [iso[1]!, iso[2]!, iso[3] ?? "01"] : dmy ? [dmy[3]!, dmy[2]!.padStart(2, "0"), dmy[1]!.padStart(2, "0")] : [];
   if (!y) return raw;
   if (field.kind === "date") return `${y}-${m}-${d}`;
-  if (/\bmm\/yyyy\b/i.test(`${field.placeholder} ${field.helpText}`)) return `${m}/${y}`;
+  if (/\bmm\s*\/\s*yyyy\b/i.test(`${field.placeholder} ${field.helpText} ${field.label}`)) return `${m}/${y}`;
   if (/\bdd\/mm\/yyyy\b/i.test(`${field.placeholder} ${field.helpText}`) || (iso?.[3] ?? dmy)) return `${d}/${m}/${y}`;
   return monthYear(raw) ?? raw;
 }
@@ -320,7 +326,8 @@ export function resolveValue(key: string, field: FieldDescriptor, profile: Profi
   } else if (typeof raw === "string" && ["date_of_birth", "employment_start", "employment_end", "current_date"].includes(key) && raw !== "Present") {
     raw = formatDate(raw, field);
   }
-  if (key === "employment_end" && raw === "Present" && field.kind === "date") return null;
+  // A current job has no end date to type into a date box (the "currently work here" box covers it).
+  if (key === "employment_end" && raw === "Present" && (field.kind === "date" || /mm|yyyy/i.test(`${field.placeholder} ${field.label}`))) return null;
   if (raw === null || raw === undefined || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null;
   // Work authorization text answers a Yes/No question only when sponsorship is known to be unnecessary.
   if (key === "work_authorization" && ["radio", "select", "combobox"].includes(field.kind) && typeof raw === "string") {

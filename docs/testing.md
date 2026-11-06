@@ -87,13 +87,15 @@ tab drag, auto-open, autofill, create-account password, other sites can't embed 
 fill on a Workday-style step (scrolls to each field, custom dropdowns, country code + national number,
 consent box, progress popup, the panel's Save and Continue); Auto apply mode end to end (create account →
 "already exists" → sign in → fill → stop at the question for the user → jump to it from the panel → continue →
-ask before Submit → submitted in the tracker); Workday "My Experience" (Add sections, split dates, skills, resume);
+ask before Submit → submitted in the tracker); Workday "My Experience" (Add sections, MM/YYYY spinbuttons typed key by key, a date box
+that drops pasted values and is re-typed after verification, a refused Save and Continue with "Errors Found"
+that is read, refilled and pressed again, skills, resume);
 fields revealed by a style change; the docked panel has no visible scrollbars.
 
 Field recognition is also measured on a corpus of form samples modelled on Workday (My Information,
-Application Questions, Voluntary Disclosures), Greenhouse, Lever, iCIMS, SmartRecruiters, Taleo,
+My Experience with automation ids and error messages, Application Questions, Voluntary Disclosures), Greenhouse, Lever, iCIMS, SmartRecruiters, Taleo,
 SuccessFactors, Ashby, a Naukri-style form and an Indian careers page
-(`apps/extension/src/test/corpus`): 138 of 138 fields map as expected; no injection on unsupported sites;
+(`apps/extension/src/test/corpus`): 155 of 155 fields map as expected, field and page errors are read; no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

@@ -55,6 +55,32 @@ function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function needsTyping(el: HTMLElement): boolean {
+  const id = el.getAttribute("data-automation-id") ?? "";
+  return el.getAttribute("role") === "spinbutton" || /dateSection/i.test(id);
+}
+
+/** Types a value the way a keyboard would: key events plus the value growing one character at a time. */
+async function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  input.focus();
+  input.select?.();
+  setNativeValue(input, "");
+  dispatch(input, "input");
+  let typed = "";
+  for (const char of value) {
+    const init = { key: char, code: /\d/.test(char) ? `Digit${char}` : undefined, bubbles: true, cancelable: true, composed: true };
+    input.dispatchEvent(new KeyboardEvent("keydown", init));
+    input.dispatchEvent(new KeyboardEvent("keypress", init));
+    typed += char;
+    setNativeValue(input, typed);
+    input.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, data: char, inputType: "insertText" }));
+    input.dispatchEvent(new KeyboardEvent("keyup", init));
+    await wait(15);
+  }
+  dispatch(input, "change");
+  input.blur();
+}
+
 const norm = (text: string) => text.toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
 
 /** The option that best matches a value: exact, then prefix, then containment, then shared words. */
@@ -220,10 +246,14 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
       }
       default: {
         const input = el as HTMLInputElement | HTMLTextAreaElement;
-        input.focus();
-        setNativeValue(input, instruction.value ?? "");
-        dispatch(input, "input", "change");
-        input.blur();
+        // Date spin boxes (Workday) and widgets that ignore a set value get it typed key by key.
+        if (instruction.typing || needsTyping(input)) await typeInto(input, instruction.value ?? "");
+        else {
+          input.focus();
+          setNativeValue(input, instruction.value ?? "");
+          dispatch(input, "input", "change");
+          input.blur();
+        }
       }
     }
   } catch (error) {
