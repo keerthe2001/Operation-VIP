@@ -1,3 +1,4 @@
+import { matchJobSkills } from "@copilot/shared";
 import { Badge, Button } from "@copilot/ui";
 import { Briefcase, Building2, CheckCircle2, ExternalLink, FormInput, Link2, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
@@ -5,6 +6,31 @@ import { useState } from "react";
 import { send } from "@/sidepanel/chrome-state";
 import { WEB_URL } from "@/shared/config";
 import { PORTAL_NAMES, type ApplicationStatus, type DetectedJob, type TrackedApplication } from "@/shared/types";
+
+function MatchingSkills({ description, skills }: { description: string | null | undefined; skills: string[] }) {
+  if (!description) {
+    return <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">No job description found on this page.</p>;
+  }
+  const matched = matchJobSkills(description, skills);
+  return (
+    <div className="mt-3 grid gap-1.5 border-t pt-3">
+      <p className="text-xs text-muted-foreground">
+        {matched.length
+          ? `The description mentions ${matched.length} of your skills`
+          : "The description doesn't mention any skills from your profile."}
+      </p>
+      {matched.length > 0 && (
+        <ul className="flex flex-wrap gap-1" aria-label="Your skills mentioned in the job description">
+          {matched.map((skill) => (
+            <li key={skill}>
+              <Badge variant="secondary">{skill}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   detected: "Detected",
@@ -64,11 +90,13 @@ export function JobCard({
   onRescan,
   tabId,
   tracked,
+  skills,
 }: {
   job: DetectedJob;
   onRescan: () => void;
   tabId?: number | null;
   tracked?: TrackedApplication | null;
+  skills?: string[];
 }) {
   return (
     <section aria-labelledby="job-heading" className="rounded-xl border bg-card p-4 shadow-sm">
@@ -109,6 +137,7 @@ export function JobCard({
           </div>
         )}
       </dl>
+      {skills && <MatchingSkills description={job.description} skills={skills} />}
       {tracked && tabId != null && <TrackerRow tabId={tabId} tracked={tracked} />}
     </section>
   );

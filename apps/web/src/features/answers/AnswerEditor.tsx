@@ -21,7 +21,12 @@ import { useProfile } from "@/features/profile/queries";
 import type { SavedAnswerInput } from "@/lib/answers/answer-service";
 import { ApiError } from "@/lib/api/errors";
 
-const SAMPLE_JOB = { company: "Acme Corp", title: "Software Engineer" };
+// The description lets {matching_skills} show realistic output in the preview.
+const SAMPLE_JOB = {
+  company: "Acme Corp",
+  title: "Software Engineer",
+  description: "We build services in Python, Go, JavaScript, React, Node.js, SQL, PostgreSQL, AWS and Docker.",
+};
 
 export interface EditorState {
   id?: string;

@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 
 from app.db.models import DocumentClass
+from app.resume_pipeline import errors
+from app.resume_pipeline.errors import PipelineError
 from app.resume_pipeline.extractors.doc import extract_doc
 from app.resume_pipeline.extractors.docx import extract_docx
 from app.resume_pipeline.extractors.image import extract_image, ocr_pdf_pages
@@ -31,8 +33,14 @@ class DocumentExtractor:
     def _pdf(self, data: bytes) -> tuple[ExtractedDocument, DocumentClass]:
         document, textless = extract_pdf(data)
         if not textless:
+            if not document.lines:
+                raise PipelineError(errors.NO_TEXT, "We couldn't find any text in this PDF.")
             return document, DocumentClass.TEXT_PDF
 
+        if self.ocr is None and document.lines:
+            # Some pages are scans but OCR is unavailable: keep the text we have.
+            document.warnings.append(f"Pages {textless} look scanned and were skipped.")
+            return document, DocumentClass.TEXT_PDF
         to_ocr = textless[: self.ocr_max_pages]
         pages, engine = ocr_pdf_pages(data, to_ocr, self.ocr, dpi=self.ocr_dpi)
         # Merge OCR'd pages back in page order with the text pages.

@@ -12,6 +12,7 @@ PLACEHOLDERS = {
     "current_company": "Your current or latest employer",
     "years_experience": "Your total years of experience",
     "top_skills": "Your first few skills",
+    "matching_skills": "Your skills that the job description mentions (else your top skills)",
     "highest_degree": "Your most recent degree",
     "notice_period": "Your notice period",
 }
@@ -36,7 +37,7 @@ STARTER_TEMPLATES: list[AnswerTemplate] = [
         question_text="Why are you interested in this role?",
         answer_template=(
             "The {job_title} role lets me build on my {years_experience} years as a "
-            "{current_designation}, especially my work with {top_skills}. I'm looking for "
+            "{current_designation}, especially my work with {matching_skills}. I'm looking for "
             "[what you want next: scope, ownership, domain], which this position offers."
         ),
     ),
@@ -89,7 +90,7 @@ STARTER_TEMPLATES: list[AnswerTemplate] = [
         question_text="Why should we hire you?",
         answer_template=(
             "I bring {years_experience} years as a {current_designation} with hands-on "
-            "experience in {top_skills}. For example, [a relevant achievement]. I'd bring the "
+            "experience in {matching_skills}. For example, [a relevant achievement]. I'd bring the "
             "same [quality] to the {job_title} role at {company}."
         ),
     ),

@@ -57,8 +57,9 @@ ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
 # Resume text is full of typographic dashes and long regular expressions.
-"app/resume_pipeline/parsing/*" = ["RUF001", "E501"]
-"tests/**" = ["S101", "S105", "S106", "S107", "S603", "S607", "RUF001", "E501"]
+"app/resume_pipeline/parsing/*" = ["RUF001", "RUF003", "E501"]
+"app/resume_pipeline/extractors/pdf.py" = ["RUF001"]
+"tests/**" = ["S101", "S105", "S106", "S107", "S311", "S603", "S607", "RUF001", "E501"]
 
 [tool.mypy]
 python_version = "3.12"

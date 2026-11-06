@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyIntent, matchAnswers, placeholderValues, renderTemplate, type SavedAnswer } from "./answers";
+import { classifyIntent, matchAnswers, matchJobSkills, placeholderValues, renderTemplate, type SavedAnswer } from "./answers";
 
 function answer(id: string, category: SavedAnswer["category"], question: string, usage = 0): SavedAnswer {
   return {
@@ -83,5 +83,22 @@ describe("renderTemplate", () => {
     expect(rendered.text).toBe("Notice: {notice_period}. I like {company} because [your reason].");
     expect(rendered.missing).toEqual(["notice_period", "company"]);
     expect(rendered.prompts).toEqual(["your reason"]);
+  });
+});
+
+describe("job description matching", () => {
+  it("finds the user's skills that the description mentions", () => {
+    const description = "We use Python, Node.js and C++ daily. Experience with AWS is a plus. JavaScript not required.";
+    expect(matchJobSkills(description, ["Go", "Python", "C++", "Node.js", "AWS", "Java", "python"])).toEqual(["Python", "C++", "Node.js", "AWS"]);
+    expect(matchJobSkills(null, ["Python"])).toEqual([]);
+  });
+
+  it("fills {matching_skills} from the description, falling back to top skills", () => {
+    const profile = {
+      personal_information: {}, professional_summary: {}, experience: [], education: [], additional_info: {},
+      skills: { programming_languages: ["Python", "Go", "Rust"], frameworks: ["Django"], databases: ["PostgreSQL"] },
+    } as unknown as Parameters<typeof placeholderValues>[0];
+    expect(placeholderValues(profile, { description: "Django and PostgreSQL experience needed" }).matching_skills).toBe("Django and PostgreSQL");
+    expect(placeholderValues(profile, {}).matching_skills).toBe("Python, Go and Rust");
   });
 });

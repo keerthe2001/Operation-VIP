@@ -1175,27 +1175,20 @@ export interface components {
         ProjectItem: {
             /** Confidence */
             confidence?: number | null;
-            /** Description */
-            description?: string | null;
             /**
              * Is Confirmed
              * @default false
              */
             is_confirmed: boolean;
             /**
-             * Outcomes
+             * Points
              * @default []
              */
-            outcomes: string[];
+            points: string[];
             /** Project Name */
             project_name?: string | null;
             /** Role */
             role?: string | null;
-            /**
-             * Technologies
-             * @default []
-             */
-            technologies: string[];
             /** Url */
             url?: string | null;
         };

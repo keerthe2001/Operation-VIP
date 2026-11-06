@@ -13,6 +13,7 @@ Nothing is invented: if a rule does not fire, the field stays null.
 
 from __future__ import annotations
 
+import itertools
 import re
 import statistics
 from dataclasses import dataclass, field
@@ -35,7 +36,7 @@ from app.schemas.resume_data import (
     Skills,
 )
 
-PARSER_VERSION = "rules-1.0"
+PARSER_VERSION = "rules-1.1"
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 URL_RE = re.compile(
@@ -43,7 +44,39 @@ URL_RE = re.compile(
     r"(?:/[^\s,|;)]*)?",
     re.IGNORECASE,
 )
-BULLET_RE = re.compile(r"^\s*(?:[•●▪■◦‣∙·\-–—*➢➤►▸»✓✔]|\(?\d{1,2}[.)])\s+")
+# Bullet glyphs, including Symbol/Wingdings bullets that Word-exported PDFs encode in the
+# Unicode private-use area (U+F0B7, U+F0A7, U+F076, ...), and "o" second-level bullets.
+_BULLET_GLYPHS = "•●▪■□◦‣∙·➢➤►▸»✓✔❖◆◇⮚➔→⇒★☆✦✧❯›\uf000-\uf0ff\ue000-\uef00"
+BULLET_RE = re.compile(
+    rf"^\s*(?:[{_BULLET_GLYPHS}]\s*|[\-–—*]\s+|o\s+(?=[A-Z])|\(?\d{{1,2}}[.)]\s+|\(?[a-z][.)]\s+(?=[A-Z]))"
+)
+MONTH_NAMES = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?"
+
+US_STATE_RE = re.compile(
+    r",\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b"
+)
+
+# A line this long that doesn't end a sentence has most likely wrapped onto the next line.
+WRAP_LENGTH = 55
+CONNECTORS = {
+    "and",
+    "or",
+    "to",
+    "with",
+    "for",
+    "of",
+    "in",
+    "by",
+    "using",
+    "via",
+    "including",
+    "while",
+}
+LABEL_LINE_RE = re.compile(r"^[A-Za-z][A-Za-z /&]{1,24}:\s")
+ACHIEVEMENT_LABEL_RE = re.compile(
+    r"^(?:key\s+)?(?:achievements?|accomplishments?|highlights|impact|results|awards?)\s*[:\-–]?\s*(?P<rest>.*)$",
+    re.IGNORECASE,
+)
 METRIC_RE = re.compile(
     r"\d+(?:\.\d+)?\s*(?:%|x\b|k\b|m\b|\+)|\$\s?\d|₹\s?\d|\b(?:increased|reduced|improved|"
     r"grew|saved|cut|boosted|decreased|accelerated|won|awarded|ranked)\b",
@@ -75,15 +108,45 @@ _PLACE = r"[A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+){0,2}"
 PLACE_RE = re.compile(rf"{_PLACE},\s*{_PLACE}|[Rr]emote|[Hh]ybrid")
 TRAILING_PLACE_RE = re.compile(rf"^(.+?),\s*({_PLACE},\s*{_PLACE})$")
 SPLIT_RE = re.compile(r"\s+(?:\||•|·|–|—|-|@|at)\s+|\s*\|\s*|,\s+(?=[A-Z])")
+TECH_LABEL_RE = re.compile(
+    r"^(?:tech(?:nologies|nology| stack)?|tools(?: used)?|stack|built with)\s*:", re.I
+)
 SKILL_SPLIT_RE = re.compile(r"\s*(?:,|;|\||•|·|/(?!\s?[A-Za-z]{1,2}\b))\s*")
 
 
 def _clean(text: str) -> str:
-    return " ".join(BULLET_RE.sub("", text).split()).strip(" ,;:|-–—")
+    text = re.sub(r"\(\s*\)|\[\s*\]", "", BULLET_RE.sub("", text))
+    cleaned = " ".join(text.split()).strip(" ,;:|-–—")
+    # Unbalanced brackets left behind after removing a date: "Engineer (" → "Engineer".
+    if cleaned.count("(") > cleaned.count(")"):
+        cleaned = cleaned.rstrip(" (")
+    if cleaned.count(")") > cleaned.count("("):
+        cleaned = cleaned.lstrip(") ")
+    return cleaned
 
 
 def _norm_heading(text: str) -> str:
-    return re.sub(r"[^a-z& ]+", "", text.lower().replace("&", " and ")).strip()
+    cleaned = re.sub(r"[^a-z ]+", " ", text.lower().replace("&", " and "))
+    return " ".join(cleaned.split())
+
+
+CONTACT_HEADINGS = {
+    "contact",
+    "contact information",
+    "contact details",
+    "contact info",
+    "personal details",
+    "personal information",
+    "personal info",
+    "get in touch",
+    "reach me",
+}
+
+# Lexicon entries normalized the same way as the text they are compared with.
+NORMALIZED_HEADINGS = {
+    kind: {_norm_heading(name) for name in names}
+    for kind, names in lexicons.SECTION_HEADINGS.items()
+}
 
 
 def _is_bullet(line: TextLine) -> bool:
@@ -123,10 +186,18 @@ class RuleBasedParser:
         self.meta = {}
         lines = [ln for ln in lines if ln.text.strip()]
         body_size = statistics.median([ln.size for ln in lines]) if lines else 11.0
+        lines = self._rejoin_wrapped(lines, body_size)
         header, sections = self._split_sections(lines, body_size)
         full_text = "\n".join(ln.text for ln in lines)
 
-        personal = self._personal(header, full_text, body_size)
+        # A "Contact" / "Personal details" section (common in sidebars) counts as header.
+        contact = [
+            ln
+            for sec in sections
+            if _norm_heading(sec.title) in CONTACT_HEADINGS
+            for ln in sec.lines
+        ]
+        personal = self._personal(header, full_text, body_size, contact)
         experience = self._experience(self._lines_of(sections, "experience"))
         education = self._education(self._lines_of(sections, "education"))
         skills = self._skills(self._lines_of(sections, "skills"), full_text)
@@ -147,6 +218,73 @@ class RuleBasedParser:
 
     # ------------------------------------------------------------------ sections
 
+    def _rejoin_wrapped(self, lines: list[TextLine], body_size: float) -> list[TextLine]:
+        """Undo line wrapping that splits a date range or a section heading in two."""
+        out: list[TextLine] = []
+        for line in lines:
+            previous = out[-1] if out else None
+            if previous is not None:
+                text = line.text.strip()
+                # "(10/2023 –" + "Current)"  /  "Jan 2020 to" + "Mar 2022"
+                month_break = re.search(
+                    rf"\(?\b(?:{MONTH_NAMES})\.?\s*$", previous.text, re.I
+                ) and re.match(r"^'?\d{2,4}\b", text)
+                # "(2021-10" + "– 2022-12)": the separator starts the next line.
+                dash_break = (
+                    not find_date_range(previous.text)
+                    and re.search(
+                        r"(?:\d{4}(?:[-/.]\d{1,2})?|\d{1,2}[-/.]\d{4}|'\d{2})\s*$", previous.text
+                    )
+                    and re.match(
+                        rf"^(?:[-–—]|to\b)\s*\(?(?:present|current|now|today|\d{{1,2}}[-/.]\d{{4}}\b|\d{{4}}\b|(?:{MONTH_NAMES})\.?\s*'?\d)",
+                        text,
+                        re.I,
+                    )
+                )
+                if (
+                    month_break
+                    or dash_break
+                    or (
+                        re.search(
+                            r"(?:\d|present|current|now)\s*(?:[-–—]|to)\s*$", previous.text, re.I
+                        )
+                        and (
+                            re.match(
+                                r"^\(?(?:present|current|now|today|\d{1,2}[/.-]\d{4}|\d{4}|[a-z]{3,9}\.?\s*'?\d{2,4})",
+                                text,
+                                re.I,
+                            )
+                        )
+                    )
+                ):
+                    out[-1] = TextLine(
+                        text=f"{previous.text.rstrip()} {text}",
+                        size=previous.size,
+                        bold=previous.bold,
+                        page=previous.page,
+                        heading_style=previous.heading_style,
+                        list_item=previous.list_item,
+                    )
+                    continue
+                # "TECHNICAL" + "SKILLS" in a narrow sidebar
+                joined = f"{previous.text.strip()} {text}"
+                if (
+                    previous.size == line.size
+                    and previous.bold == line.bold
+                    and (previous.bold or line.size >= body_size + 1)
+                    and len(joined.split()) <= 4
+                    and self._heading_kind(previous, body_size) is None
+                    and self._heading_kind(line, body_size) is None
+                    and self._heading_kind(
+                        TextLine(joined, line.size, line.bold, line.page, line.heading_style),
+                        body_size,
+                    )
+                ):
+                    out[-1] = TextLine(joined, line.size, line.bold, line.page, line.heading_style)
+                    continue
+            out.append(line)
+        return out
+
     def _heading_kind(self, line: TextLine, body_size: float) -> str | None:
         text = line.text.strip()
         words = text.split()
@@ -160,7 +298,7 @@ class RuleBasedParser:
             or (text.isupper() and len(text) > 3)
         )
         plain_ok = len(words) <= 3 and not re.search(r"[.,;]", text)
-        for kind, names in lexicons.SECTION_HEADINGS.items():
+        for kind, names in NORMALIZED_HEADINGS.items():
             # An exact lexicon match is enough when styled; plain matches must be short
             # and contain no sentence punctuation to avoid catching body text.
             if normalized in names and (styled or plain_ok):
@@ -199,7 +337,9 @@ class RuleBasedParser:
 
     # ------------------------------------------------------------------ personal
 
-    def _personal(self, header: list[TextLine], text: str, body_size: float) -> PersonalInformation:
+    def _personal(
+        self, header: list[TextLine], text: str, body_size: float, contact: list[TextLine]
+    ) -> PersonalInformation:
         info = PersonalInformation()
         prefix = "personal_information"
 
@@ -208,7 +348,7 @@ class RuleBasedParser:
             info.email = email.group(0).lower().rstrip(".")
             self._set_meta(f"{prefix}.email", 0.97, email.group(0))
 
-        phone = self._phone(text)
+        phone = self._phone(text, [*header, *contact])
         if phone:
             info.phone, raw = phone
             self._set_meta(f"{prefix}.phone", 0.9, raw)
@@ -245,28 +385,42 @@ class RuleBasedParser:
                 self._set_meta(f"{prefix}.first_name", confidence - 0.05, name)
                 self._set_meta(f"{prefix}.last_name", confidence - 0.1, name)
 
-        location = self._location(header)
+        location = self._location(header) or self._location(contact)
         if location:
             info.location = location
             self._set_meta(f"{prefix}.location", 0.6, location)
         return info
 
-    def _phone(self, text: str) -> tuple[str, str] | None:
-        lowered = text.lower()
-        hinted = [
+    def _phone(self, text: str, header: list[TextLine] | None = None) -> tuple[str, str] | None:
+        # The country comes from the person's own contact details, not e.g. a university name.
+        contact_text = " ".join(ln.text for ln in header or [])
+        lowered = contact_text.lower()
+        hinted = ["US"] if US_STATE_RE.search(contact_text) else []
+        hinted += [
             region
             for word, region in lexicons.COUNTRY_HINTS.items()
             if re.search(rf"\b{re.escape(word)}\b", lowered)
         ]
         # International numbers first, then the location's country, then common regions.
         regions: list[str] = ["ZZ", *hinted, self.region, *lexicons.COMMON_REGIONS]
-        for region in dict.fromkeys(regions):
-            for match in phonenumbers.PhoneNumberMatcher(text, region, leniency=1):
-                if phonenumbers.is_valid_number(match.number):
-                    formatted = phonenumbers.format_number(
-                        match.number, phonenumbers.PhoneNumberFormat.E164
-                    )
-                    return formatted, match.raw_string
+        # Contact details live in the header; elsewhere, skip lines with dates so a range
+        # like "11/2023 - 11/2024" is never read as a phone number.
+        candidates = [ln.text for ln in header or []]
+        candidates += [
+            line
+            for line in text.splitlines()
+            if not find_date_range(line) and not YEAR_RE.search(line) and line not in candidates
+        ]
+        for chunk in candidates:
+            for region in dict.fromkeys(regions):
+                for match in phonenumbers.PhoneNumberMatcher(chunk, region, leniency=1):
+                    if YEAR_RE.fullmatch(match.raw_string.strip()):
+                        continue
+                    if phonenumbers.is_valid_number(match.number):
+                        formatted = phonenumbers.format_number(
+                            match.number, phonenumbers.PhoneNumberFormat.E164
+                        )
+                        return formatted, match.raw_string
         return None
 
     def _name(self, header: list[TextLine], body_size: float) -> tuple[str, float] | None:
@@ -278,7 +432,7 @@ class RuleBasedParser:
             if not 1 < len(words) <= 4 or len(cleaned) > 50:
                 return False
             if re.search(r"[\d@/:|]", cleaned) or _norm_heading(cleaned) in {
-                n for names in lexicons.SECTION_HEADINGS.values() for n in names
+                n for names in NORMALIZED_HEADINGS.values() for n in names
             }:
                 return False
             if any(w.lower().strip(",.") in lexicons.TITLE_KEYWORDS for w in words):
@@ -297,6 +451,19 @@ class RuleBasedParser:
         return name, confidence
 
     def _location(self, header: list[TextLine]) -> str | None:
+        # A narrow sidebar can wrap "London, United" / "Kingdom": try rejoined pairs first.
+        for first, second in itertools.pairwise(header):
+            joined = f"{first.text.strip()} {second.text.strip()}"
+            if (
+                re.fullmatch(r"[A-Z][A-Za-z .'-]+(?: [A-Z][A-Za-z.'-]+){0,2}", second.text.strip())
+                and len(second.text.split()) <= 2
+                and re.fullmatch(
+                    r"[A-Z][A-Za-z .'-]{1,30},\s*[A-Z][A-Za-z .'-]{1,30}(?:,\s*[A-Z][A-Za-z .'-]{1,30})?",
+                    joined,
+                )
+                and not EMAIL_RE.search(joined)
+            ):
+                return joined
         for line in header:
             for part in re.split(r"\s*[|•·]\s*|\s{3,}", line.text):
                 part = part.strip()
@@ -334,6 +501,16 @@ class RuleBasedParser:
     def _title_score(self, text: str) -> int:
         lowered = text.lower()
         return sum(2 for k in lexicons.TITLE_KEYWORDS if re.search(rf"\b{re.escape(k)}\b", lowered))
+
+    def _looks_like_header_detail(self, text: str) -> bool:
+        """A line under a job's dates that still belongs to its header (title, company, place)."""
+        cleaned = _clean(text)
+        return bool(
+            self._title_score(cleaned)
+            or self._company_score(cleaned)
+            or PLACE_RE.search(cleaned)
+            or any(re.search(rf"\b{key}\b", cleaned.lower()) for key, _ in EMPLOYMENT_TYPES)
+        )
 
     @staticmethod
     def _can_be_header(line: TextLine) -> bool:
@@ -383,8 +560,11 @@ class RuleBasedParser:
             while (
                 after < next_start
                 and len(head) < 4
-                and not _is_bullet(lines[after])
+                and self._can_be_header(lines[after])
                 and len(lines[after].text) <= 70
+                and len(lines[after].text.split()) <= 8
+                and self._looks_like_header_detail(lines[after].text)
+                and not (after + 1 < next_start and lines[after + 1].text.strip()[:1].islower())
             ):
                 head.append(lines[after])
                 after += 1
@@ -404,8 +584,9 @@ class RuleBasedParser:
         if date_range is None:  # anchors always contain a range; keep mypy and -O safe
             return ExperienceItem()
         fragments: list[str] = []
+        fragment_lines: list[int] = []
         location: str | None = None
-        for line in head:
+        for line_index, line in enumerate(head):
             text = line.text
             if line is date_line:
                 text = text[: date_range.span[0]] + "   " + text[date_range.span[1] :]
@@ -428,6 +609,27 @@ class RuleBasedParser:
                     part = _clean(part)
                     if part and not re.fullmatch(r"[\W\d]*", part):
                         fragments.append(part)
+                        fragment_lines.append(line_index)
+
+        # A narrow column can wrap "Engineer — Acme" / "Technologies Pvt Ltd": rejoin a
+        # dangling capitalized word with the company-like fragment that follows it.
+        merged: list[str] = []
+        for position, fragment in enumerate(fragments):
+            if (
+                merged
+                and position > 0
+                and fragment_lines[position] != fragment_lines[position - 1]
+                and len(merged[-1].split()) == 1
+                and merged[-1][:1].isupper()
+                and self._title_score(merged[-1]) == 0
+                and self._company_score(merged[-1]) == 0
+                and (self._company_score(fragment) > 0 or self._title_score(fragment) > 0)
+                and not PLACE_RE.fullmatch(fragment)
+            ):
+                merged[-1] = f"{merged[-1]} {fragment}"
+            else:
+                merged.append(fragment)
+        fragments = merged
 
         employment_type = None
         remaining: list[str] = []
@@ -497,20 +699,50 @@ class RuleBasedParser:
             confidence=round(min(confidence, 0.95), 2),
         )
 
-    def _bullets(self, body: list[TextLine]) -> tuple[list[str], list[str]]:
+    @staticmethod
+    def _continues(previous_line: str, line: TextLine) -> bool:
+        """Is this non-bullet line the wrapped rest of the previous line?"""
+        text = line.text.strip()
+        first = text.split(" ", 1)[0].lower()
+        if text[:1].islower() or text[:1] in ",;)&" or first in CONNECTORS:
+            return True
+        # Otherwise only a long, unfinished previous line can have wrapped.
+        previous = previous_line.strip()
+        unfinished = not re.search(r"[.!?:]$|[.!?][\")\]]$", previous)
+        return unfinished and len(previous) >= WRAP_LENGTH
+
+    def _points(self, body: list[TextLine]) -> list[str]:
+        """Bullet points (or one-sentence lines) with wrapped lines joined back together."""
         items: list[str] = []
+        previous_raw = ""
         for line in body:
             text = _clean(line.text)
             if not text:
                 continue
-            if _is_bullet(line) or not items:
+            if _is_bullet(line) or not items or not self._continues(previous_raw, line):
                 items.append(text)
             else:
-                # Wrapped continuation of the previous bullet.
                 items[-1] = f"{items[-1]} {text}"
-        responsibilities = [i for i in items if not METRIC_RE.search(i)]
-        achievements = [i for i in items if METRIC_RE.search(i)]
-        return responsibilities, achievements
+            previous_raw = line.text
+        return items
+
+    def _bullets(self, body: list[TextLine]) -> tuple[list[str], list[str]]:
+        """Responsibilities, plus achievements when the resume labels them explicitly."""
+        responsibilities: list[TextLine] = []
+        achievements: list[TextLine] = []
+        target = responsibilities
+        for line in body:
+            text = line.text.strip()
+            label = ACHIEVEMENT_LABEL_RE.match(BULLET_RE.sub("", text))
+            if label:
+                rest = label.group("rest").strip()
+                if rest:  # "Achievement: Cut costs by 20%"
+                    achievements.append(TextLine(text=rest, list_item=True))
+                else:  # a sub-heading; following points are achievements
+                    target = achievements
+                continue
+            target.append(line)
+        return self._points(responsibilities), self._points(achievements)
 
     # ------------------------------------------------------------------ education
 
@@ -676,10 +908,29 @@ class RuleBasedParser:
             buckets[self._categorize(skill)].append(skill)
 
         if lines:
+            # Narrow columns can wrap a multi-word skill: "Java, Spring" / "Boot, Docker".
+            # Rejoin across the line break only when the halves form a known skill.
+            known = {name.lower() for name in lexicons.SKILLS}
+            groups: list[str] = []
             for line in lines:
                 text = _clean(line.text)
+                if not text:
+                    continue
                 label_split = re.match(r"^([A-Za-z &/]{2,40}):\s*(.+)$", text)
                 content = label_split.group(2) if label_split else text
+                previous = groups[-1] if groups else ""
+                tail = re.split(r"[,;|•·]", previous)[-1].strip()
+                head = re.split(r"[,;|•·]", content)[0].strip()
+                if (
+                    previous
+                    and not label_split
+                    and not re.search(r"[,;|•·]\s*$", previous)
+                    and f"{tail} {head}".lower() in known
+                ):
+                    groups[-1] = f"{previous} {content}"
+                else:
+                    groups.append(content)
+            for content in groups:
                 for token in SKILL_SPLIT_RE.split(content):
                     add(token)
             self._set_meta("skills", 0.8, "skills section")
@@ -692,29 +943,54 @@ class RuleBasedParser:
 
     # ------------------------------------------------------------------ projects
 
+    def _is_project_title(
+        self, line: TextLine, previous: TextLine | None, bold_titles: bool
+    ) -> bool:
+        text = line.text.strip()
+        if (
+            _is_bullet(line)
+            or len(text) > 100
+            or TECH_LABEL_RE.match(text)
+            or LABEL_LINE_RE.match(text)
+        ):
+            return False
+        if bold_titles:
+            # When the resume bolds project names, only bold lines start projects.
+            return line.bold
+        if previous is None:
+            return True
+        if find_date_range(text) or " | " in text or URL_RE.search(text):
+            return True
+        words = text.split()
+        title_like = (
+            len(words) <= 8
+            and text[:1].isupper()
+            and not re.search(r"[.;,]$", text)
+            and not text.endswith(":")
+        )
+        # A short title-like line right after a finished point starts a new project.
+        prev = previous.text.strip()
+        return title_like and (
+            not _is_bullet(line) and (bool(re.search(r"[.!?]$", prev)) or _is_bullet(previous))
+        )
+
     def _projects(self, lines: list[TextLine]) -> list[ProjectItem]:
+        lines = [ln for ln in lines if ln.text.strip()]
+        non_bullets = [ln for ln in lines if not _is_bullet(ln)]
+        # Bold only counts as the title style when it is used selectively.
+        bold_titles = any(ln.bold for ln in non_bullets) and not all(ln.bold for ln in non_bullets)
         groups: list[tuple[TextLine, list[TextLine]]] = []
+        previous: TextLine | None = None
         for line in lines:
-            is_title = (
-                not _is_bullet(line)
-                and len(line.text) <= 90
-                and (
-                    line.bold
-                    or not groups
-                    or (groups and groups[-1][1] and _is_bullet(groups[-1][1][-1]))
-                )
-                and not re.match(
-                    r"^(?:tech(?:nologies|nology| stack)?|tools|stack)\s*:", line.text, re.I
-                )
-            )
-            if is_title:
+            if self._is_project_title(line, previous, bold_titles) or not groups:
                 groups.append((line, []))
-            elif groups:
+            else:
                 groups[-1][1].append(line)
+            previous = line
 
         items: list[ProjectItem] = []
         for title_line, body in groups:
-            title_text = title_line.text
+            title_text = BULLET_RE.sub("", title_line.text)
             url_match = URL_RE.search(title_text) or next(
                 (m for ln in body if (m := URL_RE.search(ln.text))), None
             )
@@ -722,42 +998,32 @@ class RuleBasedParser:
             if date_range:
                 title_text = title_text[: date_range.span[0]] + title_text[date_range.span[1] :]
             parts = [p for p in (_clean(p) for p in SPLIT_RE.split(title_text)) if p]
+            parts = [p for p in parts if not URL_RE.fullmatch(p)]
             name = parts[0] if parts else None
-            if name and URL_RE.fullmatch(name):
-                name = None
-            tech: list[str] = []
-            description_lines: list[str] = []
+            role = None
+            for part in parts[1:]:
+                if self._title_score(part) > 0 and len(part.split()) <= 5:
+                    role = part
+            points_source: list[TextLine] = []
             for ln in body:
-                tech_label = re.match(
-                    r"^(?:tech(?:nologies|nology| stack)?|tools|stack)\s*:\s*(.+)$",
-                    _clean(ln.text),
-                    re.I,
-                )
-                if tech_label:
-                    tech.extend(t for t in SKILL_SPLIT_RE.split(tech_label.group(1)) if t)
-                else:
-                    description_lines.append(ln.text)
-            responsibilities, outcomes = self._bullets(
-                [TextLine(text=t, list_item=True) for t in description_lines]
-            )
-            if not tech:
-                tech = self._find_skills(" ".join([title_line.text, *description_lines]))
-            role_match = re.search(
-                r"\b(?:role|as)\s*:?\s+([A-Z][A-Za-z -]{2,40})", " ".join(description_lines)
-            )
+                cleaned = _clean(ln.text)
+                role_match = re.match(r"^(?:my\s+)?role\s*:\s*(.{2,60})$", cleaned, re.I)
+                if role_match:
+                    role = role or role_match.group(1).strip(" .")
+                elif not TECH_LABEL_RE.match(cleaned):
+                    points_source.append(ln)
+            points = self._points(points_source)
             items.append(
                 ProjectItem(
                     project_name=name,
-                    description=" ".join(responsibilities) or None,
-                    role=role_match.group(1).strip() if role_match else None,
-                    technologies=tech,
-                    outcomes=outcomes,
+                    role=role,
+                    points=points,
                     url=(
                         url_match.group(0)
                         if url_match and url_match.group(0).startswith("http")
                         else (f"https://{url_match.group(0)}" if url_match else None)
                     ),
-                    confidence=0.7 if title_line.bold else 0.55,
+                    confidence=0.75 if (title_line.bold or bold_titles) else 0.55,
                 )
             )
         return [p for p in items if p.project_name]
@@ -768,7 +1034,8 @@ class RuleBasedParser:
         items: list[CertificationItem] = []
         for line in lines:
             text = _clean(line.text)
-            if not text or len(text) < 4:
+            # Short entries are allowed when they are acronyms (PMP, CPA, CKA).
+            if not text or (len(text) < 4 and not (len(text) >= 2 and text.isupper())):
                 continue
             if items and not _is_bullet(line) and not line.bold and text[:1].islower():
                 continue  # wrapped continuation

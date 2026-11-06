@@ -106,6 +106,29 @@ export function matchAnswers(question: string, answers: SavedAnswer[]): AnswerMa
 export interface JobContext {
   company?: string | null;
   title?: string | null;
+  /** Plain-text job description, when the page has one. */
+  description?: string | null;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The user's own skills that the job description mentions, in profile order.
+ * Only exact (case-insensitive, whole-word) mentions count, so nothing is guessed.
+ */
+export function matchJobSkills(description: string | null | undefined, skills: string[]): string[] {
+  if (!description) return [];
+  const text = description.toLowerCase();
+  const seen = new Set<string>();
+  return skills.filter((skill) => {
+    const key = skill.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    // Word boundaries that also work for names like "C++", "Node.js" or ".NET".
+    return new RegExp(`(^|[^a-z0-9+#.])${escapeRegExp(key)}(?![a-z0-9+#])`, "i").test(text);
+  });
 }
 
 function listOf(items: string[]): string {
@@ -118,7 +141,9 @@ export function placeholderValues(profile: Pick<Profile, "personal_information" 
   const p = profile?.personal_information;
   const s = profile?.professional_summary;
   const current = profile?.experience.find((e) => e.is_current) ?? profile?.experience[0];
-  const skills = profile ? Object.values(profile.skills).flat().slice(0, 3) : [];
+  const allSkills = profile ? Object.values(profile.skills).flat() : [];
+  const skills = allSkills.slice(0, 3);
+  const matching = matchJobSkills(job.description, allSkills).slice(0, 4);
   const years = s?.total_experience_years;
   return {
     company: job.company ?? null,
@@ -129,6 +154,8 @@ export function placeholderValues(profile: Pick<Profile, "personal_information" 
     current_company: current?.company_name ?? null,
     years_experience: years === null || years === undefined ? null : Number.isInteger(years) ? String(years) : years.toFixed(1),
     top_skills: skills.length ? listOf(skills) : null,
+    // Falls back to the top skills when the page has no description to compare with.
+    matching_skills: matching.length ? listOf(matching) : skills.length ? listOf(skills) : null,
     highest_degree: profile?.education[0]?.degree ?? null,
     notice_period: profile?.additional_info.notice_period ?? null,
   };

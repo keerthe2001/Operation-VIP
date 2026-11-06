@@ -25,7 +25,7 @@ function QuestionCard({ field, tabId, job, data }: { field: MappedField; tabId: 
   const textareaId = useId();
   const question = fieldLabel(field);
   const candidates = useMemo(() => candidatesFor(question, data.answers), [question, data.answers]);
-  const values = useMemo(() => placeholderValues(data.profile, { company: job.company, title: job.title }), [data.profile, job]);
+  const values = useMemo(() => placeholderValues(data.profile, { company: job.company, title: job.title, description: job.description }), [data.profile, job]);
   const [index, setIndex] = useState(0);
   const [edited, setEdited] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);

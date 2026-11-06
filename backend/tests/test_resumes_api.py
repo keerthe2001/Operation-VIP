@@ -31,7 +31,7 @@ async def test_upload_pdf_processes_and_seeds_profile(client: AsyncClient):
     assert detail["doc_class"] == "text_pdf"
     assert detail["page_count"] == 1
     assert "Priya Raman" in detail["extracted_text"]
-    assert detail["extraction_meta"]["parser"] == "rules-1.0"
+    assert detail["extraction_meta"]["parser"].startswith("rules-")
     assert detail["extracted_data"]["personal_information"]["email"] == "priya.raman@example.com"
 
     profile = (await client.get("/api/v1/profile", headers=headers)).json()

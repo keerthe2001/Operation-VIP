@@ -27,6 +27,7 @@ MIN_CHARS_PER_PAGE = 40
 # pdfminer emits "(cid:N)" for glyphs without a Unicode mapping. In resumes these are
 # almost always bullets or separators, so they are normalized to "•".
 CID_RE = re.compile(r"\(cid:\d+\)")
+LONE_BULLET_RE = re.compile(r"(?:[•●▪■□◦‣∙·➢➤►▸»✓✔❖◆◇⮚➔→\-–—*o]|[\uf000-\uf0ff]|\(cid:\d+\))")
 
 
 def _is_bold(fontname: str) -> bool:
@@ -46,7 +47,9 @@ def _group_lines(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
         segment: list[dict[str, Any]] = [row[0]]
         for word in row[1:]:
             gap = word["x0"] - segment[-1]["x1"]
-            if gap > max(30.0, word["size"] * 3):
+            # A lone bullet glyph belongs to the text after it, however far it is indented.
+            lone_bullet = len(segment) == 1 and LONE_BULLET_RE.fullmatch(segment[0]["text"])
+            if gap > max(30.0, word["size"] * 3) and not lone_bullet:
                 lines.append(_make_line(segment))
                 segment = [word]
             else:
@@ -68,26 +71,52 @@ def _make_line(words: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _find_gutter(lines: list[dict[str, Any]], width: float) -> float | None:
+    """x position of a vertical gap separating two columns of text, if there is one."""
+    if len(lines) < 8:
+        return None
+    best: tuple[int, float] | None = None
+    for step in range(int(width * 0.2), int(width * 0.8), 4):
+        x = float(step)
+        left = sum(1 for ln in lines if ln["x1"] <= x)
+        right = sum(1 for ln in lines if ln["x0"] >= x)
+        crossing = len(lines) - left - right
+        if min(left, right) < max(4, len(lines) * 0.15):
+            continue
+        # Lines spanning the gutter are allowed only for a full-width header.
+        if crossing <= max(3, len(lines) * 0.1) and (best is None or crossing < best[0]):
+            best = (crossing, x)
+    return best[1] if best else None
+
+
 def _order_columns(lines: list[dict[str, Any]], width: float) -> list[dict[str, Any]]:
     """Read sidebar/two-column layouts column by column instead of row by row."""
-    split = width * 0.5
-    left = [ln for ln in lines if ln["x1"] <= split + 5]
-    right = [ln for ln in lines if ln["x0"] >= split - 5 and ln["x1"] > split + 5]
-    if len(lines) < 8 or len(left) < len(lines) * 0.2 or len(right) < len(lines) * 0.2:
+    gutter = _find_gutter(lines, width)
+    if gutter is None:
         return lines
-    # Find where the columns start: the first row with content on both sides.
-    left_tops = {round(ln["top"]) for ln in left}
+    left = [ln for ln in lines if ln["x1"] <= gutter]
+    right = [ln for ln in lines if ln["x0"] >= gutter]
+    # The columns start at the first row that has text on both sides; anything above
+    # (and any line crossing the gutter above that point) is the shared header.
+    left_tops = [ln["top"] for ln in left]
     both = [ln["top"] for ln in right if any(abs(ln["top"] - t) < 4 for t in left_tops)]
     if not both:
         return lines
-    column_start = min(both)
-    header = [ln for ln in lines if ln["top"] < column_start - 2]
-    body = [ln for ln in lines if ln["top"] >= column_start - 2]
-    body_left = [ln for ln in body if ln["x1"] <= split + 5]
-    body_right = [ln for ln in body if ln not in body_left]
+    column_start = min(both) - 2
+    header = [ln for ln in lines if ln["top"] < column_start]
+    body_left = [ln for ln in left if ln["top"] >= column_start]
+    body_right = [ln for ln in right if ln["top"] >= column_start]
+    spanning = [
+        ln
+        for ln in lines
+        if ln["top"] >= column_start and ln not in body_left and ln not in body_right
+    ]
     by_top = lambda ln: (ln["top"], ln["x0"])  # noqa: E731
     return (
-        sorted(header, key=by_top) + sorted(body_left, key=by_top) + sorted(body_right, key=by_top)
+        sorted(header, key=by_top)
+        + sorted(body_left, key=by_top)
+        + sorted(body_right, key=by_top)
+        + sorted(spanning, key=by_top)
     )
 
 
@@ -121,8 +150,12 @@ def extract_pdf(data: bytes) -> tuple[ExtractedDocument, list[int]]:
             except Exception:
                 logger.exception("Failed to read page %s", number)
                 words = []
-            if sum(len(w["text"]) for w in words) < MIN_CHARS_PER_PAGE:
+            # A page with little text is "scanned" only if it carries an image; a short
+            # last page (one overflowing line) is ordinary text.
+            if sum(len(w["text"]) for w in words) < MIN_CHARS_PER_PAGE and page.images:
                 textless_pages.append(number)
+                continue
+            if not words:
                 continue
             for raw in _order_columns(_group_lines(words), float(page.width)):
                 text = " ".join(CID_RE.sub(" • ", raw["text"]).split())

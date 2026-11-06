@@ -75,11 +75,14 @@ def test_engineer_resume_experience():
     assert previous.location == "Chennai, India"
     assert (previous.start_date, previous.end_date) == ("2017-07", "2020-12")
     assert intern.employment_type == "Internship"
-    # Wrapped bullet lines are joined; metric bullets become achievements.
-    assert "Mentored 4 engineers and ran design reviews for the payments platform team." in (
-        current.responsibilities
-    )
-    assert current.achievements == ["Reduced API latency by 40% by introducing Redis caching."]
+    # Wrapped bullet lines are joined; every bullet is a responsibility unless the resume
+    # labels achievements explicitly.
+    assert current.responsibilities == [
+        "Led migration of billing services to Kubernetes and PostgreSQL.",
+        "Reduced API latency by 40% by introducing Redis caching.",
+        "Mentored 4 engineers and ran design reviews for the payments platform team.",
+    ]
+    assert current.achievements == []
     assert {"Kubernetes", "PostgreSQL", "Redis"} <= set(current.technologies)
 
 
@@ -109,8 +112,7 @@ def test_engineer_resume_projects_and_certifications():
     (project,) = data.projects
     assert project.project_name == "OpenLedger"
     assert project.url == "https://github.com/priyaraman/openledger"
-    assert project.technologies == ["Python", "PostgreSQL"]
-    assert project.outcomes == ["Double-entry accounting library used by 2,000+ developers."]
+    assert project.points == ["Double-entry accounting library used by 2,000+ developers."]
 
     assert [
         (c.certification_name, c.issuing_organization, c.issue_date) for c in data.certifications
@@ -171,3 +173,95 @@ def test_skills_fallback_without_section_has_lower_confidence():
     data = parse(doc)
     assert {"Tableau", "SQL", "Python"} <= {*data.skills.tools, *data.skills.programming_languages}
     assert data.field_meta["skills"].confidence == 0.5
+
+
+def test_achievements_only_when_labelled():
+    doc = lines(
+        [
+            ("Ravi Iyer", dict(size=20.0, bold=True)),
+            ("Experience", dict(bold=True)),
+            "Sales Manager, Contoso Ltd",
+            "2019 - Present",
+            "• Managed a team of 12 account executives.",
+            "• Grew regional revenue by 35% in two years.",
+            "Key Achievements:",
+            "• Top performer award 2022.",
+            "• Opened three new markets.",
+            "Operations Lead, Fabrikam Inc",
+            "2016 - 2019",
+            "• Ran daily operations.",
+            "Achievement: Cut costs by 15%.",
+        ]
+    )
+    first, second = parse(doc).experience
+    assert first.responsibilities == [
+        "Managed a team of 12 account executives.",
+        "Grew regional revenue by 35% in two years.",
+    ]
+    assert first.achievements == ["Top performer award 2022.", "Opened three new markets."]
+    assert second.responsibilities == ["Ran daily operations."]
+    assert second.achievements == ["Cut costs by 15%."]
+
+
+def test_project_points_are_not_split_into_projects():
+    # Bullets with Word's Symbol-font glyph (as pdfplumber reports it), wrapped lines and
+    # plain sentence lines must all stay inside their project.
+    doc = lines(
+        [
+            ("Meera Das", dict(size=20.0, bold=True)),
+            ("Projects", dict(bold=True)),
+            "Inventory Tracker",
+            "\uf0b7 Built a REST API with Flask and PostgreSQL for the",
+            "warehouse team",
+            "\uf0b7Added barcode scanning",
+            "Deployed on AWS with Docker.",
+            "Chat Application | github.com/meera/chat",
+            "• Real-time messaging using WebSockets.",
+            "Role: Frontend Lead",
+        ]
+    )
+    tracker, chat = parse(doc).projects
+    assert tracker.project_name == "Inventory Tracker"
+    assert tracker.points == [
+        "Built a REST API with Flask and PostgreSQL for the warehouse team",
+        "Added barcode scanning",
+        "Deployed on AWS with Docker.",
+    ]
+    assert chat.project_name == "Chat Application"
+    assert chat.url == "https://github.com/meera/chat"
+    assert chat.role == "Frontend Lead"
+
+
+def test_bold_project_titles_win_over_heuristics():
+    doc = lines(
+        [
+            ("Sam Roy", dict(size=20.0, bold=True)),
+            ("Projects", dict(bold=True)),
+            ("Weather App", dict(bold=True)),
+            "Shows forecasts.",
+            "Uses OpenWeather API",
+            ("Budget Planner", dict(bold=True)),
+            "Tracks spending.",
+        ]
+    )
+    projects = parse(doc).projects
+    assert [p.project_name for p in projects] == ["Weather App", "Budget Planner"]
+    assert projects[0].points == ["Shows forecasts.", "Uses OpenWeather API"]
+
+
+def test_sentence_lines_without_bullets_are_separate_points():
+    doc = lines(
+        [
+            ("Ana Silva", dict(size=20.0, bold=True)),
+            ("Experience", dict(bold=True)),
+            "Nurse, City Hospital",
+            "2018 - 2023",
+            "Cared for patients in a 30-bed ward.",
+            "Trained new staff on safety procedures.",
+        ]
+    )
+    (job,) = parse(doc).experience
+    assert job.responsibilities == [
+        "Cared for patients in a 30-bed ward.",
+        "Trained new staff on safety procedures.",
+    ]

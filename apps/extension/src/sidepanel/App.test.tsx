@@ -242,3 +242,26 @@ describe("application tracking", () => {
     expect(await screen.findByText("Marked as submitted")).toBeInTheDocument();
   });
 });
+
+describe("job description", () => {
+  it("shows which of the user's skills the description mentions and uses them in answers", async () => {
+    const withSkills = { ...profile, profile: { ...profile.profile, skills: { programming_languages: ["Python", "Go"], tools: ["Docker"] } } };
+    const describedJob = { ...job, description: "You will write Python services and deploy them with Docker." };
+    installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile: withSkills },
+      session: { "tab:7": { url: job.url, job: describedJob, analyzedAt: 1 } },
+    });
+    render(<App />);
+    expect(await screen.findByText("The description mentions 2 of your skills")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Your skills mentioned in the job description" });
+    expect(list).toHaveTextContent("Python");
+    expect(list).toHaveTextContent("Docker");
+    expect(list).not.toHaveTextContent("Go");
+  });
+
+  it("says when the page has no description", async () => {
+    installFakeChrome({ local: { auth: { status: "signed_in", user }, profile }, session: { "tab:7": { url: job.url, job, analyzedAt: 1 } } });
+    render(<App />);
+    expect(await screen.findByText("No job description found on this page.")).toBeInTheDocument();
+  });
+});

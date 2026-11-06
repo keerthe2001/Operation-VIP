@@ -2,10 +2,11 @@
 
 | Suite | Command | Count |
 |---|---|---|
-| Backend (pytest, real Postgres + Redis) | `cd backend && uv run pytest` | 107 |
-| Shared logic (vitest) | `pnpm --filter @copilot/shared test` | 21 |
-| Web app (vitest + Testing Library) | `pnpm --filter @copilot/web test` | 36 |
-| Extension (vitest + Testing Library) | `pnpm --filter @copilot/extension test` | 109 |
+| Backend (pytest, real Postgres + Redis) | `cd backend && uv run pytest` | 116 |
+| Resume corpus (part of backend) | `uv run pytest tests/test_corpus.py` | 150 + 20 resumes |
+| Shared logic (vitest) | `pnpm --filter @copilot/shared test` | 23 |
+| Web app (vitest + Testing Library) | `pnpm --filter @copilot/web test` | 38 |
+| Extension (vitest + Testing Library) | `pnpm --filter @copilot/extension test` | 111 |
 | Extension E2E (Playwright, real Chromium) | `node apps/extension/e2e/run.mjs` | 36 checks |
 
 ## Backend
@@ -32,6 +33,26 @@
 | `test_extractors.py`, `test_ocr_doc_scan.py` | Validation, PDF/DOCX/DOC/image extraction, OCR, decompression bombs, ClamAV, fail-closed scanning |
 | `test_resumes_api.py`, `test_profile_api.py`, `test_storage.py`, `test_worker.py` | Upload pipeline, duplicates, isolation between users, profile CRUD/completion, S3 (moto), arq queue |
 | `test_extension_api.py`, `test_answers_api.py`, `test_applications_api.py` | ETag sync, handoff, answer library, tracker (idempotent detection, forward-only status, stats) |
+
+## Resume corpus (parser regression)
+
+`backend/tests/corpus/generator.py` builds fictional resumes with known ground truth and
+renders each with a random combination of real-world variations: PDF (four fonts, two-column
+sidebars, page sizes), DOCX (Word heading styles or bold runs, real list bullets, tables),
+Word-exported PDF and legacy `.doc` (via LibreOffice) and phone-photo PNGs (via OCR);
+headings in caps or title case with synonyms; bullet glyphs `• - * ▪ –`, numbers, Word's
+Symbol bullet or none; title-first or company-first; separators `| — , at`; six date
+formats; dates inline, on their own line, or in parentheses; shuffled and missing sections.
+
+* `tests/test_corpus.py` (runs in CI) fails if any field family drops below 98% on the fixed
+  seeds, or fewer than 95% of resumes are fully correct.
+* Explore with `uv run python -m scripts.evaluate_parser --count 300 --start <seed> [--formats pdf,docx]`.
+  It prints per-field accuracy, per-format results and the failing seeds to inspect.
+
+Latest run on 500 unseen resumes (all formats): 495 fully correct; every field family ≥ 99.6%.
+The remaining errors are OCR letter misreads ("Iyer" → "lyer"). These are synthetic
+resumes; real-world resumes with heavy design (icons instead of labels, text in graphics)
+are not covered yet, so add generator variations when a real resume parses badly.
 
 ## Frontend and extension
 

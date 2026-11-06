@@ -2099,29 +2099,17 @@
             ],
             "title": "Confidence"
           },
-          "description": {
-            "anyOf": [
-              {
-                "maxLength": 5000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
           "is_confirmed": {
             "default": false,
             "title": "Is Confirmed",
             "type": "boolean"
           },
-          "outcomes": {
+          "points": {
             "default": [],
             "items": {
               "type": "string"
             },
-            "title": "Outcomes",
+            "title": "Points",
             "type": "array"
           },
           "project_name": {
@@ -2147,14 +2135,6 @@
               }
             ],
             "title": "Role"
-          },
-          "technologies": {
-            "default": [],
-            "items": {
-              "type": "string"
-            },
-            "title": "Technologies",
-            "type": "array"
           },
           "url": {
             "anyOf": [

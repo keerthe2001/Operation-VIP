@@ -143,8 +143,8 @@ work_experience  (id, profile_id FK, company_name, designation, employment_type,
                   achievements TEXT[], technologies TEXT[], sort_order, confidence, is_confirmed)
 education        (id, profile_id FK, degree, institution, specialization, start_year,
                   graduation_year, grade, sort_order, confidence, is_confirmed)
-projects         (id, profile_id FK, project_name, description, role, technologies TEXT[],
-                  outcomes TEXT[], url, sort_order, confidence, is_confirmed)
+projects         (id, profile_id FK, project_name, role, url, points TEXT[],
+                  sort_order, confidence, is_confirmed)
 certifications   (id, profile_id FK, certification_name, issuing_organization, issue_date,
                   credential_url, confidence, is_confirmed)
 
@@ -219,6 +219,9 @@ Saved answers with `{company}`, `{job_title}`, `{current_designation}`,
 | Answer matching in `packages/shared` | The same code previews answers on the web and suggests them in the extension, offline. |
 | Sensitive fields never auto-filled | Salary, sponsorship, work authorization and demographic answers always need the user's review; EEO questions and consent boxes are never mapped. |
 | Status only moves forward automatically | The extension may set *detected* → *in progress*; *submitted* and later are only ever set by the user. |
+| Projects are name, role, link and a list of points | Technologies and outcomes duplicated the points and weren't used; every multi-line item is edited one point per field. |
+| Achievements only when the resume labels them | Classifying bullets by numbers ("30%") guessed wrong; bullets go to responsibilities unless under an "Achievements" sub-heading. |
+| Synthetic corpus with ground truth | Real resumes can't be committed; the generator covers layout variety and turns parser regressions into failing tests. |
 | Extension pages identified by URL | A side panel opened in a tab also has `sender.tab`; routing by URL keeps it from being mistaken for a content script. |
 
 ## 10. Extension message flow

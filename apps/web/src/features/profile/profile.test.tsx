@@ -119,3 +119,36 @@ describe("dashboard and resumes", () => {
     expect(await screen.findByText("No resumes yet.")).toBeInTheDocument();
   });
 });
+
+describe("point editors", () => {
+  it("edits project points one by one", async () => {
+    const { profile } = renderApp("/profile", { authenticated: true, profile: emptyProfile() });
+    const projects = await screen.findByRole("region", { name: "Projects" });
+    await userEvent.click(within(projects).getByRole("button", { name: "Add project" }));
+    await userEvent.type(within(projects).getByLabelText("Project name"), "Inventory Tracker");
+    expect(within(projects).queryByLabelText("Technologies")).not.toBeInTheDocument();
+    expect(within(projects).queryByLabelText("Outcomes")).not.toBeInTheDocument();
+
+    await userEvent.type(within(projects).getByLabelText("Description point 1"), "Built a REST API{enter}Added scanning{enter}Typo");
+    await userEvent.click(within(projects).getByRole("button", { name: "Delete description point 3" }));
+    await userEvent.click(within(projects).getByRole("button", { name: "Add point" }));
+    // An empty point is dropped on save.
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(profile.save).toHaveBeenCalled());
+    expect(profile.save.mock.calls[0]![0].projects).toEqual([
+      expect.objectContaining({ project_name: "Inventory Tracker", points: ["Built a REST API", "Added scanning"] }),
+    ]);
+  });
+
+  it("keeps achievements optional and removes empty points with backspace", async () => {
+    renderApp("/profile", { authenticated: true, profile: emptyProfile() });
+    const experience = await screen.findByRole("region", { name: "Work experience" });
+    await userEvent.click(within(experience).getByRole("button", { name: "Add role" }));
+    expect(within(experience).getByLabelText("Responsibilities point 1")).toBeInTheDocument();
+    expect(within(experience).queryByLabelText("Achievements point 1")).not.toBeInTheDocument();
+    await userEvent.click(within(experience).getByRole("button", { name: /Add achievements \(optional\)/ }));
+    const achievement = within(experience).getByLabelText("Achievements point 1");
+    await userEvent.type(achievement, "{backspace}");
+    expect(within(experience).queryByLabelText("Achievements point 1")).not.toBeInTheDocument();
+  });
+});

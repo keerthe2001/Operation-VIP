@@ -1,8 +1,9 @@
-import { Label } from "@copilot/ui";
+import { Button, Label } from "@copilot/ui";
+import { Plus } from "lucide-react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
 
 import { Field } from "@/components/fields/Field";
-import { LinesField } from "@/components/fields/LinesField";
+import { PointsField } from "@/components/fields/PointsField";
 import { TagInput } from "@/components/fields/TagInput";
 import { ListSection } from "@/features/profile/sections/ListSection";
 import type { ProfileWrite } from "@/lib/profile/profile-service";
@@ -65,7 +66,7 @@ export function ExperienceSection() {
                 control={control}
                 name={`experience.${i}.responsibilities`}
                 render={({ field }) => (
-                  <LinesField label="Responsibilities" rows={4} value={field.value ?? []} onChange={field.onChange} />
+                  <PointsField label="Responsibilities" value={field.value ?? []} onChange={field.onChange} addLabel="Add responsibility" />
                 )}
               />
             </div>
@@ -73,9 +74,16 @@ export function ExperienceSection() {
               <Controller
                 control={control}
                 name={`experience.${i}.achievements`}
-                render={({ field }) => (
-                  <LinesField label="Achievements" value={field.value ?? []} onChange={field.onChange} />
-                )}
+                render={({ field }) =>
+                  (field.value ?? []).length > 0 ? (
+                    <PointsField label="Achievements" value={field.value ?? []} onChange={field.onChange} addLabel="Add achievement" />
+                  ) : (
+                    // Optional: only shown when the resume had them or the user wants them.
+                    <Button type="button" variant="ghost" size="sm" onClick={() => field.onChange([""])}>
+                      <Plus aria-hidden="true" /> Add achievements (optional)
+                    </Button>
+                  )
+                }
               />
             </div>
             <Controller

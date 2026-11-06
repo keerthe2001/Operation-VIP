@@ -82,11 +82,10 @@ class EducationItem(_Item):
 
 class ProjectItem(_Item):
     project_name: str | None = Field(default=None, max_length=200)
-    description: str | None = Field(default=None, max_length=5000)
     role: str | None = Field(default=None, max_length=200)
-    technologies: list[str] = []
-    outcomes: list[str] = []
     url: str | None = Field(default=None, max_length=500)
+    # What the project was and did, one point per bullet.
+    points: list[str] = []
 
 
 class CertificationItem(_Item):

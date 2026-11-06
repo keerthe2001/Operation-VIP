@@ -80,11 +80,9 @@ class Project(_ProfileItem, Base):
     __tablename__ = "projects"
 
     project_name: Mapped[str | None] = mapped_column(String(200))
-    description: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str | None] = mapped_column(String(200))
-    technologies: Mapped[list[str]] = mapped_column(TextArray, default=list)
-    outcomes: Mapped[list[str]] = mapped_column(TextArray, default=list)
     url: Mapped[str | None] = mapped_column(String(500))
+    points: Mapped[list[str]] = mapped_column(TextArray, default=list)
 
 
 class Certification(_ProfileItem, Base):

@@ -43,16 +43,14 @@ export function emptyItem<S extends ListSection>(section: S): ProfileWrite[S][nu
   const items = {
     experience: {
       ...base, company_name: null, designation: null, employment_type: null, location: null,
-      start_date: null, end_date: null, is_current: false, responsibilities: [], achievements: [],
+      start_date: null, end_date: null, is_current: false, responsibilities: [""], achievements: [],
       technologies: [],
     },
     education: {
       ...base, degree: null, institution: null, specialization: null, start_year: null,
       graduation_year: null, grade: null,
     },
-    projects: {
-      ...base, project_name: null, description: null, role: null, technologies: [], outcomes: [], url: null,
-    },
+    projects: { ...base, project_name: null, role: null, url: null, points: [""] },
     certifications: {
       ...base, certification_name: null, issuing_organization: null, issue_date: null, credential_url: null,
     },

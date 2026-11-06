@@ -50,6 +50,7 @@ export function App() {
             job={job}
             tabId={tabId}
             tracked={tracked?.url === job.url ? tracked : null}
+            skills={profile ? Object.values(profile.profile.skills ?? {}).flat() : undefined}
             onRescan={() => tabId !== null && send({ type: "RESCAN_TAB", tabId })}
           />
         ) : (

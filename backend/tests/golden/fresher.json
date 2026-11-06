@@ -41,9 +41,7 @@
   ],
   "experience": [
     {
-      "achievements": [
-        "Reduced report generation time by 30%"
-      ],
+      "achievements": [],
       "company_name": "Zoho Corporation",
       "confidence": 0.95,
       "designation": "Software Development Intern",
@@ -53,7 +51,8 @@
       "is_current": false,
       "location": null,
       "responsibilities": [
-        "Built an internal dashboard using React and Node.js"
+        "Built an internal dashboard using React and Node.js",
+        "Reduced report generation time by 30%"
       ],
       "start_date": "2024-06",
       "technologies": [
@@ -138,16 +137,13 @@
   },
   "projects": [
     {
-      "confidence": 0.7,
-      "description": "Face-recognition attendance app built with Python and OpenCV.",
+      "confidence": 0.75,
       "is_confirmed": false,
-      "outcomes": [],
+      "points": [
+        "Face-recognition attendance app built with Python and OpenCV."
+      ],
       "project_name": "Smart Attendance System",
       "role": null,
-      "technologies": [
-        "Python",
-        "OpenCV"
-      ],
       "url": null
     }
   ],

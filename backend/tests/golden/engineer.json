@@ -31,9 +31,7 @@
   ],
   "experience": [
     {
-      "achievements": [
-        "Reduced API latency by 40% by introducing Redis caching."
-      ],
+      "achievements": [],
       "company_name": "Acme Technologies Pvt Ltd",
       "confidence": 0.95,
       "designation": "Senior Software Engineer",
@@ -44,6 +42,7 @@
       "location": "Bengaluru, India",
       "responsibilities": [
         "Led migration of billing services to Kubernetes and PostgreSQL.",
+        "Reduced API latency by 40% by introducing Redis caching.",
         "Mentored 4 engineers and ran design reviews for the payments platform team."
       ],
       "start_date": "2021-01",
@@ -186,18 +185,13 @@
   },
   "projects": [
     {
-      "confidence": 0.7,
-      "description": null,
+      "confidence": 0.75,
       "is_confirmed": false,
-      "outcomes": [
+      "points": [
         "Double-entry accounting library used by 2,000+ developers."
       ],
       "project_name": "OpenLedger",
       "role": null,
-      "technologies": [
-        "Python",
-        "PostgreSQL"
-      ],
       "url": "https://github.com/priyaraman/openledger"
     }
   ],

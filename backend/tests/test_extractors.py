@@ -121,7 +121,7 @@ def test_corrupt_pdf():
     assert exc.value.code == "CORRUPT_FILE"
 
 
-def test_pdf_without_text_reports_scanned():
+def test_pdf_without_text_reports_no_text():
     with pytest.raises(PipelineError) as exc:
         extract_document("pdf", blank_pdf())
     assert exc.value.code == "NO_TEXT_FOUND"
@@ -131,3 +131,40 @@ def test_corrupt_docx():
     with pytest.raises(PipelineError) as exc:
         extract_document("docx", b"PK\x03\x04garbage")
     assert exc.value.code == "CORRUPT_FILE"
+
+
+def test_detached_bullet_glyphs_stay_with_their_text():
+    import io
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(50, 780, "Responsibilities for the platform team are listed below in detail.")
+    pdf.drawString(60, 760, "\u2022")
+    pdf.drawString(120, 760, "Built a REST API")  # bullet indented far from its text
+    pdf.save()
+    document, _ = extract_document("pdf", buffer.getvalue())
+    assert document.lines[-1].text == "• Built a REST API"
+
+
+def test_short_last_page_is_text_not_a_scan():
+    import io
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(
+        50, 780, "Experience section with plenty of text on the first page of this resume."
+    )
+    pdf.showPage()
+    pdf.drawString(50, 780, "Excel, Jira")  # overflow: only a few characters, no image
+    pdf.save()
+    document, doc_class = extract_document("pdf", buffer.getvalue())
+    assert doc_class == "text_pdf"
+    assert document.lines[-1].text == "Excel, Jira"
