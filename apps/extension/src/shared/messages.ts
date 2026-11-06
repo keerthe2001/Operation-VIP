@@ -33,6 +33,7 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("SIGN_OUT") }),
   z.object({ type: z.literal("SYNC_PROFILE"), force: z.boolean().optional() }),
   z.object({ type: z.literal("RESCAN_TAB"), tabId: z.number().int() }),
+  z.object({ type: z.literal("FORCE_SCAN"), tabId: z.number().int() }),
   z.object({ type: z.literal("ENABLE_ALL_SITES") }),
   z.object({
     type: z.literal("FILL_FIELDS"),
@@ -80,7 +81,8 @@ const fillInstructionSchema = z.object({
 });
 
 export const toContentSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("ANALYZE_PAGE") }),
+  /** `force`: the user asked to fill this page, so treat any form on it as an application. */
+  z.object({ type: z.literal("ANALYZE_PAGE"), force: z.boolean().optional() }),
   z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300) }),
 ]);
 

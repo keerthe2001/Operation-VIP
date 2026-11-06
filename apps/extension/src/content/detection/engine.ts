@@ -76,6 +76,12 @@ export function detectJob(doc: Document, href: string): DetectedJob | null {
     confidence += 0.05;
     signals.push("job-metadata");
   }
+  // A form that clearly asks for applicant details is enough on its own: name, email and
+  // phone, or a couple of those next to a CV upload or on a careers URL.
+  const strongForm =
+    forms.matchedFields.length >= 3 ||
+    (forms.matchedFields.length >= 2 && (forms.hasResumeUpload || page.jobUrl || page.applyText));
+  if (strongForm) confidence = Math.max(confidence, 0.6);
   confidence = Math.min(1, confidence);
   if (confidence < JOB_THRESHOLD) return null;
 
@@ -89,10 +95,26 @@ export function detectJob(doc: Document, href: string): DetectedJob | null {
       clean(doc.querySelector('meta[property="og:site_name"]')?.getAttribute("content")) ??
       fallback.company,
     url: url.href,
-    isApplicationPage: Boolean(adapterResult?.isApplicationPage) || applicationForm,
+    isApplicationPage: Boolean(adapterResult?.isApplicationPage) || applicationForm || strongForm,
     confidence: Math.round(confidence * 100) / 100,
     signals,
     fieldCount: forms.fieldCount,
     description: posting?.description ?? pageDescription(doc),
+  };
+}
+
+/** What the user gets when they ask Copilot to fill a page it didn't recognise. */
+export function forcedJob(doc: Document, href: string, fieldCount: number): DetectedJob {
+  const fallback = splitTitle(clean(doc.querySelector('meta[property="og:title"]')?.getAttribute("content")) ?? doc.title);
+  return {
+    portal: "generic",
+    title: fallback.title,
+    company: clean(doc.querySelector('meta[property="og:site_name"]')?.getAttribute("content")) ?? fallback.company ?? new URL(href).hostname.replace(/^www\./, ""),
+    url: href,
+    isApplicationPage: true,
+    confidence: 0.5,
+    signals: ["user-requested"],
+    fieldCount,
+    description: pageDescription(doc),
   };
 }

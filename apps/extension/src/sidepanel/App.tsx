@@ -5,6 +5,7 @@ import { send, useActiveTabId, useFormState, useLocal, useTabState, useTrackedAp
 import { AnswersSection } from "@/sidepanel/components/AnswersSection";
 import { AutofillSection } from "@/sidepanel/components/AutofillSection";
 import { EmptyState } from "@/sidepanel/components/EmptyState";
+import { ForceScanButton } from "@/sidepanel/components/ForceScanButton";
 import { Header } from "@/sidepanel/components/Header";
 import { JobCard } from "@/sidepanel/components/JobCard";
 import { ProgressCard } from "@/sidepanel/components/ProgressCard";
@@ -54,8 +55,9 @@ export function App() {
             onRescan={() => tabId !== null && send({ type: "RESCAN_TAB", tabId })}
           />
         ) : (
-          <EmptyState name={firstName} />
+          <EmptyState name={firstName} tabId={tabId} />
         )}
+        {job && !job.isApplicationPage && <ForceScanButton tabId={tabId} variant="outline" />}
         {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
         {job?.isApplicationPage && tabId !== null && (
           <AnswersSection questions={formSummary.questions} tabId={tabId} job={job} data={profile} />

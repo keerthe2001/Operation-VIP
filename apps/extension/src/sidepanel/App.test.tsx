@@ -68,6 +68,13 @@ describe("side panel", () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: "SYNC_PROFILE" });
   });
 
+  it("lets the user fill a page Copilot didn't recognise", async () => {
+    const fake = installFakeChrome({ local: { auth: { status: "signed_in", user }, profile } });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Fill this page anyway/ }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FORCE_SCAN", tabId: 7 });
+  });
+
   it("shows the detected job for the active tab and reacts to updates", async () => {
     const fake = installFakeChrome({ local: { auth: { status: "signed_in", user }, profile } });
     render(<App />);

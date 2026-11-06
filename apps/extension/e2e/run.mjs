@@ -65,6 +65,20 @@ document.getElementById("next").addEventListener("click", () => {
 });
 </script></body></html>`;
 
+// A plain careers form: placeholders only, "Contact number", and a hidden CV input behind
+// a "Browse Files" button. Served on a Lever host so the content script runs there.
+const PLAIN_URL = "https://jobs.lever.co/pixelworks/career";
+const PLAIN_HTML = `<!doctype html><html><head><title>Career - Pixelworks</title></head><body><form>
+  <div><input name="your-name" placeholder="Name"></div><div><input name="contact" placeholder="Contact number"></div>
+  <div><input name="your-email" type="email" placeholder="Email"></div>
+  <div><textarea name="message" placeholder="MESSAGE"></textarea></div>
+  <div><p>Upload CV:</p><div class="dz"><input type="file" name="file-583" style="display:none"><button type="button">Browse Files</button></div></div>
+</form></body></html>`;
+// A page with a single field that isn't recognised until the user asks to fill it.
+const WEAK_URL = "https://jobs.lever.co/pixelworks/newsletter";
+const WEAK_HTML = `<!doctype html><html><head><title>Newsletter</title></head><body><form>
+  <input type="email" placeholder="Your email"></form></body></html>`;
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -313,6 +327,35 @@ try {
   await panel.getByText(/Filled 3 fields/).waitFor();
   const step2 = await workday.evaluate(() => [document.getElementById("school").value, document.getElementById("degree").value]);
   check(step2[0] === "Anna University" && step2[1] === "B.Tech", `Workday step 2 filled after re-scan (${step2.join(", ")})`);
+
+  // 10b. Plain careers form is recognised on its own; a weak form can be filled on request.
+  await context.route(PLAIN_URL, (route) => route.fulfill({ contentType: "text/html", body: PLAIN_HTML }));
+  await context.route(WEAK_URL, (route) => route.fulfill({ contentType: "text/html", body: WEAK_HTML }));
+  const plain = await context.newPage();
+  await plain.goto(PLAIN_URL);
+  const plainTab = await worker.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, PLAIN_URL);
+  await panel.goto(panelUrl(plainTab));
+  await panel.getByText("Application detected").waitFor();
+  await panel.getByRole("button", { name: /^Autofill \d+ fields?$/ }).click();
+  await panel.getByText(/Filled \d+ fields?/).waitFor();
+  const plainValues = await plain.evaluate(() => ({
+    name: document.querySelector("[name=your-name]").value,
+    phone: document.querySelector("[name=contact]").value,
+    email: document.querySelector("[name=your-email]").value,
+    cv: document.querySelector("[name=file-583]").files[0]?.name ?? null,
+  }));
+  check(
+    plainValues.name.startsWith("Priya") && plainValues.phone === "+919876543210" && plainValues.email === "priya.raman@example.com" && plainValues.cv === "priya_raman_resume.pdf",
+    `plain careers form filled, CV attached to the hidden input (${JSON.stringify(plainValues)})`,
+  );
+  const weak = await context.newPage();
+  await weak.goto(WEAK_URL);
+  const weakTab = await worker.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, WEAK_URL);
+  await panel.goto(panelUrl(weakTab));
+  await panel.getByRole("button", { name: /Fill this page anyway/ }).click();
+  await panel.getByRole("button", { name: "Autofill 1 field" }).click();
+  await panel.getByText(/Filled 1 field/).waitFor();
+  check((await weak.inputValue("input[type=email]")) === "priya.raman@example.com", "\"Fill this page anyway\" fills an unrecognised form");
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

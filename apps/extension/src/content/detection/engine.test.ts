@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectJob } from "@/content/detection/engine";
+import { detectJob, forcedJob } from "@/content/detection/engine";
 import { scanFields } from "@/content/forms/scanner";
 import { PAGES } from "@/test/fixtures/pages";
 
@@ -48,6 +48,22 @@ describe("job detection", () => {
     // Autofill sees the hidden CV input too, labelled by the text next to it.
     const cv = scanFields().find((f) => f.kind === "file");
     expect(cv?.label).toMatch(/Upload CV/);
+  });
+
+  it("is confident about any form asking for name, email and phone", () => {
+    document.documentElement.innerHTML = `<body><form>
+      <input placeholder="Full name"><input type="email" placeholder="Email"><input type="tel" placeholder="Mobile">
+    </form></body>`;
+    const job = detectJob(document, "https://example.com/join-us")!;
+    expect(job.isApplicationPage).toBe(true);
+    expect(job.confidence).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("can treat any form as an application when the user asks", () => {
+    document.documentElement.innerHTML = `<head><title>Contact - Foo</title></head><body><form><input placeholder="Email"></form></body>`;
+    expect(detectJob(document, "https://foo.example/contact")).toBeNull();
+    const job = forcedJob(document, "https://foo.example/contact", 1);
+    expect(job).toMatchObject({ portal: "generic", isApplicationPage: true, signals: ["user-requested"] });
   });
 
   it("uses structured data on generic career sites", () => {

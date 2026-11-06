@@ -85,6 +85,31 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void session.remove([tabKey(tabId), formKey(tabId), appKey(tabId)]);
 });
 
+/**
+ * "Fill this page anyway": treat whatever form is on the page as an application. If the
+ * content script isn't running there yet (a site outside the job portals, or a tab opened
+ * before Copilot got access), inject it first.
+ */
+async function forceScan(tabId: number): Promise<Reply> {
+  const ask = () => chrome.tabs.sendMessage(tabId, { type: "ANALYZE_PAGE", force: true });
+  try {
+    await ask();
+    return { ok: true };
+  } catch {
+    // No content script in this tab yet.
+  }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] });
+    await ask();
+    return { ok: true };
+  } catch {
+    return {
+      ok: false,
+      error: "Copilot can't read this page yet. Click the Copilot icon in the toolbar while on this page, then try again.",
+    };
+  }
+}
+
 // --------------------------------------------------------------------- messaging
 
 function fail(error: unknown): Reply {
@@ -111,6 +136,8 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       case "RESCAN_TAB":
         await chrome.tabs.sendMessage(message.tabId, { type: "ANALYZE_PAGE" }).catch(() => undefined);
         return { ok: true };
+      case "FORCE_SCAN":
+        return await forceScan(message.tabId);
       case "FILL_FIELDS": {
         const summary = await autofill.fill(message.tabId, message.fields, message.overwrite);
         const filled = (await autofill.state(message.tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;

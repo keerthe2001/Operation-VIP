@@ -94,7 +94,7 @@ const manifest = {
   action: { default_title: "Open Copilot", default_icon: { 16: "icons/16.png", 32: "icons/32.png" } },
   side_panel: { default_path: "sidepanel/index.html" },
   background: { service_worker: "background.js", type: "module" },
-  permissions: ["storage", "sidePanel", "alarms", "scripting"],
+  permissions: ["storage", "sidePanel", "alarms", "scripting", "activeTab"],
   host_permissions: [`${apiOrigin}/*`, ...PORTALS],
   optional_host_permissions: ["https://*/*", "http://*/*"],
   content_scripts: [{ matches: PORTALS, js: ["content.js"], run_at: "document_idle", all_frames: true }],

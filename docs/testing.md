@@ -80,7 +80,8 @@ It checks: stable extension ID; sign-in screen; web → extension session handof
 storage; profile sync; Greenhouse detection; Autofill (text, select range, resume file
 upload) while leaving questions and sensitive fields alone; Review & fill; answer library
 suggestion with placeholders and Insert; application tracking and "I submitted";
-an embedded Greenhouse iframe; a two-step Workday form; no injection on unsupported sites;
+an embedded Greenhouse iframe; a two-step Workday form; a plain careers form with a hidden CV
+input; "Fill this page anyway" on an unrecognised form; no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

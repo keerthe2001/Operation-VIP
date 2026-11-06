@@ -4,7 +4,7 @@
  * to the network and has no UI.
  */
 import { fillFields } from "@/content/autofill/writer";
-import { detectJob } from "@/content/detection/engine";
+import { detectJob, forcedJob } from "@/content/detection/engine";
 import { scanFields } from "@/content/forms/scanner";
 import { toContentSchema } from "@/shared/messages";
 
@@ -12,6 +12,8 @@ let lastJob = "";
 let lastFields = "";
 let timer: ReturnType<typeof setTimeout> | undefined;
 let filling = false;
+// Set when the user asks to fill this page; kept until the page navigates.
+let forcedUrl: string | null = null;
 
 function post(message: unknown) {
   chrome.runtime.sendMessage(message).catch(() => {
@@ -25,6 +27,10 @@ function report(force = false) {
     job = detectJob(document, location.href);
   } catch (error) {
     console.debug("[copilot] detection failed", error);
+  }
+  if (forcedUrl === location.href && !job?.isApplicationPage) {
+    const count = scanFields().length;
+    if (count > 0) job = { ...forcedJob(document, location.href, count), ...(job ? { title: job.title, company: job.company } : {}) };
   }
   const jobPayload = JSON.stringify({ job, url: location.href });
   if (force || jobPayload !== lastJob) {
@@ -62,7 +68,9 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
   const parsed = toContentSchema.safeParse(raw);
   if (!parsed.success) return false;
   if (parsed.data.type === "ANALYZE_PAGE") {
+    if (parsed.data.force) forcedUrl = location.href;
     report(true);
+    sendResponse({ ok: true });
     return false;
   }
   filling = true;
