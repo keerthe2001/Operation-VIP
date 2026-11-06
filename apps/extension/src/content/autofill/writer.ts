@@ -26,6 +26,7 @@ function hasValue(el: HTMLElement, instruction: FillInstruction): boolean {
     return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`).some((r) => (r as HTMLInputElement).checked);
   }
   if (instruction.kind === "checkbox") return false;
+  if (instruction.kind === "combobox" && instruction.multi) return false;
   if (instruction.kind === "listbox") {
     const shown = (el.textContent ?? "").trim();
     return shown !== "" && !/^(select|choose|please select|--|none selected)/i.test(shown);
@@ -188,6 +189,23 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
         break;
       }
       case "combobox": {
+        if (instruction.multi) {
+          // One value at a time: type it, then choose the matching option (or press Enter).
+          const input = el as HTMLInputElement;
+          let added = 0;
+          for (const value of (instruction.value ?? "").split(/\s*,\s*/).filter(Boolean).slice(0, 12)) {
+            input.focus();
+            setNativeValue(input, value);
+            dispatch(input, "input");
+            if (await pickComboboxOption(input, value)) added += 1;
+            setNativeValue(input, "");
+            dispatch(input, "input");
+            await wait(150);
+          }
+          input.blur();
+          if (!added) return { id: instruction.id, status: "failed", message: "None of the values matched an option" };
+          break;
+        }
         const input = el as HTMLInputElement;
         input.focus();
         setNativeValue(input, instruction.value ?? "");

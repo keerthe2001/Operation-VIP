@@ -25,6 +25,8 @@ export const fieldDescriptorSchema = z.object({
   currentValue: z.string().max(5000),
   accept: z.string().max(200),
   maxLength: z.number().int().nullable(),
+  /** Heading of the form section the field is in ("Work Experience", "Education"…). */
+  section: z.string().max(200).optional(),
 });
 export type FieldDescriptor = z.infer<typeof fieldDescriptorSchema>;
 
@@ -58,6 +60,8 @@ export interface FillInstruction {
   checked?: boolean;
   file?: { name: string; type: string; base64: string };
   overwrite: boolean;
+  /** A search box that takes one value at a time (Workday "Type to Add Skills"). */
+  multi?: boolean;
 }
 
 export const fillResultSchema = z.object({

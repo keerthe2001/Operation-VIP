@@ -132,6 +132,7 @@ const fillInstructionSchema = z.object({
   checked: z.boolean().optional(),
   file: z.object({ name: z.string().max(255), type: z.string().max(127), base64: z.string().max(20_000_000) }).optional(),
   overwrite: z.boolean(),
+  multi: z.boolean().optional(),
 });
 
 export const toContentSchema = z.discriminatedUnion("type", [
@@ -143,6 +144,11 @@ export const toContentSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("CLICK_ACTION"), kinds: z.array(z.enum(["continue", "account", "submit"])).max(3) }),
   /** The account exists: go to the site's Sign In form. */
   z.object({ type: z.literal("CLICK_SIGN_IN") }),
+  /** Press "Add" in repeatable sections so there's a block for each profile entry. */
+  z.object({
+    type: z.literal("EXPAND_SECTIONS"),
+    counts: z.object({ experience: z.number().int().min(0).max(20), education: z.number().int().min(0).max(20), languages: z.number().int().min(0).max(20), websites: z.number().int().min(0).max(20) }),
+  }),
   /** Scroll to a field and put the cursor in it. */
   z.object({ type: z.literal("FOCUS_FIELD"), id: z.string().max(40) }),
 ]);

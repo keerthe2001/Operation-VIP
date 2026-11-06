@@ -57,6 +57,30 @@ async function log(tabId: number, text: string, kind: ActivityEntry["kind"] = "i
   await chrome.storage.session.set({ [key]: [...current, { at: Date.now(), text, kind }].slice(-40) });
 }
 
+/** How many entries the profile has for each repeatable section. */
+async function sectionCounts() {
+  const p = (await local.get("profile"))?.profile;
+  const info = p?.personal_information;
+  return {
+    experience: p?.experience.length ?? 0,
+    education: p?.education.length ?? 0,
+    languages: p?.additional_info.languages?.length ?? 0,
+    websites: [info?.portfolio, info?.github, info?.twitter, info?.behance, info?.dribbble].filter(Boolean).length,
+  };
+}
+
+/** Presses "Add" in empty repeatable sections (Work Experience, Education…); returns how many. */
+async function expandSections(tabId: number): Promise<number> {
+  const reply = (await chrome.tabs
+    .sendMessage(tabId, { type: "EXPAND_SECTIONS", counts: await sectionCounts() }, { frameId: 0 })
+    .catch(() => null)) as Reply<number> | null;
+  const added = reply?.ok ? (reply.data ?? 0) : 0;
+  if (added) await log(tabId, `Added ${added} section${added === 1 ? "" : "s"} to fill (experience, education…)`);
+  return added;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** Fills every ready field on the page. */
 async function fillReady(tabId: number) {
   if (filling.has(tabId)) return { filled: 0, skipped: 0, failed: 0 };
@@ -110,6 +134,15 @@ async function runFlow(tabId: number) {
     await log(tabId, "Account already exists: signing in");
     await chrome.tabs.sendMessage(tabId, { type: "CLICK_SIGN_IN" }, { frameId: 0 }).catch(() => undefined);
     return;
+  }
+
+  // Open empty "Add" sections first, so experience and education get filled too.
+  if (!done.has(`expand|${step}`)) {
+    done.add(`expand|${step}`);
+    if ((await expandSections(tabId)) > 0) {
+      scheduleFlow(tabId); // the new fields are scanned, then filled
+      return;
+    }
   }
 
   if (!done.has(`fill|${step}`) && readyKeys(state.fields).length > 0) {
@@ -276,6 +309,7 @@ async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<u
       case "WIDGET_STATE":
         return { ok: true, data: await widgetState(tabId, tab.url, local, session) };
       case "WIDGET_FILL":
+        if ((await expandSections(tabId)) > 0) await sleep(1500);
         return { ok: true, data: await fillReady(tabId) };
       case "WIDGET_MARK_SUBMITTED": {
         const job = (await session.get(tabKey(tabId)))?.job;
@@ -363,7 +397,14 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         return { ok: true };
       }
       case "FILL_FIELDS": {
-        const summary = await autofill.fill(message.tabId, message.fields, message.overwrite);
+        // Open empty "Add" sections first; then fill what the user chose plus the new fields.
+        let fields = message.fields;
+        if ((await expandSections(message.tabId)) > 0) {
+          await sleep(1500);
+          const fresh = await autofill.state(message.tabId);
+          fields = [...new Set([...fields, ...readyKeys(fresh?.fields ?? [])])];
+        }
+        const summary = await autofill.fill(message.tabId, fields, message.overwrite);
         const state = await autofill.state(message.tabId);
         const filled = state?.fields.filter((f) => f.result === "filled").length ?? 0;
         void tracker.onFilled(message.tabId, (await session.get(tabKey(message.tabId)))?.job, filled);

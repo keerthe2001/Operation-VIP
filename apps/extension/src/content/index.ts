@@ -4,6 +4,7 @@
  * to the network and has no UI.
  */
 import { fillFields } from "@/content/autofill/writer";
+import { expandSections } from "@/content/forms/sections";
 import { detectJob, forcedJob } from "@/content/detection/engine";
 import { accountExists, actionKind, actionText, findAction, findField, findSignIn, scanFields } from "@/content/forms/scanner";
 import { toContentSchema } from "@/shared/messages";
@@ -105,6 +106,17 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     sendResponse(link ? { ok: true } : { ok: false, error: "No Sign In link on this page." });
     schedule();
     return false;
+  }
+  if (parsed.data.type === "EXPAND_SECTIONS") {
+    filling = true;
+    void expandSections(parsed.data.counts)
+      .then((added) => sendResponse({ ok: true, data: added }))
+      .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }))
+      .finally(() => {
+        filling = false;
+        schedule();
+      });
+    return true;
   }
   if (parsed.data.type === "FOCUS_FIELD") {
     const el = findField(parsed.data.id);

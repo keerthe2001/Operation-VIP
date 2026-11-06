@@ -213,6 +213,7 @@ export class AutofillCoordinator {
         overwrite,
       };
       if (field.kind === "checkbox") instruction.checked = field.optionValue === "true";
+      if (field.key === "skills" && field.kind === "combobox") instruction.multi = true;
       if (field.key === "account_password") {
         const password = await this.local.get("accountPassword");
         if (!password) continue;

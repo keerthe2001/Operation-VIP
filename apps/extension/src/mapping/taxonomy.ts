@@ -242,7 +242,7 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "currently_employed", label: "Currently employed",
-    patterns: [/\b(are you )?currently (employed|working)\b/, /\bemployment status\b/],
+    patterns: [/\b(are you )?currently (employed|working)\b/, /\bemployment status\b/, /\b(i )?currently work here\b/, /\bcurrent (job|role|position|employer)\b$/],
     types: ["select", "radio", "checkbox", "text"],
   },
   {
@@ -287,7 +287,7 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "skills", label: "Skills",
-    patterns: [/^(key |technical |relevant )?skills\b/, /\bwhat (are your|skills)\b.*skills/],
+    patterns: [/^(key |technical |relevant )?skills\b/, /\bwhat (are your|skills)\b.*skills/, /\b(type to )?add skills\b/],
     attrPatterns: [/\bskills?\b/],
   },
   {
@@ -365,6 +365,11 @@ export const RULES: FieldRule[] = [
   { key: "pronouns", label: "Pronouns", patterns: [/\bpronouns?\b/], attrPatterns: [/\bpronoun/] },
   { key: "nationality", label: "Nationality", patterns: [/\b(nationality|citizenship)\b/], attrPatterns: [/\b(nationality|citizenship)\b/] },
   { key: "languages", label: "Languages", patterns: [/\blanguages? (you speak|spoken|known)\b/, /^languages?$/] },
+  {
+    key: "role_description", label: "Role description",
+    patterns: [/\b(role|job|position) description\b/, /\b(key )?responsibilities\b/, /\bdescribe your (role|work|responsibilities)\b/, /^description$/],
+    attrPatterns: [/\b(role|job) ?description\b/],
+  },
 ];
 
 export const RULES_BY_KEY = Object.fromEntries(RULES.map((r) => [r.key, r]));

@@ -127,7 +127,15 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else currentValue = input.value ?? "";
 
     let label = labelFor(el);
+    const section = sectionOf(el);
     if (kind === "file" && (!label || label === el.getAttribute("name"))) label = nearbyText(el) || label;
+    // An upload box that only says "Drop files here" is named by its section ("Resume/CV").
+    if (kind === "file" && !/resume|cv|cover|portfolio|transcript/i.test(label) && section) label = `${section} ${label}`.trim();
+    // Split dates (Workday): "Month"/"Year" boxes take the name of their group ("From").
+    if (/^(month|year|day|mm|yyyy|dd)$/i.test(label.trim())) {
+      const group = groupLabelFor(el);
+      if (group) label = `${group} ${label}`;
+    }
     descriptors.push({
       id: fieldId(el),
       kind,
@@ -145,6 +153,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       currentValue: currentValue.slice(0, 5000),
       accept: (el.getAttribute("accept") ?? "").slice(0, 200),
       maxLength: input.maxLength > 0 ? input.maxLength : null,
+      section: section.slice(0, 200),
     });
   }
 
@@ -212,4 +221,35 @@ export function findAction(root: Document = document): HTMLElement | null {
 
 export function actionText(el: HTMLElement): string {
   return ((el instanceof HTMLInputElement ? el.value : el.textContent) ?? "").replace(/\s+/g, " ").trim();
+}
+
+const HEADINGS = "h1, h2, h3, h4, h5, legend, [role='heading']";
+
+/** The heading of the form section an element is in: the last heading before it in the
+ * nearest ancestor that has one. */
+export function sectionOf(el: Element): string {
+  let node = el.parentElement;
+  for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
+    const before = [...node.querySelectorAll(HEADINGS)].filter(
+      (h) => !h.contains(el) && h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    const heading = before.at(-1);
+    if (heading && text(heading)) return text(heading).slice(0, 200);
+  }
+  return "";
+}
+
+/** Label of the group a date part belongs to: an ARIA group, fieldset or the closest label above. */
+function groupLabelFor(el: Element): string {
+  const group = el.closest("[role='group'], fieldset");
+  if (group) {
+    const label = group instanceof HTMLFieldSetElement ? text(group.querySelector("legend")) : labelFor(group);
+    if (label) return label.replace(/\*\s*$/, "").trim();
+  }
+  let node: Element | null = el.parentElement;
+  for (let depth = 0; node && depth < 4; depth += 1, node = node.parentElement) {
+    const label = node.querySelector("label");
+    if (label && !label.contains(el) && text(label) && !/^(month|year|day)$/i.test(text(label))) return text(label).replace(/\*\s*$/, "").trim();
+  }
+  return "";
 }

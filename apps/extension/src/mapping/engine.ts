@@ -17,8 +17,11 @@ const SENSITIVE_KEYS = new Set([
 ]);
 
 /** Keys that belong to one job or one degree: repeated blocks map to the 1st, 2nd, … entry. */
-export const EXPERIENCE_KEYS = new Set(["current_company", "current_title", "job_duration", "employment_start", "employment_end"]);
-export const EDUCATION_KEYS = new Set(["school", "degree", "discipline", "graduation_year", "gpa"]);
+export const EXPERIENCE_KEYS = new Set([
+  "current_company", "current_title", "job_duration", "employment_start", "employment_end", "role_description", "job_location", "currently_working",
+]);
+export const EDUCATION_KEYS = new Set(["school", "degree", "discipline", "graduation_year", "gpa", "education_start"]);
+const LIST_KEYS = new Set(["language_item", "website_item"]);
 const CONSENT = /\b(agree|consent|acknowledge|privacy|terms|certify|confirm that)\b/;
 
 const KIND_TYPES: Record<FieldDescriptor["kind"], string> = {
@@ -49,7 +52,47 @@ export function isQuestion(field: FieldDescriptor): boolean {
   return false;
 }
 
+/** Which part of a split date a box takes ("From" → Month / Year boxes on Workday). */
+export function datePart(field: FieldDescriptor): "month" | "year" | null {
+  const text = `${field.label} ${field.placeholder} ${field.name} ${field.htmlId}`.toLowerCase();
+  const id = field.htmlId.toLowerCase();
+  if (/\b(month|mm)\b/.test(text) || /datesectionmonth/.test(id)) return "month";
+  if (/\b(year|yyyy|yy)\b/.test(text) || /datesectionyear/.test(id)) return "year";
+  return null;
+}
+
+const DATE_KEYS = new Set(["employment_start", "employment_end", "graduation_year", "education_start", "date_of_birth"]);
+
+/**
+ * What a field asks for, using its section too: "To" under Education is the graduation year,
+ * "Location" under Work Experience is that job's location, "URL" under Websites is a link.
+ */
 export function classify(field: FieldDescriptor): Classification {
+  const section = (field.section ?? "").toLowerCase();
+  const part = datePart(field);
+  // Match "From Month" as "From".
+  const base = part ? { ...field, label: field.label.replace(/\b(month|year|day|mm|yyyy|dd)\b/gi, " ").trim() } : field;
+  const original = classifyLabel(field);
+  const stripped = part ? classifyLabel(base) : original;
+  // "Graduation Year" is a field on its own; "From Year" is the year box of "From".
+  const result = original.key && DATE_KEYS.has(original.key) ? original : stripped.key && DATE_KEYS.has(stripped.key) ? stripped : original;
+  const inEducation = /\b(education|academic|school)\b/.test(section);
+  const inWork = /\b(work experience|employment|experience)\b/.test(section) && !inEducation;
+  const label = norm(base.label);
+  if (inEducation) {
+    if (result.key === "employment_start" || /^from\b/.test(label)) return { key: "education_start", confidence: 0.9, question: false };
+    if (result.key === "employment_end" || /^to\b/.test(label)) return { key: "graduation_year", confidence: 0.9, question: false };
+    if (/\b(overall result|gpa|grade|percentage)\b/.test(label)) return { key: "gpa", confidence: 0.9, question: false };
+  }
+  if (inWork && (result.key === "location" || result.key === "city" || /^location$/.test(label))) return { key: "job_location", confidence: 0.9, question: false };
+  if (inWork && result.key === "currently_employed") return { key: "currently_working", confidence: 0.95, question: false };
+  if (/\blanguages?\b/.test(section) && /^language$/.test(label)) return { key: "language_item", confidence: 0.92, question: false };
+  if (/\b(websites?|links?)\b/.test(section) && /\b(url|website|link)\b/.test(label)) return { key: "website_item", confidence: 0.9, question: false };
+  if (part && result.key && !DATE_KEYS.has(result.key)) return { key: null, confidence: 0, question: false };
+  return result;
+}
+
+function classifyLabel(field: FieldDescriptor): Classification {
   const label = norm(field.label);
   const placeholder = norm(field.placeholder);
   const help = norm(field.helpText);
@@ -188,12 +231,19 @@ function profileValue(key: string, profile: ProfileData, resumeName: string | nu
     case "github": return p.github;
     case "portfolio": return p.portfolio;
     case "current_company": return job?.company_name;
-    case "current_title": return index === 0 ? (s.current_designation ?? job?.designation) : job?.designation;
+    case "current_title": return job?.designation ?? (index === 0 ? s.current_designation : null);
     case "years_experience": return s.total_experience_years;
     case "school": return edu?.institution;
     case "degree": return edu?.degree;
     case "discipline": return edu?.specialization;
     case "graduation_year": return edu?.graduation_year;
+    case "education_start": return edu?.start_year;
+    case "role_description": return job?.responsibilities?.length ? job.responsibilities.map((r) => `• ${r}`).join("\n") : null;
+    case "job_location": return job?.location;
+    case "currently_working": return job ? !!job.is_current : null;
+    case "language_item": return extra.languages?.[index] ?? null;
+    case "website_item":
+      return [p.portfolio, p.github, p.twitter, p.behance, p.dribbble].filter((link): link is string => !!link)[index] ?? null;
     case "gpa": return edu?.grade;
     case "skills": return Object.values(profile.skills).flat();
     case "resume": return resumeName;
@@ -258,7 +308,14 @@ function formatDate(raw: string, field: FieldDescriptor): string {
 
 export function resolveValue(key: string, field: FieldDescriptor, profile: ProfileData, resumeName: string | null, index = 0): ResolvedValue | null {
   let raw = profileValue(key, profile, resumeName, index);
-  if (typeof raw === "string" && ["date_of_birth", "employment_start", "employment_end", "current_date"].includes(key) && raw !== "Present") {
+  const part = DATE_KEYS.has(key) ? datePart(field) : null;
+  if (part && raw === "Present") return null; // a current job has no end date to type
+  if (part && raw !== null && raw !== undefined) {
+    // Split date boxes: "07" in Month, "2024" in Year.
+    const m = String(raw).match(/^(\d{4})(?:-(\d{2}))?/);
+    raw = m ? (part === "year" ? m[1]! : (m[2] ?? null)) : null;
+    if (raw === null) return null;
+  } else if (typeof raw === "string" && ["date_of_birth", "employment_start", "employment_end", "current_date"].includes(key) && raw !== "Present") {
     raw = formatDate(raw, field);
   }
   if (key === "employment_end" && raw === "Present" && field.kind === "date") return null;
@@ -318,13 +375,25 @@ export function fieldLabel(field: MappedField): string {
  * 1st, 2nd, … entry from the profile in page order.
  */
 export function mapFields(fields: FieldDescriptor[], frameId: number, profile: ProfileData | null, resumeName: string | null): MappedField[] {
-  const seen = new Map<string, number>();
+  // Each group (jobs, schools, list items) counts entry blocks: a field that repeats within
+  // the current block starts the next one, so a job without "To" dates doesn't shift the rest.
+  const blocks = new Map<string, { index: number; seen: Set<string> }>();
+  const groupOf = (key: string) => (EXPERIENCE_KEYS.has(key) ? "experience" : EDUCATION_KEYS.has(key) ? "education" : LIST_KEYS.has(key) ? key : null);
   const mapped = fields.map((field) => {
     const first = mapField(field, frameId, profile, resumeName);
-    if (!first.key || !(EXPERIENCE_KEYS.has(first.key) || EDUCATION_KEYS.has(first.key))) return first;
-    const index = seen.get(first.key) ?? 0;
-    seen.set(first.key, index + 1);
-    return index === 0 ? first : mapField(field, frameId, profile, resumeName, index);
+    const key = first.key;
+    const group = key ? groupOf(key) : null;
+    if (!key || !group) return first;
+    const part = datePart(field);
+    const slot = part ? `${key}|${part}` : key;
+    const block = blocks.get(group) ?? { index: 0, seen: new Set<string>() };
+    if (block.seen.has(slot)) {
+      block.index += 1;
+      block.seen = new Set();
+    }
+    block.seen.add(slot);
+    blocks.set(group, block);
+    return block.index === 0 ? first : mapField(field, frameId, profile, resumeName, block.index);
   });
   // When the form asks for the country code separately, the phone box gets the number alone.
   if (mapped.some((f) => f.key === "phone_country")) {

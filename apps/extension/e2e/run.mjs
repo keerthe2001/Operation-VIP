@@ -194,6 +194,68 @@ async function clickUntil(locator, done, attempts = 3) {
   return false;
 }
 
+// Workday's "My Experience" step: repeatable sections behind "Add" buttons, split Month/Year
+// dates, a skills search box that takes one skill at a time, a hidden resume upload.
+const EXP_URL = "https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-88/apply/myExperience";
+const EXP_HTML = `<!doctype html><html><head><title>My Experience</title></head><body>
+<h2>My Experience</h2>
+<section id="work"><h3>Work Experience</h3><div class="entries"></div><button type="button" class="add">Add</button></section>
+<section id="edu"><h3>Education</h3><p>Type in school name and click enter.</p><div class="entries"></div><button type="button" class="add">Add</button></section>
+<section><h3>Skills</h3><label for="skills">Type to Add Skills</label>
+  <input id="skills" data-uxi-widget-type="selectinput" aria-autocomplete="list"><ul id="chips"></ul></section>
+<section><h3>Resume/CV</h3><p>Upload a file (5MB max)</p>
+  <div class="drop"><input type="file" id="cv" style="display:none"><span>Drop files here</span> or <button type="button">Select files</button></div></section>
+<section><h3>Social Network URLs</h3><label for="li">LinkedIn</label><input id="li"></section>
+<button type="button" id="next">Save and Continue</button>
+<script>
+  let n = 0;
+  const block = (kind) => {
+    n++;
+    if (kind === "work") return \`<div class="entry">
+      <label for="t\${n}">Job Title</label><input id="t\${n}" class="title">
+      <label for="c\${n}">Company</label><input id="c\${n}" class="company">
+      <label><input type="checkbox" class="current"> I currently work here</label>
+      <div role="group" aria-labelledby="fl\${n}"><span id="fl\${n}">From</span>
+        <input aria-label="Month" class="fm" placeholder="MM"><input aria-label="Year" class="fy" placeholder="YYYY"></div>
+      <label for="d\${n}">Role Description</label><textarea id="d\${n}" class="desc"></textarea></div>\`;
+    return \`<div class="entry"><label for="s\${n}">School or University</label><input id="s\${n}" class="school">
+      <label for="g\${n}">Degree</label><input id="g\${n}" class="degree"></div>\`;
+  };
+  for (const id of ["work", "edu"]) {
+    const sec = document.getElementById(id);
+    sec.querySelector(".add").addEventListener("click", () => {
+      sec.querySelector(".entries").insertAdjacentHTML("beforeend", block(id));
+      sec.querySelector(".add").textContent = "Add Another";
+    });
+  }
+  const skills = document.getElementById("skills");
+  const known = ["Python", "Go", "SQL", "JavaScript", "AWS", "Docker", "Kubernetes", "PostgreSQL", "Git", "Terraform", "Django"];
+  skills.addEventListener("input", () => {
+    document.querySelector("[role=listbox]")?.remove();
+    const q = skills.value.toLowerCase(); if (!q) return;
+    const list = document.createElement("ul"); list.setAttribute("role", "listbox");
+    for (const k of known.filter((k) => k.toLowerCase().startsWith(q))) {
+      const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = k;
+      li.addEventListener("click", () => { document.getElementById("chips").insertAdjacentHTML("beforeend", "<li class=chip>" + k + "</li>"); list.remove(); });
+      list.append(li);
+    }
+    document.body.append(list);
+  });
+  window.__atContinue = null;
+  document.getElementById("next").addEventListener("click", () => {
+    window.__atContinue = {
+      titles: [...document.querySelectorAll(".title")].map((i) => i.value),
+      companies: [...document.querySelectorAll(".company")].map((i) => i.value),
+      months: [...document.querySelectorAll(".fm")].map((i) => i.value),
+      years: [...document.querySelectorAll(".fy")].map((i) => i.value),
+      schools: [...document.querySelectorAll(".school")].map((i) => i.value),
+      chips: [...document.querySelectorAll(".chip")].map((c) => c.textContent),
+      cv: document.getElementById("cv").files[0]?.name ?? null,
+      linkedin: document.getElementById("li").value,
+    };
+  });
+</script></body></html>`;
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -517,12 +579,18 @@ try {
   const restored = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
   check(Math.abs(restored - viewport.width) < 2, "close collapses it and the page returns to full width");
   const box = await bubble.boundingBox();
-  await naukri.mouse.move(box.x + 20, box.y + 20);
-  await naukri.mouse.down();
-  await naukri.mouse.move(200, 500, { steps: 8 });
-  await naukri.mouse.up();
+  const savedTabY = () => worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.y);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const from = await bubble.boundingBox();
+    await naukri.mouse.move(from.x + 20, from.y + 20);
+    await naukri.mouse.down();
+    await naukri.mouse.move(200, 500, { steps: 8 });
+    await naukri.mouse.up();
+    await naukri.waitForTimeout(400);
+    if ((await savedTabY()) > box.y) break;
+  }
   const tabBox = await bubble.boundingBox();
-  const savedY = await worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.y);
+  const savedY = await savedTabY();
   check(Math.round(tabBox.x + tabBox.width) === viewport.width && Math.abs(savedY - tabBox.y) < 2 && savedY > box.y, "edge tab drags vertically, stays on the edge, position saved");
   // Toolbar icon: the same toggle message the icon's click handler sends.
   const naukriTab = await worker.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, NAUKRI_URL);
@@ -644,6 +712,26 @@ try {
   check(flowStatus === "submitted", `submitted after the user's OK and saved in the tracker (${flowStatus})`);
   await panelIn(flow).getByText("Submitted and saved to your tracker").waitFor();
   check(true, "activity log shows each step");
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
+
+  // 10g. Workday "My Experience" in Auto mode: Add sections, fill every block, then continue.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "auto", fillProgress: "off" } }));
+  const expCounts = await worker.evaluate(async () => {
+    const p = (await chrome.storage.local.get("profile")).profile.profile;
+    return { jobs: p.experience.length, schools: p.education.length, first: p.experience.find((e) => e.is_current) ?? p.experience[0], school: p.education[0]?.institution };
+  });
+  await context.route(EXP_URL, (route) => route.fulfill({ contentType: "text/html", body: EXP_HTML }));
+  const exp = await context.newPage();
+  await exp.goto(EXP_URL);
+  await exp.waitForFunction(() => window.__atContinue, null, { timeout: 60000 });
+  const atContinue = await exp.evaluate(() => window.__atContinue);
+  if (shots) await exp.screenshot({ path: `${shots}/my-experience.png`, fullPage: true });
+  check(atContinue.titles.length === expCounts.jobs && atContinue.schools.length === expCounts.schools, `pressed Add for each job and school in the profile (${atContinue.titles.length} jobs, ${atContinue.schools.length} schools)`);
+  check(atContinue.titles[0] === expCounts.first.designation && atContinue.companies[0] === expCounts.first.company_name, `work experience filled before continuing (${atContinue.titles[0]} at ${atContinue.companies[0]})`);
+  check(/^\d{2}$/.test(atContinue.months[0]) && /^\d{4}$/.test(atContinue.years[0]), `split From date filled as month and year (${atContinue.months[0]}/${atContinue.years[0]})`);
+  check(atContinue.schools[0] === expCounts.school, `education filled (${atContinue.schools[0]})`);
+  check(atContinue.chips.length >= 3, `skills entered one at a time in the search box (${atContinue.chips.join(", ")})`);
+  check(atContinue.cv === "Priya_Raman_Resume.pdf" && atContinue.linkedin.includes("linkedin.com"), "resume uploaded under its section heading, LinkedIn filled");
   await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
 
   // 11. Sign out from the panel.
