@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 
 import type { FormState } from "@/shared/fields";
 import type { PanelMessage, Reply } from "@/shared/messages";
-import { appKey, DEFAULT_LOCAL, formKey, tabKey, type LocalStore } from "@/shared/storage";
-import type { TabState, TrackedApplication } from "@/shared/types";
+import { DEFAULT_SETTINGS, type AutofillSettings } from "@/shared/settings";
+import { appKey, DEFAULT_LOCAL, DEFAULT_WIDGET, formKey, tabKey, type LocalStore, type WidgetPrefs } from "@/shared/storage";
+import type { ActivityEntry, TabState, TrackedApplication } from "@/shared/types";
 
 /** Live value from chrome.storage.local. */
 export function useLocal<K extends keyof LocalStore>(key: K): LocalStore[K] {
@@ -80,3 +81,15 @@ export async function send<T = unknown>(message: PanelMessage): Promise<Reply<T>
 }
 export const useTrackedApplication = (tabId: number | null) =>
   useSessionValue<TrackedApplication>(tabId === null ? null : appKey(tabId));
+
+export const useActivity = (tabId: number | null) => useSessionValue<ActivityEntry[]>(tabId === null ? null : `activity:${tabId}`) ?? [];
+
+/** Settings with defaults for anything not saved yet (older installs, partial writes). */
+export function useSettings(): AutofillSettings {
+  const stored = useLocal("settings");
+  return { ...DEFAULT_SETTINGS, ...stored };
+}
+export function useWidgetPrefs(): WidgetPrefs {
+  const stored = useLocal("widget");
+  return { ...DEFAULT_WIDGET, ...stored };
+}

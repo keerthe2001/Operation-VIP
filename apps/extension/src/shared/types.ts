@@ -91,3 +91,10 @@ export interface WidgetState {
   profile: { label: string; value: string }[];
   prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; y: number; hidden: boolean; theme: "system" | "light" | "dark"; showMatch: boolean };
 }
+
+/** One line of the panel's activity log. */
+export interface ActivityEntry {
+  at: number;
+  text: string;
+  kind: "info" | "done" | "need";
+}

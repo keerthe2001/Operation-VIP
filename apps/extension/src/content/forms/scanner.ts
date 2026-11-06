@@ -172,16 +172,42 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
 }
 
 const ACTION_TEXT =
-  /^(save and continue|save & continue|continue|next|next step|create account|sign in|log ?in|review|submit( application)?|apply( now)?|send application)$/i;
-export const CONTINUE_TEXT = /^(save and continue|save & continue|continue|next|next step)$/i;
+  /^(save and continue|save & continue|continue|next|next step|create account|sign up|register|sign in|log ?in|verify|review|submit( application| my application)?|apply( now)?|send application|finish)$/i;
+export const CONTINUE_TEXT = /^(save and continue|save & continue|continue|next|next step|review)$/i;
+const ACCOUNT_TEXT = /^(create account|sign up|register|sign in|log ?in|verify)$/i;
+const SIGN_IN_LINK = /^(sign in|log ?in|already have an account\?? ?sign in)$/i;
+
+export type ActionKind = "continue" | "account" | "submit";
+export function actionKind(text: string): ActionKind {
+  if (CONTINUE_TEXT.test(text)) return "continue";
+  if (ACCOUNT_TEXT.test(text)) return "account";
+  return "submit";
+}
+
+const ACCOUNT_EXISTS =
+  /\b(already (exists|registered|in use|been registered|have an account with)|account (with this|for this) (email|e-mail)|email (address )?is already|an account already)\b/i;
+export const accountExists = (doc: Document = document) => ACCOUNT_EXISTS.test((doc.body?.innerText ?? "").slice(0, 30_000));
+
+/** The site's link or button to switch from Create Account to Sign In. */
+export function findSignIn(root: Document = document): HTMLElement | null {
+  const candidates = deepQueryAll(root, "a, button, [role='button'], [role='link']").filter(
+    (el): el is HTMLElement => el instanceof HTMLElement && isVisible(el) && SIGN_IN_LINK.test(actionText(el)),
+  );
+  return candidates[0] ?? null;
+}
 
 /** The page's main button for this step (Continue, Create Account…), if there is one. */
 export function findAction(root: Document = document): HTMLElement | null {
   const candidates = deepQueryAll(root, "button, input[type=submit], [role='button'], a[data-automation-id]")
     .filter((el): el is HTMLElement => el instanceof HTMLElement && isVisible(el) && !el.closest("copilot-assistant"))
     .filter((el) => !(el as HTMLButtonElement).disabled && ACTION_TEXT.test(actionText(el)));
-  // Prefer the last match: the main button usually sits at the end of the form.
-  return candidates.at(-1) ?? null;
+  // A link inside a sentence ("Already have an account? Sign in") isn't the step's main button.
+  const score = (el: HTMLElement, index: number) => {
+    const parentText = (el.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim();
+    const inSentence = parentText.length > actionText(el).length + 12;
+    return (el.matches("button[type=submit], input[type=submit]") ? 4 : 0) + (el.closest("form") ? 2 : 0) - (inSentence ? 5 : 0) + index / 1000;
+  };
+  return candidates.map((el, i) => ({ el, s: score(el, i) })).sort((a, b) => b.s - a.s)[0]?.el ?? null;
 }
 
 export function actionText(el: HTMLElement): string {

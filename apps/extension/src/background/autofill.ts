@@ -2,7 +2,7 @@ import type { Api } from "@/background/api";
 import { bestGuess } from "@/mapping/best-guess";
 import { fieldLabel, mapFields } from "@/mapping/engine";
 import { DEFAULT_SETTINGS } from "@/shared/settings";
-import type { FieldDescriptor, FillInstruction, FillResult, FormState, MappedField } from "@/shared/fields";
+import type { ActionKind, FieldDescriptor, FillInstruction, FillResult, FormState, MappedField } from "@/shared/fields";
 import type { KeyValueArea, LocalStore, SessionStore } from "@/shared/storage";
 import { formEntry, formKey, tabKey } from "@/shared/storage";
 
@@ -80,7 +80,15 @@ export class AutofillCoordinator {
     return adjusted.map((f): MappedField => (f.key && off.has(f.key) ? { ...f, status: "unmapped", value: null, optionValue: null } : f));
   }
 
-  async onFieldsScanned(tabId: number, frameId: number, url: string, fields: FieldDescriptor[], action?: string | null): Promise<FormState> {
+  async onFieldsScanned(
+    tabId: number,
+    frameId: number,
+    url: string,
+    fields: FieldDescriptor[],
+    action?: string | null,
+    actionKind?: ActionKind | null,
+    accountExists?: boolean,
+  ): Promise<FormState> {
     const previous = await this.state(tabId);
     // A new top-level page starts a new form; other frames keep their fields.
     const keep = previous && !(frameId === 0 && previous.url !== url)
@@ -99,6 +107,8 @@ export class AutofillCoordinator {
       updatedAt: Date.now(),
       lastFill: previous && previous.url === url ? previous.lastFill : undefined,
       action: action !== undefined && (frameId === 0 || action) ? action : previous?.action,
+      actionKind: action !== undefined && (frameId === 0 || action) ? (actionKind ?? null) : previous?.actionKind,
+      accountExists: frameId === 0 ? !!accountExists : previous?.accountExists,
     };
     await this.session.set(formEntry(tabId, state));
     return state;

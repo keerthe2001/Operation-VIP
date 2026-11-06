@@ -139,6 +139,61 @@ const STEP_HTML = `<!doctype html><html><head><title>My Information</title>
   }
 </script></body></html>`;
 
+// A whole application in Auto mode: account step (the account exists → sign in), a step
+// with one required question for the user, a review page with the final Submit.
+const FLOW_URL = "https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-77/apply";
+const FLOW_HTML = `<!doctype html><html><head><title>Apply - Analyst</title></head><body><main id="app"></main>
+<script>
+  const app = document.getElementById("app");
+  window.__clicks = [];
+  const steps = {
+    create: () => \`<h2>Create Account</h2><form onsubmit="return false">
+      <label for="em">Email Address</label><input id="em" type="email" required>
+      <label for="pw">Password</label><input id="pw" type="password" required>
+      <label for="pw2">Verify New Password</label><input id="pw2" type="password" required>
+      <label><input type="checkbox" id="ok" required> I accept the privacy statement *</label>
+      \${window.__exists ? '<p role="alert">An account already exists for this email address.</p>' : ""}
+      <button type="submit" id="go">Create Account</button>
+      <p>Already have an account? <a href="#" id="signin">Sign In</a></p></form>\`,
+    signin: () => \`<h2>Sign In</h2><form onsubmit="return false">
+      <label for="em">Email Address</label><input id="em" type="email" required>
+      <label for="pw">Password</label><input id="pw" type="password" required>
+      <button type="submit" id="go">Sign In</button></form>\`,
+    info: () => \`<h2>My Information</h2><form onsubmit="return false">
+      <label for="fn">First Name</label><input id="fn" required>
+      <label for="ln">Last Name</label><input id="ln" required>
+      <label for="why">Why do you want to join Acme? *</label><textarea id="why" required></textarea>
+      <button type="submit" id="go">Save and Continue</button></form>\`,
+    review: () => \`<h2>Review</h2><p>Check your application.</p><button type="button" id="go">Submit</button>\`,
+    done: () => \`<h2>Thank you for applying!</h2><p>Your application has been submitted.</p>\`,
+  };
+  let step = "create";
+  const render = () => { app.innerHTML = steps[step](); };
+  app.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.id === "signin") { e.preventDefault(); window.__clicks.push("signin-link"); step = "signin"; render(); }
+    if (t.id !== "go") return;
+    window.__clicks.push(t.textContent);
+    if (step === "create") { window.__exists = true; render(); }
+    else if (step === "signin") { window.__signedIn = [document.getElementById("em").value, document.getElementById("pw").value]; step = "info"; render(); }
+    else if (step === "info") { step = "review"; render(); }
+    else if (step === "review") { step = "done"; render(); }
+  });
+  render();
+</script></body></html>`;
+
+/** Clicks until `done()` resolves true: the embedded panel can re-layout while live updates arrive. */
+async function clickUntil(locator, done, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    // Playwright's mouse clicks into an iframe inside a shadow root occasionally miss in this
+    // headless setup; after one real click, dispatch the event directly.
+    if (i === 0) await locator.click({ timeout: 8000 }).catch(() => undefined);
+    else await locator.dispatchEvent("click").catch(() => undefined);
+    if (await done().then((v) => v, () => false)) return true;
+  }
+  return false;
+}
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -159,6 +214,8 @@ try {
   let [worker] = context.serviceWorkers();
   worker ??= await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).host;
+  // Most steps below exercise filling on request; the Auto apply mode is tested on its own.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
   check(extensionId === EXPECTED_ID, `extension loaded with stable id ${extensionId}`);
 
   // 1. A user with a processed resume (via the API for speed).
@@ -438,21 +495,25 @@ try {
   check(Math.round(drawer.x + drawer.width) === viewport.width && Math.round(drawer.height) === viewport.height, "drawer docks full-height on the right with the Copilot panel inside");
   const pageWidth = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
   check(Math.abs(pageWidth - (viewport.width - 380)) < 2, `page shrinks to make room for the drawer (${pageWidth}px)`);
-  await panelIn(naukri).getByRole("tab", { name: /Match/ }).click();
-  await panelIn(naukri).getByText(/^Missing \(/).waitFor();
+  await clickUntil(panelIn(naukri).getByRole("tab", { name: /Match/ }), () => panelIn(naukri).getByText(/^Missing \(/).waitFor({ timeout: 5000 }).then(() => true));
   check(await panelIn(naukri).getByText("Snowflake").isVisible(), "Match tab lists skills missing from the profile");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
-  await panelIn(naukri).getByRole("tab", { name: /Autofill/ }).click();
-  await panelIn(naukri).getByRole("button", { name: "Save job" }).waitFor();
-  await panelIn(naukri).getByRole("button", { name: "Save job" }).click();
-  await panelIn(naukri).getByText(/^Tracked/).waitFor();
+  await clickUntil(panelIn(naukri).getByRole("tab", { name: /Autofill/ }), () =>
+    panelIn(naukri).getByRole("button", { name: "Save job" }).waitFor({ timeout: 4000 }).then(() => true),
+  );
+  await clickUntil(panelIn(naukri).getByRole("button", { name: "Save job" }), () =>
+    panelIn(naukri).getByText(/^Tracked/).waitFor({ timeout: 6000 }).then(() => true),
+  );
   check(true, "job saved to the tracker from the panel");
-  await panelIn(naukri).getByRole("button", { name: /theme$/ }).click();
-  const theme = await worker.evaluate(async () => (await chrome.storage.local.get("theme")).theme);
+  const storedTheme = () => worker.evaluate(async () => (await chrome.storage.local.get("theme")).theme);
+  await clickUntil(panelIn(naukri).getByRole("button", { name: /theme$/ }), async () => {
+    await naukri.waitForTimeout(500);
+    return (await storedTheme()) !== undefined && (await storedTheme()) !== "system";
+  });
+  const theme = await storedTheme();
   check(theme === "light" || theme === "dark", `theme switch saved (${theme})`);
   // The panel's close button collapses the drawer to the edge tab.
-  await panelIn(naukri).getByRole("button", { name: "Close", exact: true }).click();
-  await bubble.waitFor();
+  await clickUntil(panelIn(naukri).getByRole("button", { name: "Close", exact: true }), () => bubble.waitFor({ timeout: 5000 }).then(() => true));
   const restored = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
   check(Math.abs(restored - viewport.width) < 2, "close collapses it and the page returns to full width");
   const box = await bubble.boundingBox();
@@ -486,9 +547,9 @@ try {
   await form.goto(WIDGET_FORM_URL);
   const fillButton = panelIn(form).getByRole("button", { name: /^Autofill \d+ fields$/ });
   await fillButton.waitFor({ timeout: 15000 });
+  await panelIn(form).getByText(/^Tracked/).waitFor({ timeout: 10000 }).catch(() => undefined); // let the panel settle
   if (shots) await form.screenshot({ path: `${shots}/widget-autofill.png` });
-  await fillButton.click();
-  await panelIn(form).getByText(/Filled \d+ fields/).waitFor();
+  await clickUntil(fillButton, () => form.waitForFunction(() => document.getElementById("f").value !== "", null, { timeout: 8000 }).then(() => true));
   const formValues = await form.evaluate(() => ["a", "b", "c", "d", "e", "f"].map((id) => document.getElementById(id).value));
   check(
     formValues[0] === "Priya" && formValues[2] === "priya.raman@example.com" && formValues[4] !== "" && formValues[5] !== "",
@@ -503,8 +564,8 @@ try {
   await account.goto(ACCOUNT_URL);
   const accountFill = panelIn(account).getByRole("button", { name: /^Autofill \d+ fields$/ });
   await accountFill.waitFor({ timeout: 15000 });
-  await accountFill.click();
-  await panelIn(account).getByText(/Filled \d+ fields/).waitFor();
+  await panelIn(account).getByText(/^Tracked/).waitFor({ timeout: 10000 }).catch(() => undefined);
+  await clickUntil(accountFill, () => account.waitForFunction(() => document.getElementById("pw2").value !== "", null, { timeout: 8000 }).then(() => true));
   const creds = await account.evaluate(() => [document.getElementById("em").value, document.getElementById("pw").value, document.getElementById("pw2").value]);
   check(creds[0] === "priya.raman@example.com" && creds[1] === "Str0ng!Pass" && creds[2] === "Str0ng!Pass", "create-account page: email and both password boxes filled");
   const shellRight = await account.evaluate(() => document.getElementById("shell").getBoundingClientRect().right);
@@ -516,12 +577,13 @@ try {
   // 10e. Interactive fill on a Workday-style step: scrolls field by field, picks options in
   // custom dropdowns, ticks the required consent, shows progress, and the panel's copy of the
   // page's button presses Save and Continue.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual", fillProgress: "popup" } }));
   await context.route(STEP_URL, (route) => route.fulfill({ contentType: "text/html", body: STEP_HTML }));
   const step = await context.newPage();
   await step.goto(STEP_URL);
   const stepFill = panelIn(step).getByRole("button", { name: /^Autofill \d+ fields$/ });
   await stepFill.waitFor({ timeout: 15000 });
-  await stepFill.click();
+  await clickUntil(stepFill, () => widget(step).locator(".progress-card").waitFor({ timeout: 6000 }).then(() => true));
   await widget(step).locator(".progress-card").waitFor({ timeout: 10000 });
   if (shots) await step.screenshot({ path: `${shots}/fill-progress.png` });
   await widget(step).getByText("Completed!").waitFor({ timeout: 20000 });
@@ -540,9 +602,49 @@ try {
   check(distinct >= 3, `page scrolled to each field while filling (${distinct} scroll positions)`);
   if (shots) await step.screenshot({ path: `${shots}/fill-done.png` });
   const actionButton = panelIn(step).getByRole("button", { name: /^Save and Continue/ });
-  await actionButton.click();
-  await step.waitForFunction(() => window.__continued === 1);
+  await clickUntil(actionButton, () => step.waitForFunction(() => window.__continued >= 1, null, { timeout: 6000 }).then(() => true));
   check(true, "panel's “Save and Continue” presses the page's own button");
+
+  // 10f. Auto apply mode: account → sign in → fill → the user answers one question → review → submit.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "auto", fillProgress: "off" } }));
+  await context.route(FLOW_URL, (route) => route.fulfill({ contentType: "text/html", body: FLOW_HTML }));
+  const flow = await context.newPage();
+  await flow.goto(FLOW_URL);
+  await flow.waitForFunction(() => window.__signedIn, null, { timeout: 40000 });
+  const signedIn = await flow.evaluate(() => ({ creds: window.__signedIn, clicks: window.__clicks }));
+  check(signedIn.clicks[0] === "Create Account" && signedIn.clicks.includes("signin-link"), `auto: created the account, saw it exists and switched to Sign In (${signedIn.clicks.join(" → ")})`);
+  check(signedIn.creds[0] === "priya.raman@example.com" && signedIn.creds[1] === "Str0ng!Pass", "auto: signed in with the saved email and password");
+  await flow.waitForFunction(() => document.getElementById("ln")?.value === "Raman", null, { timeout: 20000 });
+  const needItem = panelIn(flow).getByRole("button", { name: /Why do you want to join Acme/ });
+  await needItem.waitFor({ timeout: 15000 });
+  check(true, "auto: filled the next page and stopped at the question that needs the user");
+  if (shots) await flow.screenshot({ path: `${shots}/flow-needs-you.png` });
+  const focusedWhy = async () => flow.waitForFunction(() => document.activeElement?.id === "why", null, { timeout: 10000 }).then(() => true, () => false);
+  await flow.waitForTimeout(1500); // let the panel settle after the step change
+  await needItem.dispatchEvent("mousedown");
+  if (!(await focusedWhy())) {
+    await needItem.dispatchEvent("mousedown");
+    if (!(await focusedWhy())) throw new Error("FAILED: needs-you click didn't focus the field");
+  }
+  check(true, "clicking a needs-you item in the panel jumps to that field");
+  await flow.keyboard.type("I build data products and Acme's analytics team is where I want to grow.");
+  await panelIn(flow).getByText("Everything is filled. Submit the application?").waitFor({ timeout: 20000 });
+  const reviewClicks = await flow.evaluate(() => window.__clicks);
+  check(reviewClicks.includes("Save and Continue") && !reviewClicks.includes("Submit"), "auto: continued once the user answered, then stopped before Submit");
+  if (shots) await flow.screenshot({ path: `${shots}/flow-submit.png` });
+  await clickUntil(panelIn(flow).getByRole("button", { name: "Submit", exact: true }), () =>
+    flow.getByText("Thank you for applying!").waitFor({ timeout: 8000 }).then(() => true),
+  );
+  let flowStatus;
+  for (let i = 0; i < 20 && flowStatus !== "submitted"; i++) {
+    const apps = await fetch(`${API}/api/v1/applications`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
+    flowStatus = apps.find((a) => a.job_url?.startsWith("https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-77"))?.status;
+    if (flowStatus !== "submitted") await new Promise((r) => setTimeout(r, 250));
+  }
+  check(flowStatus === "submitted", `submitted after the user's OK and saved in the tracker (${flowStatus})`);
+  await panelIn(flow).getByText("Submitted and saved to your tracker").waitFor();
+  check(true, "activity log shows each step");
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

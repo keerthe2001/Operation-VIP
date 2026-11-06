@@ -2,7 +2,7 @@ import { Alert, Button, Input, NativeSelect } from "@copilot/ui";
 import { ArrowLeft, Globe, LogOut, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
-import { send, useLocal } from "@/sidepanel/chrome-state";
+import { send, useLocal, useWidgetPrefs } from "@/sidepanel/chrome-state";
 import { AutofillSettings } from "@/sidepanel/components/AutofillSettings";
 import { WEB_URL } from "@/shared/config";
 import type { UserRead } from "@/shared/types";
@@ -76,7 +76,7 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
 }
 
 function WidgetSettings() {
-  const widget = useLocal("widget");
+  const widget = useWidgetPrefs();
   const modeId = useId();
   return (
     <section className="grid gap-2">

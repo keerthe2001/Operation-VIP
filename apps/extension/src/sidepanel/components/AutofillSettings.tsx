@@ -1,7 +1,7 @@
 import { Button, Input, NativeSelect, cn } from "@copilot/ui";
 import { useId, useState, type ReactNode } from "react";
 
-import { send, useLocal } from "@/sidepanel/chrome-state";
+import { send, useSettings, useWidgetPrefs } from "@/sidepanel/chrome-state";
 import { FIELD_GROUPS, type AutofillSettings as Settings } from "@/shared/settings";
 
 const save = (settings: Partial<Settings>) => send({ type: "SET_SETTINGS", settings });
@@ -35,12 +35,25 @@ const onOff = (value: boolean): "on" | "off" => (value ? "on" : "off");
 
 /** Simplify-style autofill behaviour settings. */
 export function AutofillSettings() {
-  const settings = useLocal("settings");
-  const widget = useLocal("widget");
+  const settings = useSettings();
+  const widget = useWidgetPrefs();
   const [email, setEmail] = useState<string | null>(null);
   return (
     <section className="grid gap-5">
       <h2 className="text-sm font-semibold">Autofill</h2>
+
+      <Setting
+        label="Apply mode"
+        note={
+          settings.applyMode === "auto"
+            ? "Copilot fills each page as it opens, creates your job-site account (or signs in if you already have one) and continues to the next page. It stops for anything that needs you and asks before the final Submit."
+            : "Copilot fills when you click Autofill. You press the page's Continue, Create Account and Submit buttons yourself."
+        }
+      >
+        {(id) => (
+          <Choice id={id} value={settings.applyMode} options={[["auto", "Auto"], ["manual", "Manual"]]} onChange={(v) => save({ applyMode: v })} />
+        )}
+      </Setting>
 
       <Setting
         label="Use a separate email for applications"
@@ -79,24 +92,6 @@ export function AutofillSettings() {
 
       <Setting label="Match score on job pages" note="Your keyword match score with the job description, on the edge tab and job card.">
         {(id) => <Choice id={id} value={settings.showMatch ? "shown" : "hidden"} options={[["shown", "Shown"], ["hidden", "Hidden"]]} onChange={(v) => save({ showMatch: v === "shown" })} />}
-      </Setting>
-
-      <Setting
-        label="Continuously autofill multipage forms"
-        note={settings.continuousFill ? "After your first autofill, each new step of the application is filled as it appears." : "For applications with several pages, click Autofill on each page."}
-      >
-        {(id) => (
-          <Choice id={id} value={settings.continuousFill ? "on" : "off"} options={[["off", "Disabled"], ["on", "Enabled"]]} onChange={(v) => save({ continuousFill: v === "on" })} />
-        )}
-      </Setting>
-
-      <Setting
-        label="Continue automatically"
-        note={settings.autoContinue ? "After autofill, Copilot presses the page's Continue / Next button. It never presses a final Submit." : "After autofill, you click the page's Continue or Submit button yourself."}
-      >
-        {(id) => (
-          <Choice id={id} value={settings.autoContinue ? "on" : "off"} options={[["off", "Disabled"], ["on", "Enabled (never submits)"]]} onChange={(v) => save({ autoContinue: v === "on" })} />
-        )}
       </Setting>
 
       <Setting
@@ -144,7 +139,7 @@ export function AutofillSettings() {
           <Choice
             id={id}
             value={settings.fillProgress}
-            options={[["popup", "Popup (top right)"], ["modal", "Modal (blurred overlay)"], ["off", "Only in the panel"]]}
+            options={[["off", "In the panel"], ["popup", "Popup on the page (top right)"], ["modal", "Modal (blurred overlay)"]]}
             onChange={(v) => save({ fillProgress: v })}
           />
         )}

@@ -5,7 +5,7 @@
  */
 import { fillFields } from "@/content/autofill/writer";
 import { detectJob, forcedJob } from "@/content/detection/engine";
-import { actionText, CONTINUE_TEXT, findAction, scanFields } from "@/content/forms/scanner";
+import { accountExists, actionKind, actionText, findAction, findField, findSignIn, scanFields } from "@/content/forms/scanner";
 import { toContentSchema } from "@/shared/messages";
 
 // Confirmation pages after applying.
@@ -43,13 +43,17 @@ function report(force = false) {
     post({ type: "PAGE_ANALYZED", job, url: location.href, submitted });
   }
   // Field details are only collected on application pages.
+  // The page's main button is reported from the top frame even without form fields, so a final
+  // "Review → Submit" page of an application still gets its Submit step.
   const fields = job?.isApplicationPage ? scanFields() : [];
-  const actionEl = job?.isApplicationPage ? findAction() : null;
+  const actionEl = job?.isApplicationPage || window === window.top ? findAction() : null;
   const action = actionEl ? actionText(actionEl).slice(0, 80) : null;
-  const fieldsPayload = JSON.stringify({ fields, action });
+  const kind = action ? actionKind(action) : null;
+  const exists = !!job?.isApplicationPage && accountExists();
+  const fieldsPayload = JSON.stringify({ fields, action, exists });
   if (force || fieldsPayload !== lastFields) {
     lastFields = fieldsPayload;
-    post({ type: "FIELDS_SCANNED", url: location.href, fields, action });
+    post({ type: "FIELDS_SCANNED", url: location.href, fields, action, actionKind: kind, accountExists: exists });
   }
 }
 
@@ -62,6 +66,8 @@ function schedule() {
 // Single-page apps and multi-step forms change content without reloading.
 new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
 document.addEventListener("change", schedule, true);
+// Notice fields the user fills by hand, so the panel can move on to the next one.
+document.addEventListener("input", schedule, true);
 let lastUrl = location.href;
 setInterval(() => {
   if (location.href !== lastUrl) {
@@ -82,14 +88,40 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
   }
   if (parsed.data.type === "CLICK_ACTION") {
     const button = findAction();
-    // Automatic clicks only ever press Continue / Next, never a final submit.
-    if (!button || (parsed.data.continueOnly && !CONTINUE_TEXT.test(actionText(button)))) {
+    // Only the kinds of step the caller allows (Submit only after the user's OK).
+    if (!button || !parsed.data.kinds.includes(actionKind(actionText(button)))) {
       sendResponse({ ok: false, error: "No button to click on this page." });
       return false;
     }
     button.scrollIntoView?.({ block: "center" });
     button.click();
-    sendResponse({ ok: true });
+    sendResponse({ ok: true, data: actionText(button) });
+    schedule();
+    return false;
+  }
+  if (parsed.data.type === "CLICK_SIGN_IN") {
+    const link = findSignIn();
+    if (link) link.click();
+    sendResponse(link ? { ok: true } : { ok: false, error: "No Sign In link on this page." });
+    schedule();
+    return false;
+  }
+  if (parsed.data.type === "FOCUS_FIELD") {
+    const el = findField(parsed.data.id);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      // The click in the panel can pull focus back to it right after; make sure it lands here.
+      const land = () => {
+        if (document.activeElement !== el) el.focus({ preventScroll: true });
+      };
+      land();
+      for (const delay of [150, 400, 900]) setTimeout(land, delay);
+      el.animate?.(
+        [{ boxShadow: "0 0 0 0 rgba(91,76,240,0.8)" }, { boxShadow: "0 0 0 6px rgba(91,76,240,0)" }],
+        { duration: 900, iterations: 2 },
+      );
+    }
+    sendResponse(el ? { ok: true } : { ok: false, error: "That field is no longer on the page." });
     return false;
   }
   filling = true;

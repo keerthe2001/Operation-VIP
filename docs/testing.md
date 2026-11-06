@@ -85,7 +85,9 @@ input; "Fill this page anyway" on an unrecognised form; the in-page drawer with 
 side panel; edge tab, page shrinks while open, toolbar toggle, Match/Profile tabs, save job, theme,
 tab drag, auto-open, autofill, create-account password, other sites can't embed the panel); one-by-one
 fill on a Workday-style step (scrolls to each field, custom dropdowns, country code + national number,
-consent box, progress popup, the panel's Save and Continue); no injection on unsupported sites;
+consent box, progress popup, the panel's Save and Continue); Auto apply mode end to end (create account →
+"already exists" → sign in → fill → stop at the question for the user → jump to it from the panel → continue →
+ask before Submit → submitted in the tracker); no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

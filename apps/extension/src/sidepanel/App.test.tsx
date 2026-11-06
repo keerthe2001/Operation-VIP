@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -295,5 +295,46 @@ describe("panel tabs and embedding", () => {
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: /theme$/ }));
     expect(fake.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "SET_THEME" }));
+  });
+});
+
+describe("guided flow", () => {
+  const field = (id: string, label: string, extra: Record<string, unknown> = {}) => ({
+    id, frameId: 0, kind: "text", label, name: "", htmlId: "", placeholder: "", autocomplete: "", helpText: "", required: true,
+    options: [], currentValue: "", accept: "", maxLength: null, key: null, confidence: 0, status: "question", value: null, optionValue: null, ...extra,
+  });
+
+  it("logs activity, takes the user to fields that need them, then moves on", async () => {
+    const fake = installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: {
+        "tab:7": { url: job.url, job, analyzedAt: 1 },
+        "form:7": { url: job.url, updatedAt: 1, action: "Save and Continue", actionKind: "continue", fields: [field("q1", "Why Acme?"), field("q2", "Notice period")] },
+        "activity:7": [{ at: 1, text: "Filled 6 fields", kind: "done" }, { at: 2, text: "2 fields need you", kind: "need" }],
+      },
+    });
+    render(<App />);
+    expect(await screen.findByText("Filled 6 fields")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("button", { name: /Why Acme\?/ }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FOCUS_FIELD", tabId: 7, key: "0:q1" });
+    // The user fills it on the page: Copilot takes them to the next one.
+    await fake.set("session", {
+      "form:7": { url: job.url, updatedAt: 2, action: "Save and Continue", actionKind: "continue", fields: [field("q1", "Why Acme?", { currentValue: "Because" }), field("q2", "Notice period")] },
+    });
+    await vi.waitFor(() => expect(fake.sendMessage).toHaveBeenCalledWith({ type: "FOCUS_FIELD", tabId: 7, key: "0:q2" }));
+  });
+
+  it("asks before the final submit", async () => {
+    const fake = installFakeChrome({
+      local: { auth: { status: "signed_in", user }, profile },
+      session: {
+        "tab:7": { url: job.url, job, analyzedAt: 1 },
+        "form:7": { url: job.url, updatedAt: 1, action: "Submit", actionKind: "submit", fields: [field("q1", "Why Acme?", { currentValue: "Because" })] },
+      },
+    });
+    render(<App />);
+    expect(await screen.findByText("Everything is filled. Submit the application?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "SUBMIT_APPLICATION", tabId: 7 });
   });
 });

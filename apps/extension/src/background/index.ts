@@ -14,9 +14,9 @@ import {
   widgetMessageSchema,
   type Reply,
 } from "@/shared/messages";
-import type { FillResult } from "@/shared/fields";
+import type { FillResult, FormState, MappedField } from "@/shared/fields";
 import { appKey, chromeArea, DEFAULT_LOCAL, DEFAULT_WIDGET, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
-import type { DetectedJob, TabState } from "@/shared/types";
+import type { ActivityEntry, DetectedJob, TabState } from "@/shared/types";
 
 const local = chromeArea<LocalStore>(chrome.storage.local);
 const session = chromeArea<SessionStore>(chrome.storage.session);
@@ -45,12 +45,19 @@ async function showProgress(tabId: number, phase: "start" | "field" | "done", it
 autofill.onStart = (tabId, items) => void showProgress(tabId, "start", items);
 autofill.onDone = (tabId, items) => void showProgress(tabId, "done", items);
 
-/** Tabs where the user started autofill: later steps of the same application fill by themselves
- * when "Continuously autofill multipage forms" is on. */
-const activeFill = new Map<number, { host: string; at: number }>();
 const filling = new Set<number>();
 
-/** Fills every ready field, then (if enabled) presses the page's Continue button. */
+// ---------------------------------------------------------------- activity log (shown in the panel)
+
+const activityKey = (tabId: number) => `activity:${tabId}`;
+async function log(tabId: number, text: string, kind: ActivityEntry["kind"] = "info") {
+  const key = activityKey(tabId);
+  const current = ((await chrome.storage.session.get(key))[key] as ActivityEntry[] | undefined) ?? [];
+  if (current.at(-1)?.text === text) return;
+  await chrome.storage.session.set({ [key]: [...current, { at: Date.now(), text, kind }].slice(-40) });
+}
+
+/** Fills every ready field on the page. */
 async function fillReady(tabId: number) {
   if (filling.has(tabId)) return { filled: 0, skipped: 0, failed: 0 };
   filling.add(tabId);
@@ -61,25 +68,72 @@ async function fillReady(tabId: number) {
     const after = await autofill.state(tabId);
     const filled = after?.fields.filter((f) => f.result === "filled").length ?? 0;
     void tracker.onFilled(tabId, (await session.get(tabKey(tabId)))?.job, filled);
-    if (state) activeFill.set(tabId, { host: new URL(state.url).hostname, at: Date.now() });
-    const requiredLeft = after?.fields.some((f) => f.required && !f.currentValue && f.result !== "filled") ?? true;
-    if ((await settings()).autoContinue && !requiredLeft) {
-      await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", continueOnly: true }, { frameId: 0 }).catch(() => undefined);
-    }
+    if (summary.filled) void log(tabId, `Filled ${summary.filled} field${summary.filled === 1 ? "" : "s"}`, "done");
+    if (summary.failed) void log(tabId, `${summary.failed} field${summary.failed === 1 ? "" : "s"} couldn't be filled`, "need");
     return summary;
   } finally {
     filling.delete(tabId);
   }
 }
 
-const continueTimers = new Map<number, ReturnType<typeof setTimeout>>();
-async function maybeContinueFilling(tabId: number, url: string) {
-  const active = activeFill.get(tabId);
-  if (!active || active.host !== new URL(url).hostname || Date.now() - active.at > 60 * 60 * 1000) return;
-  if (!(await settings()).continuousFill) return;
-  clearTimeout(continueTimers.get(tabId));
-  // Wait for the new step to settle before filling it.
-  continueTimers.set(tabId, setTimeout(() => void fillReady(tabId), 800));
+// ---------------------------------------------------------------- auto apply
+
+/** Steps already handled, so a page that re-renders after an error isn't clicked again. */
+const handledSteps = new Map<number, Set<string>>();
+const flowTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+const needsYou = (state: FormState) =>
+  state.fields.filter((f) => f.required && !hasValue(f) && f.result !== "filled");
+const hasValue = (f: MappedField) => f.currentValue.trim() !== "" || f.result === "filled";
+
+/** Called whenever a page step changes: fill it, then move to the next step on its own. */
+function scheduleFlow(tabId: number) {
+  clearTimeout(flowTimers.get(tabId));
+  // Let the step settle before acting on it.
+  flowTimers.set(tabId, setTimeout(() => void runFlow(tabId), 900));
+}
+
+async function runFlow(tabId: number) {
+  if (filling.has(tabId) || (await settings()).applyMode !== "auto") return;
+  if ((await auth.state()).status !== "signed_in") return;
+  const job = (await session.get(tabKey(tabId)))?.job;
+  const state = await autofill.state(tabId);
+  if (!job?.isApplicationPage || !state || (state.fields.length === 0 && !state.action)) return;
+
+  const step = `${state.url}|${state.action ?? ""}|${state.fields.map((f) => f.id).join(",")}`;
+  const done = handledSteps.get(tabId) ?? new Set<string>();
+  handledSteps.set(tabId, done);
+
+  // The site says the account exists: switch to its Sign In form.
+  if (state.accountExists && state.actionKind === "account" && !done.has(`signin|${state.url}`)) {
+    done.add(`signin|${state.url}`);
+    await log(tabId, "Account already exists: signing in");
+    await chrome.tabs.sendMessage(tabId, { type: "CLICK_SIGN_IN" }, { frameId: 0 }).catch(() => undefined);
+    return;
+  }
+
+  if (!done.has(`fill|${step}`) && readyKeys(state.fields).length > 0) {
+    done.add(`fill|${step}`);
+    await fillReady(tabId);
+    scheduleFlow(tabId);
+    return;
+  }
+
+  const missing = needsYou((await autofill.state(tabId)) ?? state);
+  if (missing.length > 0) {
+    await log(tabId, `${missing.length} field${missing.length === 1 ? "" : "s"} need${missing.length === 1 ? "s" : ""} you`, "need");
+    return;
+  }
+
+  const kind = state.actionKind;
+  if (!kind || !state.action || done.has(`click|${step}`)) return;
+  if (kind === "submit") {
+    await log(tabId, "Everything is filled. Ready to submit", "need");
+    return; // the final Submit always waits for the user's OK
+  }
+  done.add(`click|${step}`);
+  await log(tabId, kind === "account" ? `${state.action}…` : `${state.action} → next page`);
+  await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", kinds: [kind] }, { frameId: 0 }).catch(() => undefined);
 }
 
 const promptedSubmission = new Set<string>();
@@ -122,31 +176,43 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // --------------------------------------------------------------------- tab state
 
+/** The application a tab is in the middle of (by site), for its later pages. */
+const applyContext = new Map<number, { host: string; job: DetectedJob; at: number }>();
+
 /** Several frames can report (e.g. an embedded Greenhouse iframe): keep the best one. */
 const frameReports = new Map<number, Map<number, DetectedJob | null>>();
 
-async function recordTab(tabId: number, frameId: number, url: string, job: DetectedJob | null) {
+async function recordTab(tabId: number, frameId: number, url: string, reported: DetectedJob | null) {
   const frames = frameReports.get(tabId) ?? new Map<number, DetectedJob | null>();
   if (frameId === 0) frames.clear(); // a top-level navigation resets the page
-  frames.set(frameId, job);
+  frames.set(frameId, reported);
   frameReports.set(tabId, frames);
   const best = [...frames.values()]
     .filter((j): j is DetectedJob => j !== null)
     .sort((a, b) => Number(b.isApplicationPage) - Number(a.isApplicationPage) || b.confidence - a.confidence)[0];
-  const state: TabState = { url, job: best ?? null, analyzedAt: Date.now() };
+  // Later pages of an application in progress (a review page without fields, say) stay part of it.
+  const flow = applyContext.get(tabId);
+  let job = best ?? null;
+  if (!job?.isApplicationPage && flow && flow.host === new URL(url).hostname && Date.now() - flow.at < 60 * 60 * 1000) {
+    job = { ...flow.job, url, isApplicationPage: true, signals: [...flow.job.signals, "same-application"] };
+  }
+  if (job?.isApplicationPage) applyContext.set(tabId, { host: new URL(url).hostname, job, at: Date.now() });
+  const state: TabState = { url, job, analyzedAt: Date.now() };
   await session.set(tabEntry(tabId, state));
-  await chrome.action.setBadgeText({ tabId, text: best?.isApplicationPage ? "●" : "" });
+  await chrome.action.setBadgeText({ tabId, text: job?.isApplicationPage ? "●" : "" });
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#4f46e5" });
   // "Applications you submit without autofill: track them" (otherwise only after autofill).
-  if (best?.isApplicationPage && (await auth.state()).status === "signed_in" && (await settings()).trackWithoutAutofill) {
-    void tracker.onDetected(tabId, best);
+  if (job?.isApplicationPage && (await auth.state()).status === "signed_in" && (await settings()).trackWithoutAutofill) {
+    void tracker.onDetected(tabId, job);
   }
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   frameReports.delete(tabId);
   void session.remove([tabKey(tabId), formKey(tabId), appKey(tabId)]);
-  void chrome.storage.session.remove(`embed:${tabId}`);
+  void chrome.storage.session.remove([`embed:${tabId}`, `activity:${tabId}`]);
+  handledSteps.delete(tabId);
+  applyContext.delete(tabId);
 });
 
 /**
@@ -301,12 +367,32 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         const state = await autofill.state(message.tabId);
         const filled = state?.fields.filter((f) => f.result === "filled").length ?? 0;
         void tracker.onFilled(message.tabId, (await session.get(tabKey(message.tabId)))?.job, filled);
-        if (state) activeFill.set(message.tabId, { host: new URL(state.url).hostname, at: Date.now() });
         return { ok: true, data: summary };
       }
       case "CLICK_ACTION": {
+        // The user pressed it in the panel: any step except the final submit (see below).
         const reply = (await chrome.tabs
-          .sendMessage(message.tabId, { type: "CLICK_ACTION" }, { frameId: 0 })
+          .sendMessage(message.tabId, { type: "CLICK_ACTION", kinds: ["continue", "account"] }, { frameId: 0 })
+          .catch(() => null)) as Reply | null;
+        return reply ?? { ok: false, error: "The page didn't respond." };
+      }
+      case "SUBMIT_APPLICATION": {
+        const reply = (await chrome.tabs
+          .sendMessage(message.tabId, { type: "CLICK_ACTION", kinds: ["submit"] }, { frameId: 0 })
+          .catch(() => null)) as Reply | null;
+        if (!reply?.ok) return reply ?? { ok: false, error: "The page didn't respond." };
+        const job = (await session.get(tabKey(message.tabId)))?.job;
+        if (!(await tracker.get(message.tabId)) && job) await tracker.save(message.tabId, job);
+        const tracked = await tracker.setStatus(message.tabId, "submitted").catch(() => null);
+        const tab = await chrome.tabs.get(message.tabId).catch(() => null);
+        if (tab?.url) promptedSubmission.add(tab.url);
+        await log(message.tabId, tracked ? "Submitted and saved to your tracker" : "Submitted", "done");
+        return { ok: true };
+      }
+      case "FOCUS_FIELD": {
+        const [frameId, id] = [Number(message.key.split(":")[0]), message.key.split(":").slice(1).join(":")];
+        const reply = (await chrome.tabs
+          .sendMessage(message.tabId, { type: "FOCUS_FIELD", id }, { frameId })
           .catch(() => null)) as Reply | null;
         return reply ?? { ok: false, error: "The page didn't respond." };
       }
@@ -388,9 +474,9 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     } else if (message.type === "FIELDS_SCANNED") {
       const url = sender.tab.url ?? message.url;
       void autofill
-        .onFieldsScanned(tabId, frameId, url, message.fields, message.action)
+        .onFieldsScanned(tabId, frameId, url, message.fields, message.action, message.actionKind, message.accountExists)
         .then(() => {
-          if (!filling.has(tabId)) void maybeContinueFilling(tabId, url);
+          if (!filling.has(tabId)) scheduleFlow(tabId);
         });
     } else {
       void autofill.onProgress(tabId, frameId, message.id, message.status, message.message).then((items) => {

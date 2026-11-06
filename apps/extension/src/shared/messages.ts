@@ -36,6 +36,8 @@ export const contentMessageSchema = z.discriminatedUnion("type", [
     fields: z.array(fieldDescriptorSchema).max(300),
     /** Text of the page's main button (Continue, Create Account…). */
     action: z.string().max(80).nullable().optional(),
+    actionKind: z.enum(["continue", "account", "submit"]).nullable().optional(),
+    accountExists: z.boolean().optional(),
   }),
   /** One field done while filling one by one. */
   z.object({ type: z.literal("FILL_PROGRESS"), id: z.string().max(40), status: z.enum(["filling", "filled", "skipped", "failed"]), message: z.string().max(300).optional() }),
@@ -77,6 +79,9 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("SAVE_JOB"), tabId: z.number().int() }),
   /** The user clicked the panel's copy of the page's main button. */
   z.object({ type: z.literal("CLICK_ACTION"), tabId: z.number().int() }),
+  /** Final OK: press Submit, then mark the application submitted. */
+  z.object({ type: z.literal("SUBMIT_APPLICATION"), tabId: z.number().int() }),
+  z.object({ type: z.literal("FOCUS_FIELD"), tabId: z.number().int(), key: z.string().max(60) }),
   z.object({ type: z.literal("SET_SETTINGS"), settings: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal("DISMISS_WHATS_NEW") }),
   z.object({ type: z.literal("SET_ACCOUNT_PASSWORD"), password: z.string().max(128).nullable() }),
@@ -134,7 +139,12 @@ export const toContentSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("ANALYZE_PAGE"), force: z.boolean().optional() }),
   /** `interactive`: scroll to each field and fill it one by one, reporting progress. */
   z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300), interactive: z.boolean().optional() }),
-  z.object({ type: z.literal("CLICK_ACTION"), continueOnly: z.boolean().optional() }),
+  /** Press the page's main button, only if it does one of `kinds`. */
+  z.object({ type: z.literal("CLICK_ACTION"), kinds: z.array(z.enum(["continue", "account", "submit"])).max(3) }),
+  /** The account exists: go to the site's Sign In form. */
+  z.object({ type: z.literal("CLICK_SIGN_IN") }),
+  /** Scroll to a field and put the cursor in it. */
+  z.object({ type: z.literal("FOCUS_FIELD"), id: z.string().max(40) }),
 ]);
 
 export type ContentMessage = z.infer<typeof contentMessageSchema>;

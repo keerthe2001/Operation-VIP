@@ -76,4 +76,12 @@ export interface FormState {
   filling?: string[];
   /** Text of the page's main button (Continue, Create Account…), if one was found. */
   action?: string | null;
+  actionKind?: ActionKind | null;
+  /** The site says an account already exists for this email. */
+  accountExists?: boolean;
+  /** Everything is filled and the next button submits the application: waiting for the user's OK. */
+  awaitingSubmit?: boolean;
 }
+
+/** What the page's main button does. */
+export type ActionKind = "continue" | "account" | "submit";

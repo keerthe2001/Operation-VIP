@@ -2,7 +2,7 @@ import { Button } from "@copilot/ui";
 import { RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { send, STALE_WORKER_EVENT, useLocal } from "@/sidepanel/chrome-state";
+import { send, STALE_WORKER_EVENT, useLocal, useSettings } from "@/sidepanel/chrome-state";
 
 /** Shown when the background is still running an older build of Copilot. */
 export function UpdateBanner() {
@@ -31,10 +31,19 @@ const NOTES = [
 
 /** A short note after each update (Settings → “What's new” notification). */
 export function WhatsNew() {
-  const settings = useLocal("settings");
+  const settings = useSettings();
   const seen = useLocal("seenVersion");
+  // Render only once storage has loaded, so the note doesn't flash and shift the panel.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void chrome.storage.local.get(["seenVersion", "settings"]).then(() => active && setLoaded(true));
+    return () => {
+      active = false;
+    };
+  }, []);
   const version = chrome.runtime.getManifest?.().version ?? "";
-  if (!settings.whatsNew || !version || seen === version) return null;
+  if (!loaded || !settings.whatsNew || !version || seen === version) return null;
   return (
     <div className="mx-4 mt-4 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-xs">
       <div className="flex items-center justify-between">

@@ -7,10 +7,10 @@ export interface AutofillSettings {
   bestGuessAnswers: boolean;
   /** Match score on the edge tab and job card. */
   showMatch: boolean;
-  /** Keep filling each new step of a multi-page application after the first autofill. */
-  continuousFill: boolean;
-  /** After autofill, click the page's Continue / Next button (never a final Submit). */
-  autoContinue: boolean;
+  /** "auto": fill every page as it opens, create the job-site account (or sign in when it
+   * exists) and continue to the next page; stop for fields that need you and ask before
+   * the final Submit. "manual": fill when asked; you press the page's buttons. */
+  applyMode: "auto" | "manual";
   /** Track applications even when you fill them yourself. */
   trackWithoutAutofill: boolean;
   /** Upload the resume as "First_Last_Resume.pdf" instead of its original file name. */
@@ -29,11 +29,10 @@ export const DEFAULT_SETTINGS: AutofillSettings = {
   applicationEmail: null,
   bestGuessAnswers: true,
   showMatch: true,
-  continuousFill: false,
-  autoContinue: false,
+  applyMode: "auto",
   trackWithoutAutofill: true,
   resumeFileName: "my_name",
-  fillProgress: "popup",
+  fillProgress: "off",
   submissionPrompt: true,
   whatsNew: true,
   disabledFields: [],

@@ -114,6 +114,8 @@ export function AutofillSection({ tabId, form }: Props) {
     else setReviewing(false);
   }
 
+  // A last "Review → Submit" page has no fields: the Submit step above is all there is.
+  if (form && summary.detected === 0 && form.action) return null;
   if (!form || summary.detected === 0) {
     return (
       <section className="rounded-xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
