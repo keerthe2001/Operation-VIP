@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.db.models import DocumentClass, ResumeStatus
+from app.resume_pipeline.parsing.parser import PARSER_VERSION
 
 
 class ResumeRead(BaseModel):
@@ -25,6 +26,9 @@ class ResumeRead(BaseModel):
     # Surfaced from extraction_meta so clients can flag OCR'd or partial extractions.
     ocr_confidence: float | None = None
     warnings: list[str] = []
+    # True when a newer parser exists than the one that read this file; re-processing the
+    # resume picks up the parser's latest fixes.
+    parser_outdated: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -35,6 +39,10 @@ class ResumeRead(BaseModel):
         values = {name: getattr(data, name) for name in cls.model_fields if hasattr(data, name)}
         values["ocr_confidence"] = meta.get("ocr_confidence")
         values["warnings"] = list(meta.get("warnings") or [])
+        values["parser_outdated"] = (
+            getattr(data, "status", None) == ResumeStatus.READY
+            and meta.get("parser") != PARSER_VERSION
+        )
         return values
 
 

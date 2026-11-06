@@ -106,3 +106,16 @@ async def test_extension_profile_includes_answers_and_etag_changes(client: Async
     )
     assert again.status_code == 200
     assert again.json()["answers"][0]["category"] == "why_company"
+
+
+def test_starter_templates_need_no_manual_editing():
+    import re
+
+    from app.services.answer_templates import PLACEHOLDERS, STARTER_TEMPLATES
+
+    for template in STARTER_TEMPLATES:
+        for text in [template.answer_template, *template.variants]:
+            assert "[" not in text, text  # nothing for the user to fill in by hand
+            for name, fallback in re.findall(r"\{(\w+)(?:\|([^{}]*))?\}", text):
+                assert name in PLACEHOLDERS, name
+                assert fallback, f"{{{name}}} needs a fallback in: {text}"

@@ -203,13 +203,17 @@ describe("answer suggestions", () => {
     expect(screen.getAllByRole("button", { name: "Save to library" }).length).toBeGreaterThan(0);
   });
 
-  it("blocks inserting text that still has placeholders or prompts", async () => {
+  it("blocks inserting unfilled placeholders but only flags [brackets]", async () => {
     await renderQuestions();
     const box = screen.getByLabelText(/Why do you want to work at Acme\?/);
     await userEvent.clear(box);
-    await userEvent.type(box, "I like it because [[your reason]");
-    expect(screen.getByText(/Replace before inserting/)).toBeInTheDocument();
+    await userEvent.type(box, "My notice is {{notice_period}");
+    expect(screen.getByText(/replace before inserting/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Insert" })[0]).toBeDisabled();
+    await userEvent.clear(box);
+    await userEvent.type(box, "I like it because [[your reason]");
+    expect(screen.getByText(/Check the \[bracketed\] parts/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Insert" })[0]).toBeEnabled();
   });
 
   it("offers to save new answers when nothing matches", async () => {

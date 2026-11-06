@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from httpx import AsyncClient
 
@@ -162,3 +163,32 @@ async def test_users_cannot_access_each_others_resumes(client: AsyncClient):
 async def test_resume_endpoints_require_auth(client: AsyncClient):
     assert (await client.get("/api/v1/resumes")).status_code == 401
     assert (await client.get(f"/api/v1/resumes/{uuid.uuid4()}")).status_code == 401
+
+
+def test_resume_read_flags_an_outdated_parser():
+    from types import SimpleNamespace
+
+    from app.db.models import ResumeStatus
+    from app.resume_pipeline.parsing.parser import PARSER_VERSION
+    from app.schemas.resume import ResumeRead
+
+    def resume(status: ResumeStatus, parser: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            file_name="cv.pdf",
+            mime_type="application/pdf",
+            size_bytes=1,
+            doc_class=None,
+            status=status,
+            error_code=None,
+            error_message=None,
+            page_count=1,
+            is_primary=True,
+            created_at=datetime.now(UTC),
+            processed_at=None,
+            extraction_meta={"parser": parser},
+        )
+
+    assert ResumeRead.model_validate(resume(ResumeStatus.READY, "rules-1.0")).parser_outdated
+    assert not ResumeRead.model_validate(resume(ResumeStatus.READY, PARSER_VERSION)).parser_outdated
+    assert not ResumeRead.model_validate(resume(ResumeStatus.PARSING, "rules-1.0")).parser_outdated

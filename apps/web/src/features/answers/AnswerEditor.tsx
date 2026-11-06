@@ -21,11 +21,16 @@ import { useProfile } from "@/features/profile/queries";
 import type { SavedAnswerInput } from "@/lib/answers/answer-service";
 import { ApiError } from "@/lib/api/errors";
 
-// The description lets {matching_skills} show realistic output in the preview.
+// A sample posting so the job-description placeholders show realistic output in the preview.
 const SAMPLE_JOB = {
   company: "Acme Corp",
   title: "Software Engineer",
-  description: "We build services in Python, Go, JavaScript, React, Node.js, SQL, PostgreSQL, AWS and Docker.",
+  description: [
+    "Acme Corp helps small businesses get paid faster with simple online invoicing.",
+    "What you'll do",
+    "• Build data pipelines and APIs that power our analytics platform",
+    "• Work with Python, SQL, React, AWS and Docker",
+  ].join("\n"),
 };
 
 export interface EditorState {
@@ -35,25 +40,48 @@ export interface EditorState {
 
 function Preview({ template }: { template: string }) {
   const profile = useProfile();
-  const rendered = renderTemplate(template, placeholderValues(profile.data ?? null, SAMPLE_JOB));
+  const descriptionId = useId();
+  const [pasted, setPasted] = useState("");
+  const job = pasted.trim()
+    ? { company: guessCompany(pasted), title: null, description: pasted }
+    : SAMPLE_JOB;
+  const rendered = renderTemplate(template, placeholderValues(profile.data ?? null, job));
   return (
     <div className="grid gap-1.5">
       <p className="text-xs font-medium text-muted-foreground">
-        Preview for “{SAMPLE_JOB.title}” at “{SAMPLE_JOB.company}”
+        {pasted.trim() ? "Preview for the job description you pasted" : `Preview for a sample “${SAMPLE_JOB.title}” job at “${SAMPLE_JOB.company}”`}
       </p>
       <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">{rendered.text || "…"}</p>
       {rendered.missing.length > 0 && (
         <p className="text-xs text-warning-foreground">
-          Not in your profile yet: {rendered.missing.map((m) => `{${m}}`).join(", ")}. These stay visible until you add them.
+          Not in your profile yet: {rendered.missing.map((m) => `{${m}}`).join(", ")}. Add them to your profile, or write a
+          fallback like {"{notice_period|soon}"}.
         </p>
       )}
-      {rendered.prompts.length > 0 && (
-        <p className="text-xs text-warning-foreground">
-          Replace the [bracketed] parts with your own words. The extension won't insert an answer that still has them.
-        </p>
-      )}
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer select-none">Try it with a real job description</summary>
+        <label htmlFor={descriptionId} className="mt-2 block">
+          Paste a job posting. On job sites the extension reads it for you.
+        </label>
+        <Textarea
+          id={descriptionId}
+          rows={4}
+          className="mt-1"
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder="About us… What you'll do…"
+        />
+      </details>
     </div>
   );
+}
+
+/** The company name from a pasted posting's "About <Company>" line or first sentence, if obvious. */
+function guessCompany(description: string): string | null {
+  const about = description.match(/^about ([A-Z][\w&.-]*(?: [A-Z][\w&.-]*){0,3})\s*$/m);
+  if (about) return about[1]!;
+  const first = description.match(/^([A-Z][\w&.-]*(?: [A-Z][\w&.-]*){0,3}) (?:is|helps|builds|makes|provides|powers)\b/m);
+  return first?.[1] ?? null;
 }
 
 export function AnswerEditor({ state, onClose }: { state: EditorState | null; onClose: () => void }) {
@@ -96,7 +124,10 @@ function EditorForm({ state, onClose }: { state: EditorState; onClose: () => voi
     >
       <DialogHeader>
         <DialogTitle>{state.id ? "Edit answer" : "New answer"}</DialogTitle>
-        <DialogDescription>Write it once in your own words. Placeholders are filled in for each application.</DialogDescription>
+        <DialogDescription>
+          Write it once. Placeholders are filled in for each application from your profile and the job description.
+          Use {"{placeholder|fallback}"} to choose the words used when a value isn't available.
+        </DialogDescription>
       </DialogHeader>
       {save.isError && (
         <Alert variant="destructive">{save.error instanceof ApiError ? save.error.message : "Couldn't save the answer."}</Alert>

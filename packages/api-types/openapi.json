@@ -2326,6 +2326,11 @@
             ],
             "title": "Page Count"
           },
+          "parser_outdated": {
+            "default": false,
+            "title": "Parser Outdated",
+            "type": "boolean"
+          },
           "processed_at": {
             "anyOf": [
               {
@@ -2451,6 +2456,11 @@
               }
             ],
             "title": "Page Count"
+          },
+          "parser_outdated": {
+            "default": false,
+            "title": "Parser Outdated",
+            "type": "boolean"
           },
           "processed_at": {
             "anyOf": [

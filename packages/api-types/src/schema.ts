@@ -1255,6 +1255,11 @@ export interface components {
             ocr_confidence?: number | null;
             /** Page Count */
             page_count: number | null;
+            /**
+             * Parser Outdated
+             * @default false
+             */
+            parser_outdated: boolean;
             /** Processed At */
             processed_at: string | null;
             /** Size Bytes */
@@ -1293,6 +1298,11 @@ export interface components {
             ocr_confidence?: number | null;
             /** Page Count */
             page_count: number | null;
+            /**
+             * Parser Outdated
+             * @default false
+             */
+            parser_outdated: boolean;
             /** Processed At */
             processed_at: string | null;
             /** Size Bytes */

@@ -78,6 +78,12 @@ describe("renderTemplate", () => {
     expect(rendered.missing).toEqual([]);
   });
 
+  it("uses {name|fallback} text when a value is unknown", () => {
+    const rendered = renderTemplate("I can start {notice_period|soon} at {company|your company}{job_title}.", placeholderValues(profile, { company: "Globex" }));
+    expect(rendered.text).toBe("I can start soon at Globex{job_title}.");
+    expect(rendered.missing).toEqual(["job_title"]);
+  });
+
   it("keeps missing values visible and reports prompts to personalize", () => {
     const rendered = renderTemplate("Notice: {notice_period}. I like {company} because [your reason].", placeholderValues(profile));
     expect(rendered.text).toBe("Notice: {notice_period}. I like {company} because [your reason].");

@@ -34,7 +34,10 @@ function QuestionCard({ field, tabId, job, data }: { field: MappedField; tabId: 
   const candidate = candidates[index] ?? null;
   const rendered = candidate ? renderTemplate(candidate.template, values) : null;
   const text = edited ?? rendered?.text ?? "";
-  const unresolved = [...text.matchAll(/\{(\w+)\}|\[([^\]]+)\]/g)].map((m) => m[1] ?? m[2]!);
+  // A literal {placeholder} would look broken in an application, so it blocks inserting;
+  // [brackets] might be intentional, so they only get a hint.
+  const unresolved = [...text.matchAll(/\{(\w+)(?:\|[^{}]*)?\}/g)].map((m) => m[1]!);
+  const prompts = [...text.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1]!);
 
   async function insert() {
     setBusy(true);
@@ -82,8 +85,11 @@ function QuestionCard({ field, tabId, job, data }: { field: MappedField; tabId: 
       />
       {unresolved.length > 0 && (
         <p className="text-xs text-warning-foreground">
-          Replace before inserting: {unresolved.map((u) => `“${u.replace(/_/g, " ")}”`).join(", ")}
+          Not in your profile yet, replace before inserting: {unresolved.map((u) => `“${u.replace(/_/g, " ")}”`).join(", ")}
         </p>
+      )}
+      {unresolved.length === 0 && prompts.length > 0 && (
+        <p className="text-xs text-muted-foreground">Check the [bracketed] parts before inserting.</p>
       )}
       {field.maxLength && text.length > field.maxLength && (
         <p className="text-xs text-destructive">This field allows {field.maxLength} characters; the answer has {text.length}.</p>

@@ -36,7 +36,7 @@ from app.schemas.resume_data import (
     Skills,
 )
 
-PARSER_VERSION = "rules-1.1"
+PARSER_VERSION = "rules-1.2"
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 URL_RE = re.compile(
@@ -111,6 +111,11 @@ SPLIT_RE = re.compile(r"\s+(?:\||•|·|–|—|-|@|at)\s+|\s*\|\s*|,\s+(?=[A-Z]
 TECH_LABEL_RE = re.compile(
     r"^(?:tech(?:nologies|nology| stack)?|tools(?: used)?|stack|built with)\s*:", re.I
 )
+CERT_LEVEL_RE = re.compile(
+    r"\b(?:associate|professional|foundational|fundamentals|practitioner|expert|specialty|"
+    r"level|beginner|intermediate|advanced|part|module|track)\b",
+    re.IGNORECASE,
+)
 SKILL_SPLIT_RE = re.compile(r"\s*(?:,|;|\||•|·|/(?!\s?[A-Za-z]{1,2}\b))\s*")
 
 
@@ -151,6 +156,24 @@ NORMALIZED_HEADINGS = {
 
 def _is_bullet(line: TextLine) -> bool:
     return line.list_item or bool(BULLET_RE.match(line.text))
+
+
+def _ends_mid_sentence(text: str) -> bool:
+    """Text that clearly stops mid-sentence: a trailing comma, '&', open bracket or connector."""
+    text = text.strip()
+    if not text:
+        return False
+    if re.search(r"[,&(/+–-]$", text) or text.count("(") > text.count(")"):
+        return True
+    return text.rsplit(" ", 1)[-1].lower() in CONNECTORS
+
+
+# PDF kerning sometimes splits the first letter off a word: "G enerated" → "Generated".
+SPLIT_INITIAL_RE = re.compile(r"^([B-HJ-Z]) ([a-z]{3,})\b")
+
+
+def _fix_split_initial(text: str) -> str:
+    return SPLIT_INITIAL_RE.sub(r"\1\2", text)
 
 
 @dataclass
@@ -706,8 +729,11 @@ class RuleBasedParser:
         first = text.split(" ", 1)[0].lower()
         if text[:1].islower() or text[:1] in ",;)&" or first in CONNECTORS:
             return True
-        # Otherwise only a long, unfinished previous line can have wrapped.
         previous = previous_line.strip()
+        # A line that stops mid-sentence ("... (Accuracy, Precision,") always continues.
+        if _ends_mid_sentence(previous):
+            return True
+        # Otherwise only a long, unfinished previous line can have wrapped.
         unfinished = not re.search(r"[.!?:]$|[.!?][\")\]]$", previous)
         return unfinished and len(previous) >= WRAP_LENGTH
 
@@ -716,15 +742,17 @@ class RuleBasedParser:
         items: list[str] = []
         previous_raw = ""
         for line in body:
-            text = _clean(line.text)
-            if not text:
+            if not _clean(line.text):
                 continue
+            raw = BULLET_RE.sub("", line.text).strip()
             if _is_bullet(line) or not items or not self._continues(previous_raw, line):
-                items.append(text)
+                items.append(raw)
             else:
-                items[-1] = f"{items[-1]} {text}"
+                # Join the raw text so punctuation at the break ("Precision," / "Recall")
+                # is kept; cleaning happens once the point is complete.
+                items[-1] = f"{items[-1]} {raw}"
             previous_raw = line.text
-        return items
+        return [cleaned for cleaned in (_fix_split_initial(_clean(i)) for i in items) if cleaned]
 
     def _bullets(self, body: list[TextLine]) -> tuple[list[str], list[str]]:
         """Responsibilities, plus achievements when the resume labels them explicitly."""
@@ -891,9 +919,11 @@ class RuleBasedParser:
 
     def _categorize(self, skill: str) -> str:
         lowered = skill.lower()
-        for name, category in lexicons.SKILLS.items():
-            if name.lower() == lowered:
-                return category
+        base = lowered.split("(", 1)[0].strip()  # "AWS (S3)" is categorized as AWS
+        for candidate in (lowered, base):
+            for name, category in lexicons.SKILLS.items():
+                if name.lower() == candidate:
+                    return category
         return "other"
 
     def _skills(self, lines: list[TextLine], full_text: str) -> Skills:
@@ -901,7 +931,9 @@ class RuleBasedParser:
         seen: set[str] = set()
 
         def add(skill: str) -> None:
-            skill = skill.strip(" .-–—()")
+            skill = skill.strip(" .-–—")
+            if skill.count("(") != skill.count(")"):
+                skill = skill.strip("()").strip()
             if not skill or len(skill) > 40 or skill.lower() in seen or len(skill.split()) > 5:
                 return
             seen.add(skill.lower())
@@ -921,11 +953,18 @@ class RuleBasedParser:
                 previous = groups[-1] if groups else ""
                 tail = re.split(r"[,;|•·]", previous)[-1].strip()
                 head = re.split(r"[,;|•·]", content)[0].strip()
+                wrapped = (
+                    f"{tail} {head}".lower() in known
+                    # A long row that stops without a separator, followed by a word that
+                    # isn't a skill by itself: "... Data Pipelines, ETL" / "Concepts, ...".
+                    or (len(previous) >= 70 and head.lower() not in known)
+                )
                 if (
                     previous
                     and not label_split
+                    and not _is_bullet(line)
                     and not re.search(r"[,;|•·]\s*$", previous)
-                    and f"{tail} {head}".lower() in known
+                    and wrapped
                 ):
                     groups[-1] = f"{previous} {content}"
                 else:
@@ -959,6 +998,8 @@ class RuleBasedParser:
             return line.bold
         if previous is None:
             return True
+        if _ends_mid_sentence(previous.text) or text[:1].islower():
+            return False  # the wrapped rest of the previous line, e.g. "Recall, F1-Score)"
         if find_date_range(text) or " | " in text or URL_RE.search(text):
             return True
         words = text.split()
@@ -1064,6 +1105,12 @@ class RuleBasedParser:
                 (i for i, part in enumerate(parts) if len(parts) > 1 and self._is_issuer(part)),
                 None,
             )
+            if issuer_index is None and len(parts) == 2 and re.search(r"\s[–—]\s", text):
+                # "Name — Provider": an unknown provider after a dash, unless it's a level
+                # ("AWS Solutions Architect – Associate").
+                words = parts[1].split()
+                if 2 <= len(words) <= 6 and not CERT_LEVEL_RE.search(parts[1]):
+                    issuer_index = 1
             if issuer_index is not None:
                 issuer: str | None = parts[issuer_index]
                 rest = [p for i, p in enumerate(parts) if i != issuer_index]

@@ -27,7 +27,7 @@ import { ResumeDropzone } from "@/features/resumes/ResumeDropzone";
 import { ResumePreviewDialog } from "@/features/resumes/ResumePreviewDialog";
 import { ResumeStatusBadge } from "@/features/resumes/ResumeStatusBadge";
 import { formatBytes, formatDate } from "@/lib/format";
-import type { Resume } from "@/lib/resumes/resume-service";
+import type { Resume, ResumeService } from "@/lib/resumes/resume-service";
 import { useServices } from "@/lib/services";
 
 export function ResumesPage() {
@@ -37,11 +37,15 @@ export function ResumesPage() {
   const [pendingImport, setPendingImport] = useState<Resume | null>(null);
   const reprocess = useReprocessResume();
   const remove = useDeleteResume();
-  const { profile } = useServices();
+  const { profile, resumes: resumeService } = useServices();
   const client = useQueryClient();
   const navigate = useNavigate();
   const importResume = useMutation({
-    mutationFn: (id: string) => profile.importResume(id),
+    mutationFn: async (resume: Resume) => {
+      // Resumes read by an older parser are re-read first so the profile gets the latest fixes.
+      if (resume.parser_outdated) await rereadResume(resumeService, resume.id);
+      return profile.importResume(resume.id);
+    },
     onSuccess: (data) => {
       client.setQueryData(["profile"], data);
       toast.success("Profile updated from this resume");
@@ -107,6 +111,11 @@ export function ResumesPage() {
                       {resume.status === "failed" && resume.error_message && (
                         <p className="mt-1 text-xs text-destructive">{resume.error_message}</p>
                       )}
+                      {resume.parser_outdated && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Read with an older version of our resume reader. “Use for profile” re-reads it first.
+                        </p>
+                      )}
                       {resume.status === "ready" &&
                         resume.warnings.map((warning) => (
                           <p key={warning} className="mt-1 text-xs text-warning-foreground">
@@ -124,14 +133,14 @@ export function ResumesPage() {
                         <UserRoundCheck aria-hidden="true" /> Use for profile
                       </Button>
                     )}
-                    {resume.status === "failed" && (
+                    {(resume.status === "failed" || resume.parser_outdated) && (
                       <Button
                         variant="ghost"
                         size="sm"
                         loading={reprocess.isPending && reprocess.variables === resume.id}
                         onClick={() => reprocess.mutate(resume.id)}
                       >
-                        <RefreshCw aria-hidden="true" /> Retry
+                        <RefreshCw aria-hidden="true" /> {resume.status === "failed" ? "Retry" : "Re-read"}
                       </Button>
                     )}
                     <Button
@@ -192,6 +201,7 @@ export function ResumesPage() {
             <DialogDescription>
               Your profile will be rebuilt from “{pendingImport?.file_name}”. Edits you made to the current profile
               will be replaced. Additional application details are kept.
+              {pendingImport?.parser_outdated && " We'll re-read the file with the latest resume reader first."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -200,7 +210,7 @@ export function ResumesPage() {
             </DialogClose>
             <Button
               loading={importResume.isPending}
-              onClick={() => pendingImport && importResume.mutate(pendingImport.id)}
+              onClick={() => pendingImport && importResume.mutate(pendingImport)}
             >
               Replace profile
             </Button>
@@ -209,4 +219,17 @@ export function ResumesPage() {
       </Dialog>
     </div>
   );
+}
+
+/** Re-processes a resume and waits until it's ready again. */
+async function rereadResume(service: Pick<ResumeService, "reprocess" | "get">, id: string, timeoutMs = 90_000): Promise<void> {
+  await service.reprocess(id);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const resume = await service.get(id);
+    if (resume.status === "ready") return;
+    if (resume.status === "failed") throw new Error(resume.error_message ?? "We couldn't re-read this resume.");
+  }
+  throw new Error("Re-reading the resume is taking longer than expected. Try again in a minute.");
 }

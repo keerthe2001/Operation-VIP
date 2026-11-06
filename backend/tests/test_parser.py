@@ -265,3 +265,49 @@ def test_sentence_lines_without_bullets_are_separate_points():
         "Cared for patients in a 30-bed ward.",
         "Trained new staff on safety procedures.",
     ]
+
+
+@pytest.mark.parametrize("bold_titles", [True, False])
+def test_wrapped_metric_list_stays_in_its_point(bold_titles):
+    # A point that wraps mid-list ("(Accuracy, Precision," / "Recall, F1-Score)") must stay
+    # one point, keep its commas, and never turn "Recall" into a project of its own.
+    title = dict(bold=True) if bold_titles else {}
+    doc = lines(
+        [
+            ("Priya Nair", dict(size=20.0, bold=True)),
+            ("Projects", dict(bold=True)),
+            ("Sales Demand Forecasting", title),
+            "• Built a demand forecasting model using 10+ years of weekly sales data to plan stock levels.",
+            "• G enerated forecasts by tuning seasonality and trend parameters to improve stability.",
+            ("Customer Churn Prediction for Telecom Subscribers", title),
+            "• Trained Logistic Regression and XGBoost models on 200,000+ customer records.",
+            "• Cleaned and encoded features to improve model performance.",
+            "• Evaluated the models with cross-validation and classification metrics (Accuracy, Precision,",
+            "Recall, F1-Score)",
+            "• Reached 88% accuracy, helping the retention team target at-risk customers early.",
+            ("Skills", dict(bold=True)),
+            "• Data: Python, SQL, Pandas, Statistical Analysis, Feature Engineering, Data Pipelines, ETL",
+            "Concepts, Data Quality, Tableau",
+            "• Cloud: AWS (S3)",
+            ("Certifications", dict(bold=True)),
+            "• PG Diploma in Data Analytics — Northfield Learning Academy",
+            "• AWS Certified Solutions Architect – Associate",
+        ]
+    )
+    data = parse(doc)
+    forecasting, churn = data.projects
+    assert forecasting.points[1].startswith("Generated forecasts")
+    assert churn.project_name == "Customer Churn Prediction for Telecom Subscribers"
+    assert churn.points == [
+        "Trained Logistic Regression and XGBoost models on 200,000+ customer records.",
+        "Cleaned and encoded features to improve model performance.",
+        "Evaluated the models with cross-validation and classification metrics "
+        "(Accuracy, Precision, Recall, F1-Score)",
+        "Reached 88% accuracy, helping the retention team target at-risk customers early.",
+    ]
+    assert "ETL Concepts" in data.skills.other
+    assert "AWS (S3)" in data.skills.cloud
+    diploma, architect = data.certifications
+    assert diploma.certification_name == "PG Diploma in Data Analytics"
+    assert diploma.issuing_organization == "Northfield Learning Academy"
+    assert architect.certification_name == "AWS Certified Solutions Architect – Associate"

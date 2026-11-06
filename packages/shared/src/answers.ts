@@ -5,6 +5,8 @@
  */
 import type { components } from "@copilot/api-types";
 
+import { analyzeJobDescription } from "./job-insights";
+
 type Schemas = components["schemas"];
 export type SavedAnswer = Schemas["SavedAnswerRead"];
 export type AnswerCategory = SavedAnswer["category"];
@@ -126,8 +128,10 @@ export function matchJobSkills(description: string | null | undefined, skills: s
     const key = skill.trim().toLowerCase();
     if (!key || seen.has(key)) return false;
     seen.add(key);
-    // Word boundaries that also work for names like "C++", "Node.js" or ".NET".
-    return new RegExp(`(^|[^a-z0-9+#.])${escapeRegExp(key)}(?![a-z0-9+#])`, "i").test(text);
+    // Word boundaries that also work for names like "C++", "Node.js" or ".NET"; "AWS (S3)" also
+    // matches a plain "AWS".
+    const names = [key, key.split("(")[0]!.trim()].filter(Boolean);
+    return names.some((name) => new RegExp(`(^|[^a-z0-9+#.])${escapeRegExp(name)}(?![a-z0-9+#])`, "i").test(text));
   });
 }
 
@@ -136,28 +140,95 @@ function listOf(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
+type ProfileLike = Pick<
+  Profile,
+  "personal_information" | "professional_summary" | "experience" | "education" | "skills" | "additional_info"
+> & { projects?: Profile["projects"] };
+
+/** "Engineered data pipelines." → "engineered data pipelines" so it reads after "I". */
+export function asClause(text: string | null | undefined): string | null {
+  const clean = text?.replace(/\s+/g, " ").trim().replace(/[\s.;,:]+$/, "");
+  if (!clean) return null;
+  // Keep acronyms and names ("SQL", "AWS") as written.
+  return /^[A-Z][a-z]/.test(clean) ? clean[0]!.toLowerCase() + clean.slice(1) : clean;
+}
+
+const article = (word: string) => (/^[aeiou]/i.test(word) && !/^(uni|use|eu)/i.test(word) ? "an" : "a");
+const hasNumber = (point: string) => /\d|%/.test(point);
+const RESULT_WORDS =
+  /^(achieved|improved|increased|reduced|cut|saved|grew|boosted|raised|won|delivered|accelerated|lowered|doubled|tripled|exceeded)\b/i;
+/** The strongest result: a measurable outcome first ("Achieved 90% accuracy"), then any number. */
+const bestResult = (points: string[]) =>
+  points.find((p) => RESULT_WORDS.test(p.trim()) && hasNumber(p)) ??
+  points.find((p) => /%/.test(p)) ??
+  points.find(hasNumber);
+
+function background(profile: ProfileLike | null, years: string | null): string | null {
+  if (!profile) return null;
+  const current = profile.experience.find((e) => e.is_current) ?? profile.experience[0];
+  const designation = profile.professional_summary.current_designation ?? current?.designation ?? null;
+  if (designation) {
+    const base = `${article(designation)} ${designation}`;
+    if (!years || Number(years) < 1) return base;
+    return `${base} with ${years} year${years === "1" ? "" : "s"} of experience`;
+  }
+  const education = profile.education[0];
+  if (education?.degree) {
+    const student = !!education.graduation_year && education.graduation_year > new Date().getFullYear();
+    const field = education.specialization ? ` in ${education.specialization}` : "";
+    return `${article(education.degree)} ${education.degree} ${student ? "student" : "graduate"}${field}`;
+  }
+  return null;
+}
+
 /** Values for {placeholders}, taken only from the profile and the detected job. */
-export function placeholderValues(profile: Pick<Profile, "personal_information" | "professional_summary" | "experience" | "education" | "skills" | "additional_info"> | null, job: JobContext = {}): Record<string, string | null> {
+export function placeholderValues(profile: ProfileLike | null, job: JobContext = {}): Record<string, string | null> {
   const p = profile?.personal_information;
   const s = profile?.professional_summary;
   const current = profile?.experience.find((e) => e.is_current) ?? profile?.experience[0];
   const allSkills = profile ? Object.values(profile.skills).flat() : [];
   const skills = allSkills.slice(0, 3);
   const matching = matchJobSkills(job.description, allSkills).slice(0, 4);
-  const years = s?.total_experience_years;
+  const yearsValue = s?.total_experience_years;
+  const years =
+    yearsValue === null || yearsValue === undefined ? null : Number.isInteger(yearsValue) ? String(yearsValue) : yearsValue.toFixed(1);
+  const insights = analyzeJobDescription(job.description, job.company);
+
+  // Older cached profiles (extension storage) may lack some lists, so read them defensively.
+  const workPoints = profile?.experience.flatMap((e) => [...(e.achievements ?? []), ...(e.responsibilities ?? [])]) ?? [];
+  const project = profile?.projects?.find((pr) => pr.points?.length) ?? profile?.projects?.[0];
+  const projectPoints = project?.points ?? [];
+  const allPoints = [...workPoints, ...(profile?.projects?.flatMap((pr) => pr.points ?? []) ?? [])];
+  const projectResult = bestResult(projectPoints.slice(1)) ?? null;
+  const notice = profile?.additional_info.notice_period?.trim() || null;
+
   return {
     company: job.company ?? null,
     job_title: job.title ?? null,
+    role: job.title ? `the ${job.title.replace(/\s+(role|position)$/i, "")} role` : null,
+    company_focus: insights.companyFocus,
+    job_responsibility: insights.responsibility,
     first_name: p?.first_name ?? p?.full_name?.split(" ")[0] ?? null,
     full_name: p?.full_name ?? null,
+    background: background(profile, years),
     current_designation: s?.current_designation ?? current?.designation ?? null,
     current_company: current?.company_name ?? null,
-    years_experience: years === null || years === undefined ? null : Number.isInteger(years) ? String(years) : years.toFixed(1),
+    years_experience: years,
     top_skills: skills.length ? listOf(skills) : null,
     // Falls back to the top skills when the page has no description to compare with.
     matching_skills: matching.length ? listOf(matching) : skills.length ? listOf(skills) : null,
+    recent_work: asClause(current?.responsibilities?.[0] ?? current?.achievements?.[0] ?? projectPoints[0]),
+    top_achievement: asClause(bestResult(allPoints)),
+    project_name: project?.project_name ?? null,
+    project_highlight: asClause(projectPoints[0]),
+    project_result: asClause(projectResult),
     highest_degree: profile?.education[0]?.degree ?? null,
-    notice_period: profile?.additional_info.notice_period ?? null,
+    notice_period: notice,
+    start_availability: notice
+      ? /immediate|^0\s*(day|week)|none|n\/a/i.test(notice)
+        ? "immediately"
+        : `after my notice period of ${notice}`
+      : null,
   };
 }
 
@@ -169,13 +240,18 @@ export interface RenderedAnswer {
   prompts: string[];
 }
 
+/**
+ * Fills {placeholders}. `{name|fallback text}` uses the fallback when the value isn't known
+ * (for example when the job page has no description), so the answer still reads naturally.
+ */
 export function renderTemplate(template: string, values: Record<string, string | null>): RenderedAnswer {
   const missing = new Set<string>();
-  const text = template.replace(/\{(\w+)\}/g, (match, name: string) => {
+  const text = template.replace(/\{(\w+)(?:\|([^{}]*))?\}/g, (_match, name: string, fallback: string | undefined) => {
     const value = values[name];
     if (value) return value;
+    if (fallback !== undefined) return fallback;
     missing.add(name);
-    return match;
+    return `{${name}}`;
   });
   const prompts = [...text.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1]!);
   return { text, missing: [...missing], prompts };

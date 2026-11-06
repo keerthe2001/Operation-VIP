@@ -39,8 +39,8 @@ function TemplateGallery({ onCustomize, existing }: { onCustomize: (t: AnswerTem
       <CardHeader>
         <CardTitle>Start from a template</CardTitle>
         <CardDescription>
-          Templates use your profile details and [bracketed prompts] for the parts only you can write. Customize them
-          before relying on them.
+          Templates fill themselves in for each application from your profile and the job description on the page,
+          so they're ready to use as they are. Edit them any time to sound more like you.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -63,7 +63,7 @@ function TemplateGallery({ onCustomize, existing }: { onCustomize: (t: AnswerTem
                   onClick={() =>
                     save.mutate(
                       { input: template },
-                      { onSuccess: () => toast.success("Added to your library. Personalize the [bracketed] parts.") },
+                      { onSuccess: () => toast.success("Added to your library. It fills in automatically for each job.") },
                     )
                   }
                 >
