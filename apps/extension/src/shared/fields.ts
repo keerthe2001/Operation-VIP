@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const FIELD_KINDS = [
   "text", "email", "tel", "url", "number", "date", "textarea", "select", "radio",
-  "checkbox", "file", "contenteditable", "combobox",
+  "checkbox", "file", "contenteditable", "combobox", "password",
 ] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number];
 

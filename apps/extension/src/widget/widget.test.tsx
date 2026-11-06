@@ -7,7 +7,7 @@ import type { MappedField } from "@/shared/fields";
 import { memoryArea, type LocalStore, type SessionStore } from "@/shared/storage";
 import type { DetectedJob, WidgetState } from "@/shared/types";
 import { makeProfile } from "@/test/profile-fixture";
-import { clampY, panelTop, snap } from "@/widget/position";
+import { clampY } from "@/widget/position";
 import { Widget } from "@/widget/Widget";
 
 const job: DetectedJob = {
@@ -23,12 +23,11 @@ function mapped(id: string, status: MappedField["status"], extra: Partial<Mapped
   };
 }
 
-describe("bubble position", () => {
-  it("snaps to the nearest side and stays on screen", () => {
-    expect(snap(100, 300, 1200, 800)).toEqual({ side: "left", y: 300 });
-    expect(snap(900, -50, 1200, 800)).toEqual({ side: "right", y: 12 });
-    expect(clampY(5000, 800)).toBe(736);
-    expect(panelTop(700, 500, 800)).toBe(288);
+describe("edge tab position", () => {
+  it("stays on screen", () => {
+    expect(clampY(-50, 800)).toBe(12);
+    expect(clampY(5000, 800)).toBe(732);
+    expect(clampY(300, 800)).toBe(300);
   });
 });
 
@@ -55,18 +54,18 @@ describe("widgetState", () => {
     expect(state.resumeName).toBe("priya.pdf");
     expect(state.match).toMatchObject({ matched: ["Python", "Go"], missing: ["Docker", "Kubernetes"], requiredYears: 3, experienceOk: true, locationOk: true });
     expect(state.profile.find((r) => r.label === "Email")?.value).toBe("priya.raman@example.com");
-    expect(state.prefs).toMatchObject({ mode: "job_pages", side: "right", hidden: false });
+    expect(state.prefs).toMatchObject({ mode: "job_pages", hidden: false, theme: "system" });
   });
 });
 
 function makeState(overrides: Partial<WidgetState> = {}): WidgetState {
   return {
     signedIn: true, firstName: "Priya", job, tracked: null,
-    form: { detected: 4, ready: 3, review: 1, missing: 0, questions: 0, filled: 0, hasCoverLetterField: false, hasResumeField: true },
+    form: { detected: 4, ready: 3, review: 1, missing: 0, questions: 0, filled: 0, hasCoverLetterField: false, hasResumeField: true, needsPassword: true },
     resumeName: "priya.pdf",
     match: { score: 72, matched: ["Python"], missing: ["Docker"], requiredYears: 3, haveYears: 7, experienceOk: true, location: "Bengaluru", locationOk: true },
     profile: [{ label: "Email", value: "priya.raman@example.com" }],
-    prefs: { mode: "job_pages", autoOpen: true, side: "right", y: 160, hidden: false },
+    prefs: { mode: "job_pages", autoOpen: true, y: 160, hidden: false, theme: "light" },
     ...overrides,
   };
 }
@@ -86,8 +85,12 @@ describe("floating assistant", () => {
     const send = setup(makeState());
     await userEvent.click(await screen.findByRole("button", { name: "Autofill 3 fields" }));
     expect(send).toHaveBeenCalledWith({ type: "WIDGET_FILL" });
-    expect(await screen.findByText(/Filled 3 fields/)).toBeInTheDocument();
-    expect(screen.getByText("No field found")).toBeInTheDocument();
+    expect(await screen.findByText("Filled 3")).toBeInTheDocument();
+    expect(screen.getByText("No field")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Set account password/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Dark theme" }));
+    expect(send).toHaveBeenCalledWith({ type: "WIDGET_THEME", theme: "dark" });
+    expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
   });
 
   it("shows the job match and copies profile values", async () => {
@@ -95,23 +98,24 @@ describe("floating assistant", () => {
     Object.assign(navigator, { clipboard: { writeText } });
     setup(makeState());
     await userEvent.click(await screen.findByRole("tab", { name: /Match/ }));
-    expect(screen.getByText("Strong match")).toBeInTheDocument();
+    expect(await screen.findByText("Strong match")).toBeInTheDocument();
     expect(screen.getByText("Docker")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: /Profile/ }));
     await userEvent.click(screen.getByRole("button", { name: "Copy Email" }));
     expect(writeText).toHaveBeenCalledWith("priya.raman@example.com");
   });
 
-  it("starts as a bubble on job postings and can be hidden on the site", async () => {
+  it("starts closed on job posts, slides open from the edge tab and can be hidden on the site", async () => {
     const send = setup(makeState({ job: { ...job, isApplicationPage: false } }));
-    const bubble = await screen.findByRole("button", { name: "Open Copilot" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const tab = await screen.findByRole("button", { name: "Open Copilot" });
+    expect(document.querySelector(".drawer.open")).toBeNull();
     await act(async () => {
-      bubble.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
-      bubble.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+      tab.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 200 }));
+      tab.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, clientX: 10, clientY: 200 }));
     });
-    expect(await screen.findByText("This is a job posting")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Minimise" }));
+    expect(document.querySelector(".drawer.open")).not.toBeNull();
+    expect(screen.getByText("Job post", { selector: ".row-title" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
     await userEvent.click(screen.getByRole("button", { name: "Hide Copilot on this site" }));
     expect(send).toHaveBeenCalledWith({ type: "WIDGET_PREFS", prefs: { hideOnHost: location.hostname } });
     expect(screen.queryByRole("button", { name: "Open Copilot" })).not.toBeInTheDocument();

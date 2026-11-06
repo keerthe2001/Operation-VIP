@@ -40,8 +40,19 @@ export class AutofillCoordinator {
   }
 
   private async profileContext() {
-    const data = await this.local.get("profile");
-    return { profile: data?.profile ?? null, resumeName: data?.primary_resume?.status === "ready" ? data.primary_resume.file_name : null };
+    const [data, password] = await Promise.all([this.local.get("profile"), this.local.get("accountPassword")]);
+    return {
+      profile: data?.profile ?? null,
+      resumeName: data?.primary_resume?.status === "ready" ? data.primary_resume.file_name : null,
+      hasPassword: !!password,
+    };
+  }
+
+  /** Password boxes are ready only when the user saved an account password. */
+  private withPassword(fields: MappedField[], hasPassword: boolean): MappedField[] {
+    return fields.map((f) =>
+      f.key === "account_password" && !hasPassword ? { ...f, status: "missing", value: null } : f,
+    );
   }
 
   async onFieldsScanned(tabId: number, frameId: number, url: string, fields: FieldDescriptor[]): Promise<FormState> {
@@ -51,8 +62,8 @@ export class AutofillCoordinator {
       ? previous.fields.filter((f) => f.frameId !== frameId)
       : [];
     const results = new Map(previous?.fields.map((f) => [fieldKey(f), f]) ?? []);
-    const { profile, resumeName } = await this.profileContext();
-    const mapped = mapFields(fields, frameId, profile, resumeName).map((next) => {
+    const { profile, resumeName, hasPassword } = await this.profileContext();
+    const mapped = this.withPassword(mapFields(fields, frameId, profile, resumeName), hasPassword).map((next) => {
       const before = results.get(fieldKey(next));
       return before?.result ? { ...next, result: before.result, resultMessage: before.resultMessage } : next;
     });
@@ -68,12 +79,15 @@ export class AutofillCoordinator {
 
   /** Re-map every tab after the profile changed. */
   async remapAll(tabIds: number[]): Promise<void> {
-    const { profile, resumeName } = await this.profileContext();
+    const { profile, resumeName, hasPassword } = await this.profileContext();
     for (const tabId of tabIds) {
       const state = await this.state(tabId);
       if (!state) continue;
       const frames = [...new Set(state.fields.map((f) => f.frameId))];
-      const remapped = frames.flatMap((frameId) => mapFields(state.fields.filter((f) => f.frameId === frameId), frameId, profile, resumeName));
+      const remapped = this.withPassword(
+        frames.flatMap((frameId) => mapFields(state.fields.filter((f) => f.frameId === frameId), frameId, profile, resumeName)),
+        hasPassword,
+      );
       const before = new Map(state.fields.map((f) => [fieldKey(f), f]));
       state.fields = remapped.map((f) => ({ ...f, result: before.get(fieldKey(f))?.result, resultMessage: before.get(fieldKey(f))?.resultMessage }));
       await this.session.set(formEntry(tabId, state));
@@ -128,6 +142,11 @@ export class AutofillCoordinator {
         overwrite,
       };
       if (field.kind === "checkbox") instruction.checked = field.optionValue === "true";
+      if (field.key === "account_password") {
+        const password = await this.local.get("accountPassword");
+        if (!password) continue;
+        instruction.value = password;
+      }
       if (field.kind === "file") {
         instruction.file = await this.resumeFile();
         if (!instruction.file) continue;

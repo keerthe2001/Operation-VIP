@@ -96,6 +96,15 @@ const WIDGET_FORM_HTML = `<!doctype html><html><head><title>Apply - Pixelworks</
   <label for="e">City</label><input id="e"><label for="f">Latest Employer Name</label><input id="f">
 </form></body></html>`;
 
+// A Workday-style create-account step.
+const ACCOUNT_URL = "https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-9/apply/createAccount";
+const ACCOUNT_HTML = `<!doctype html><html><head><title>Create Account</title></head><body><h2>Create Account</h2><form>
+  <label for="em">Email Address</label><input id="em" type="email">
+  <label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password">
+  <label for="pw2">Verify New Password</label><input id="pw2" type="password">
+  <label><input type="checkbox" id="agree"> I agree to the terms</label>
+</form></body></html>`;
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -381,29 +390,41 @@ try {
   await naukri.goto(NAUKRI_URL);
   const bubble = widget(naukri).getByRole("button", { name: "Open Copilot" });
   await bubble.waitFor({ timeout: 15000 });
-  check(true, "assistant bubble shown on a Naukri job posting");
+  check(true, "assistant edge tab shown on a Naukri job posting");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-bubble.png` });
   await bubble.click();
-  await widget(naukri).getByText("This is a job posting").waitFor();
+  await widget(naukri).locator(".drawer.open").waitFor();
+  await naukri.waitForTimeout(400); // slide-in animation
+  const drawer = await widget(naukri).locator(".drawer").boundingBox();
+  const viewport = naukri.viewportSize();
+  check(Math.round(drawer.x + drawer.width) === viewport.width && Math.round(drawer.height) === viewport.height, "drawer slides in full-height from the right edge");
+  const pageWidth = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
+  check(Math.abs(pageWidth - (viewport.width - 380)) < 2, `page shrinks to make room for the drawer (${pageWidth}px)`);
   await widget(naukri).getByRole("tab", { name: /Match/ }).click();
-  await widget(naukri).getByText(/Mentioned, not in your profile/).waitFor();
+  await widget(naukri).getByText(/^Missing \(/).waitFor();
   const missingSkills = await widget(naukri).locator(".pill.warn").allInnerTexts();
   check(missingSkills.includes("Snowflake"), `job match lists skills missing from the profile (${missingSkills.join(", ")})`);
   if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
   await widget(naukri).getByRole("tab", { name: /Autofill/ }).click();
   await widget(naukri).getByRole("button", { name: "Save job" }).click();
-  await widget(naukri).getByText("Saved to your tracker.").waitFor();
+  await widget(naukri).getByText("Saved", { exact: true }).first().waitFor();
   check(true, "job saved to the tracker from the assistant");
-  // Drag the bubble to the left edge; it docks there and remembers it.
-  await widget(naukri).getByRole("button", { name: "Minimise", exact: true }).click();
+  // Theme switch, then close and drag the edge tab down; it stays on the edge and remembers it.
+  await widget(naukri).getByRole("button", { name: /theme$/ }).click();
+  const theme = await worker.evaluate(async () => (await chrome.storage.local.get("theme")).theme);
+  check(theme === "light" || theme === "dark", `theme switch saved (${theme})`);
+  await widget(naukri).getByRole("button", { name: "Close", exact: true }).click();
+  await widget(naukri).locator(".drawer.open").waitFor({ state: "detached" });
+  const restored = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
+  check(Math.abs(restored - viewport.width) < 2, "page returns to full width when the drawer closes");
   const box = await bubble.boundingBox();
   await naukri.mouse.move(box.x + 20, box.y + 20);
   await naukri.mouse.down();
-  await naukri.mouse.move(200, 400, { steps: 8 });
+  await naukri.mouse.move(200, 500, { steps: 8 });
   await naukri.mouse.up();
-  const dockedLeft = await bubble.evaluate((el) => el.getBoundingClientRect().left < 100);
-  const savedSide = await worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.side);
-  check(dockedLeft && savedSide === "left", "dragged bubble docks to the nearest side and the position is saved");
+  const tabBox = await bubble.boundingBox();
+  const savedY = await worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.y);
+  check(Math.round(tabBox.x + tabBox.width) === viewport.width && Math.abs(savedY - tabBox.y) < 2 && savedY > box.y, "edge tab drags vertically, stays on the edge, position saved");
 
   await context.route(WIDGET_FORM_URL, (route) => route.fulfill({ contentType: "text/html", body: WIDGET_FORM_HTML }));
   const form = await context.newPage();
@@ -412,13 +433,27 @@ try {
   await fillButton.waitFor({ timeout: 15000 });
   if (shots) await form.screenshot({ path: `${shots}/widget-autofill.png` });
   await fillButton.click();
-  await widget(form).getByText(/Filled \d+ fields/).waitFor();
+  await widget(form).getByText(/^Filled \d+$/).waitFor();
   const formValues = await form.evaluate(() => ["a", "b", "c", "d", "e", "f"].map((id) => document.getElementById(id).value));
   check(
     formValues[0] === "Priya" && formValues[2] === "priya.raman@example.com" && formValues[4] !== "" && formValues[5] !== "",
     `assistant opened by itself and filled the form in one click (${formValues.join(" | ")})`,
   );
   if (shots) await form.screenshot({ path: `${shots}/widget-filled.png` });
+
+  // 10d. Create-account page: the preset job-site password goes into both password boxes.
+  await worker.evaluate(async () => chrome.storage.local.set({ accountPassword: "Str0ng!Pass" }));
+  await context.route(ACCOUNT_URL, (route) => route.fulfill({ contentType: "text/html", body: ACCOUNT_HTML }));
+  const account = await context.newPage();
+  await account.goto(ACCOUNT_URL);
+  const accountFill = widget(account).getByRole("button", { name: /^Autofill \d+ fields$/ });
+  await accountFill.waitFor({ timeout: 15000 });
+  await accountFill.click();
+  await widget(account).getByText(/^Filled \d+$/).waitFor();
+  const creds = await account.evaluate(() => [document.getElementById("em").value, document.getElementById("pw").value, document.getElementById("pw2").value]);
+  check(creds[0] === "priya.raman@example.com" && creds[1] === "Str0ng!Pass" && creds[2] === "Str0ng!Pass", "create-account page: email and both password boxes filled");
+  const sessionDump = await worker.evaluate(async () => JSON.stringify(await chrome.storage.session.get(null)));
+  check(!sessionDump.includes("Str0ng!Pass"), "the password never lands in the tab state");
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

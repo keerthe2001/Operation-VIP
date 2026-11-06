@@ -51,13 +51,14 @@ export async function widgetState(
   local: KeyValueArea<LocalStore>,
   session: KeyValueArea<SessionStore>,
 ): Promise<WidgetState> {
-  const [auth, data, prefs, tab, form, tracked] = await Promise.all([
+  const [auth, data, prefs, tab, form, tracked, theme] = await Promise.all([
     local.get("auth"),
     local.get("profile"),
     local.get("widget"),
     session.get(tabKey(tabId)),
     session.get(formKey(tabId)),
     session.get(appKey(tabId)),
+    local.get("theme"),
   ]);
   const widget = { ...DEFAULT_WIDGET, ...prefs };
   const host = url ? new URL(url).hostname : "";
@@ -79,6 +80,7 @@ export async function widgetState(
       filled: fields.filter(hasValue).length,
       hasCoverLetterField: fields.some((f) => /cover\s*letter/i.test(`${f.label} ${f.name}`)),
       hasResumeField: fields.some((f) => f.kind === "file" && f.key === "resume"),
+      needsPassword: fields.some((f) => f.key === "account_password" && f.status === "missing"),
     },
     resumeName: data?.primary_resume?.status === "ready" ? data.primary_resume.file_name : null,
     match: match && {
@@ -95,8 +97,8 @@ export async function widgetState(
     prefs: {
       mode: widget.mode,
       autoOpen: widget.autoOpen,
-      side: widget.side,
       y: widget.y,
+      theme: theme ?? "system",
       hidden: widget.hiddenHosts.includes(host),
     },
   };

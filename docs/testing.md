@@ -81,8 +81,9 @@ storage; profile sync; Greenhouse detection; Autofill (text, select range, resum
 upload) while leaving questions and sensitive fields alone; Review & fill; answer library
 suggestion with placeholders and Insert; application tracking and "I submitted";
 an embedded Greenhouse iframe; a two-step Workday form; a plain careers form with a hidden CV
-input; "Fill this page anyway" on an unrecognised form; the floating assistant (bubble on a Naukri-style
-posting, job match, save job, drag-to-dock, auto-open and one-click autofill); no injection on unsupported sites;
+input; "Fill this page anyway" on an unrecognised form; the side drawer (edge tab on a Naukri-style
+posting, page shrinks while open, job match, save job, theme switch, tab drag, auto-open,
+one-click autofill, create-account password); no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

@@ -73,6 +73,8 @@ export interface WidgetState {
     filled: number;
     hasCoverLetterField: boolean;
     hasResumeField: boolean;
+    /** A password box is on the page but no account password is saved. */
+    needsPassword: boolean;
   };
   resumeName: string | null;
   match: {
@@ -87,5 +89,5 @@ export interface WidgetState {
   } | null;
   /** Quick-copy profile values. */
   profile: { label: string; value: string }[];
-  prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; side: "left" | "right"; y: number; hidden: boolean };
+  prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; y: number; hidden: boolean; theme: "system" | "light" | "dark" };
 }

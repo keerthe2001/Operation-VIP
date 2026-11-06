@@ -44,7 +44,7 @@ describe("scanner", () => {
     document.body.innerHTML = `
       <form>
         <label for="a">Email *</label><input id="a" type="email" name="email" required autocomplete="email">
-        <input type="hidden" name="token"><input type="password" name="pw"><input type="submit">
+        <input type="hidden" name="token"><input type="password" name="pw" value="secret"><input type="submit">
         <input name="honeypot_field"><input disabled name="x"><div hidden><input name="hidden_one"></div>
         <label for="s">Degree</label><select id="s"><option value="">Choose</option><option value="bs">BSc</option></select>
         <fieldset><legend>Relocate?</legend>
@@ -56,15 +56,18 @@ describe("scanner", () => {
     const fields = scanFields();
     expect(fields.map((f) => [f.kind, f.label])).toEqual([
       ["email", "Email *"],
+      ["password", "pw"],
       ["select", "Degree"],
       ["file", "Resume/CV"],
       ["contenteditable", "Cover letter"],
       ["radio", "Relocate?"],
     ]);
     expect(fields[0]).toMatchObject({ required: true, autocomplete: "email", name: "email" });
-    expect(fields[1]!.options).toEqual([{ value: "", label: "Choose" }, { value: "bs", label: "BSc" }]);
-    expect(fields[4]).toMatchObject({ options: [{ value: "y", label: "Yes" }, { value: "n", label: "No" }], currentValue: "No" });
-    expect(fields[2]!.accept).toBe(".pdf");
+    // Password boxes are reported as filled or empty, never with their content.
+    expect(fields[1]!.currentValue).toBe("••••••••");
+    expect(fields[2]!.options).toEqual([{ value: "", label: "Choose" }, { value: "bs", label: "BSc" }]);
+    expect(fields[5]).toMatchObject({ options: [{ value: "y", label: "Yes" }, { value: "n", label: "No" }], currentValue: "No" });
+    expect(fields[3]!.accept).toBe(".pdf");
     // IDs are stable across scans.
     expect(scanFields().map((f) => f.id)).toEqual(fields.map((f) => f.id));
   });

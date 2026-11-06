@@ -34,6 +34,7 @@ export const widgetMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("WIDGET_FORCE") }),
   z.object({ type: z.literal("WIDGET_SAVE_JOB") }),
   z.object({ type: z.literal("WIDGET_OPEN_PANEL") }),
+  z.object({ type: z.literal("WIDGET_THEME"), theme: z.enum(["light", "dark"]) }),
   z.object({
     type: z.literal("WIDGET_PREFS"),
     prefs: z
@@ -54,6 +55,8 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("RESCAN_TAB"), tabId: z.number().int() }),
   z.object({ type: z.literal("FORCE_SCAN"), tabId: z.number().int() }),
   z.object({ type: z.literal("ENABLE_ALL_SITES") }),
+  z.object({ type: z.literal("SET_THEME"), theme: z.enum(["system", "light", "dark"]) }),
+  z.object({ type: z.literal("SET_ACCOUNT_PASSWORD"), password: z.string().max(128).nullable() }),
   z.object({
     type: z.literal("SET_WIDGET_PREFS"),
     prefs: z.object({ mode: z.enum(["job_pages", "always", "off"]), autoOpen: z.boolean(), showOnAllHosts: z.literal(true) }).partial(),

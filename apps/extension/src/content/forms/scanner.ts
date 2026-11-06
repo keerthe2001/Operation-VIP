@@ -3,7 +3,7 @@ import { isVisible, text } from "@/content/dom/visibility";
 import type { FieldDescriptor, FieldKind } from "@/shared/fields";
 
 export const FIELD_ATTR = "data-copilot-field";
-const SKIPPED_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "search", "password"]);
+const SKIPPED_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "search"]);
 const MAX_FIELDS = 300;
 
 let counter = 0;
@@ -49,7 +49,7 @@ function kindOf(el: Element): FieldKind {
     const role = el.getAttribute("role");
     if (role === "combobox" || el.getAttribute("aria-autocomplete") === "list") return "combobox";
     switch (el.type) {
-      case "email": case "tel": case "url": case "number": case "date": case "radio": case "checkbox": case "file":
+      case "email": case "tel": case "url": case "number": case "date": case "radio": case "checkbox": case "file": case "password":
         return el.type;
       default:
         return "text";
@@ -109,6 +109,8 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else if (kind === "checkbox") currentValue = input.checked ? "checked" : "";
     else if (kind === "file") currentValue = input.files?.length ? input.files[0]!.name : "";
     else if (kind === "contenteditable") currentValue = text(el);
+    // Never report what's typed in a password box, only whether it's filled.
+    else if (kind === "password") currentValue = input.value ? "••••••••" : "";
     else currentValue = input.value ?? "";
 
     let label = labelFor(el);

@@ -1,4 +1,4 @@
-import { Alert, Button, NativeSelect } from "@copilot/ui";
+import { Alert, Button, Input, NativeSelect } from "@copilot/ui";
 import { ArrowLeft, Globe, LogOut, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -63,6 +63,8 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
         )}
         {message && <Alert>{message}</Alert>}
       </section>
+      <AccountPassword />
+      <ThemeSettings />
       <WidgetSettings />
       <Button variant="outline" size="sm" className="justify-self-start text-destructive" onClick={() => send({ type: "SIGN_OUT" })}>
         <LogOut aria-hidden="true" /> Sign out
@@ -113,6 +115,61 @@ function WidgetSettings() {
           Show it again on {widget.hiddenHosts.length} hidden site{widget.hiddenHosts.length === 1 ? "" : "s"}
         </Button>
       )}
+    </section>
+  );
+}
+
+function AccountPassword() {
+  const saved = useLocal("accountPassword");
+  const id = useId();
+  const [value, setValue] = useState<string | null>(null);
+  const [show, setShow] = useState(false);
+  const current = value ?? saved ?? "";
+  return (
+    <section className="grid gap-2">
+      <h2 className="text-sm font-semibold">Job-site account password</h2>
+      <p className="text-xs text-muted-foreground">Filled on sign-up and sign-in pages (Workday, Taleo…). Stored only on this device.</p>
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          aria-label="Job-site account password"
+          type={show ? "text" : "password"}
+          autoComplete="new-password"
+          value={current}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button variant="ghost" size="sm" onClick={() => setShow((s) => !s)}>
+          {show ? "Hide" : "Show"}
+        </Button>
+      </div>
+      <Button
+        size="sm"
+        className="justify-self-start"
+        disabled={value === null || value === (saved ?? "")}
+        onClick={async () => {
+          await send({ type: "SET_ACCOUNT_PASSWORD", password: current || null });
+          setValue(null);
+        }}
+      >
+        Save
+      </Button>
+    </section>
+  );
+}
+
+function ThemeSettings() {
+  const theme = useLocal("theme");
+  const id = useId();
+  return (
+    <section className="grid gap-2">
+      <label htmlFor={id} className="text-sm font-semibold">
+        Theme
+      </label>
+      <NativeSelect id={id} value={theme} onChange={(e) => send({ type: "SET_THEME", theme: e.target.value as "system" | "light" | "dark" })}>
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </NativeSelect>
     </section>
   );
 }

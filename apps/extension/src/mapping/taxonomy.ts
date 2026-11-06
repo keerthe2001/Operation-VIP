@@ -235,6 +235,14 @@ export const RULES: FieldRule[] = [
     attrPatterns: [/\bskills?\b/],
   },
   {
+    key: "account_password", label: "Account password",
+    // Sign-up and sign-in pages of job portals (Workday, Taleo, iCIMS…).
+    patterns: [/\bpassword\b/, /\bpass ?code\b/, /\bpin\b/],
+    attrPatterns: [/\b(password|passwd|pwd)\b/],
+    autocomplete: ["new-password", "current-password"],
+    types: ["password"],
+  },
+  {
     key: "resume", label: "Resume",
     patterns: [/\b(resume|resumé|cv|curriculum vitae)\b/], attrPatterns: [/\b(resume|cv)\b/], types: ["file"],
     exclude: [/\bcover\b/],

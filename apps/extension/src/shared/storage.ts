@@ -14,6 +14,9 @@ export interface LocalStore {
   sync: SyncState;
   allSitesEnabled: boolean;
   widget: WidgetPrefs;
+  /** Password for new accounts on job portals. Kept on this device only, never synced. */
+  accountPassword: string | null;
+  theme: "system" | "light" | "dark";
 }
 
 /** The floating in-page assistant. */
@@ -59,6 +62,8 @@ export const DEFAULT_LOCAL: LocalStore = {
   sync: { state: "idle", lastSyncedAt: null, error: null },
   allSitesEnabled: false,
   widget: DEFAULT_WIDGET,
+  accountPassword: null,
+  theme: "system",
 };
 
 /** Small async key/value interface so background logic is testable without Chrome. */

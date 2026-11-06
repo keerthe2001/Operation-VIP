@@ -4,11 +4,13 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  EyeOff,
   FileText,
   Gauge,
   MapPin,
-  Minus,
+  ChevronsRight,
+  KeyRound,
+  Moon,
+  Sun,
   PanelRight,
   Sparkles,
   UserRound,
@@ -20,7 +22,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Poin
 
 import type { Reply } from "@/shared/messages";
 import type { WidgetState } from "@/shared/types";
-import { BUBBLE, clampY, DRAG_THRESHOLD, panelTop, snap, type Dock } from "@/widget/position";
+import { clampY, DRAG_THRESHOLD, DRAWER_WIDTH } from "@/widget/position";
 
 export type Send = <T = unknown>(message: Record<string, unknown>) => Promise<Reply<T>>;
 type Tab = "autofill" | "match" | "profile";
@@ -52,23 +54,22 @@ export function Widget({ send, url }: { send: Send; url: () => string }) {
   const [state, setState] = useState<WidgetState | null>(null);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("autofill");
-  const [dockState, setDock] = useState<Dock | null>(null);
-  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const [y, setY] = useState<number | null>(null);
+  const [dragY, setDragY] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [gone, setGone] = useState(false);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
   const autoOpened = useRef(new Set<string>());
-  const pointer = useRef<{ startX: number; startY: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [panelHeight, setPanelHeight] = useState(560);
+  const pointer = useRef<{ startY: number; offset: number; moved: boolean } | null>(null);
 
   const refresh = useCallback(async () => {
     const reply = await send<WidgetState>({ type: "WIDGET_STATE" });
     if (!reply.ok || !reply.data) return;
     const next = reply.data;
     setState(next);
-    // Open by itself once per page when an application form shows up.
+    // Slide open by itself once per page when an application form shows up.
     const href = url();
     if (next.job?.isApplicationPage && next.prefs.autoOpen && next.signedIn && !autoOpened.current.has(href)) {
       autoOpened.current.add(href);
@@ -88,94 +89,93 @@ export function Widget({ send, url }: { send: Send; url: () => string }) {
   }, [open, refresh]);
 
   useEffect(() => {
-    const onResize = () => setDock((d) => (d ? { ...d, y: clampY(d.y, window.innerHeight) } : d));
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return;
+    const onChange = () => setSystemDark(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
   }, []);
 
-  // Track the panel's height so it can be kept on screen next to the bubble.
+  // Docked like a side panel: while open, the page narrows to make room instead of being
+  // covered (on narrow windows the drawer overlays it).
+  const docked = open && !!state && !gone;
   useEffect(() => {
-    const el = panelRef.current;
-    if (!open || !el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setPanelHeight(el.offsetHeight));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [open]);
+    if (!docked || window.innerWidth < 900) return;
+    const html = document.documentElement;
+    const before = { width: html.style.getPropertyValue("width"), priority: html.style.getPropertyPriority("width") };
+    html.style.setProperty("width", `calc(100% - ${DRAWER_WIDTH}px)`, "important");
+    window.dispatchEvent(new Event("resize"));
+    return () => {
+      if (before.width) html.style.setProperty("width", before.width, before.priority);
+      else html.style.removeProperty("width");
+      window.dispatchEvent(new Event("resize"));
+    };
+  }, [docked]);
 
   if (!state || gone) return null;
-  // Until the user moves it, the bubble sits where they last left it (saved preference).
-  const dock = dockState ?? { side: state.prefs.side, y: clampY(state.prefs.y, window.innerHeight) };
-  const visible =
-    !state.prefs.hidden &&
-    state.prefs.mode !== "off" &&
-    (state.prefs.mode === "always" || !!state.job);
+  const visible = !state.prefs.hidden && state.prefs.mode !== "off" && (state.prefs.mode === "always" || !!state.job);
   if (!visible) return null;
 
   const job = state.job;
   const form = state.form;
+  const top = dragY ?? y ?? clampY(state.prefs.y, window.innerHeight);
+  const dark = state.prefs.theme === "dark" || (state.prefs.theme === "system" && systemDark);
 
-  function saveDock(next: Dock) {
-    setDock(next);
-    void send({ type: "WIDGET_PREFS", prefs: { side: next.side, y: next.y } });
-  }
-
+  // The edge tab only moves up and down; a short press opens the drawer.
   function onPointerDown(event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    pointer.current = { startX: event.clientX, startY: event.clientY, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, moved: false };
+    pointer.current = { startY: event.clientY, offset: event.clientY - top, moved: false };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
   function onPointerMove(event: PointerEvent<HTMLButtonElement>) {
     const p = pointer.current;
     if (!p) return;
-    if (!p.moved && Math.hypot(event.clientX - p.startX, event.clientY - p.startY) < DRAG_THRESHOLD) return;
+    if (!p.moved && Math.abs(event.clientY - p.startY) < DRAG_THRESHOLD) return;
     p.moved = true;
-    setDrag({ x: event.clientX - p.offsetX, y: event.clientY - p.offsetY });
+    setDragY(clampY(event.clientY - p.offset, window.innerHeight));
   }
   function onPointerUp(event: PointerEvent<HTMLButtonElement>) {
     const p = pointer.current;
     pointer.current = null;
     if (!p) return;
     if (p.moved) {
-      saveDock(snap(event.clientX - p.offsetX, event.clientY - p.offsetY, window.innerWidth, window.innerHeight));
-      setDrag(null);
+      const next = clampY(event.clientY - p.offset, window.innerHeight);
+      setY(next);
+      setDragY(null);
+      void send({ type: "WIDGET_PREFS", prefs: { y: next } });
     } else {
-      setOpen((o) => !o);
+      setOpen(true);
     }
   }
-  function onBubbleKey(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-      event.preventDefault();
-      saveDock({ ...dock, y: clampY(dock.y + (event.key === "ArrowUp" ? -40 : 40), window.innerHeight) });
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      saveDock({ ...dock, side: event.key === "ArrowLeft" ? "left" : "right" });
-    }
+  function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const next = clampY(top + (event.key === "ArrowUp" ? -40 : 40), window.innerHeight);
+    setY(next);
+    void send({ type: "WIDGET_PREFS", prefs: { y: next } });
   }
 
   async function act(message: Record<string, unknown>, success: string) {
     setBusy(true);
     setNotice(null);
-    const reply = await send<{ filled?: number }>(message);
+    const reply = await send(message);
     setBusy(false);
     setNotice(reply.ok ? { kind: "ok", text: success } : { kind: "error", text: reply.error });
     void refresh();
-    return reply;
   }
 
   async function fill() {
     setBusy(true);
     setNotice(null);
-    const reply = await send<{ filled: number; failed?: number }>({ type: "WIDGET_FILL" });
+    const reply = await send<{ filled: number }>({ type: "WIDGET_FILL" });
     setBusy(false);
-    if (!reply.ok) setNotice({ kind: "error", text: reply.error });
-    else setNotice({ kind: "ok", text: `Filled ${reply.data?.filled ?? 0} field${reply.data?.filled === 1 ? "" : "s"}. Review the form before you submit.` });
+    setNotice(reply.ok ? { kind: "ok", text: `Filled ${reply.data?.filled ?? 0}` } : { kind: "error", text: reply.error });
     void refresh();
   }
 
   async function openPanel() {
     const reply = await send({ type: "WIDGET_OPEN_PANEL" });
-    if (!reply.ok) setNotice({ kind: "error", text: "Click the Copilot icon in the toolbar to open the full panel." });
+    if (!reply.ok) setNotice({ kind: "error", text: "Click the Copilot icon in the toolbar." });
   }
 
   async function copy(label: string, value: string) {
@@ -184,48 +184,44 @@ export function Widget({ send, url }: { send: Send; url: () => string }) {
       setCopied(label);
       setTimeout(() => setCopied((c) => (c === label ? null : c)), 1500);
     } catch {
-      setNotice({ kind: "error", text: "Couldn't copy on this page." });
+      setNotice({ kind: "error", text: "Couldn't copy here." });
     }
   }
 
-  const sideStyle = dock.side === "right" ? { right: 16 } : { left: 16 };
-  const bubbleStyle = drag ? { left: drag.x, top: drag.y } : { ...sideStyle, top: dock.y };
-  const panelStyle = {
-    ...(dock.side === "right" ? { right: 16 + BUBBLE + 10 } : { left: 16 + BUBBLE + 10 }),
-    top: panelTop(dock.y, panelHeight, window.innerHeight),
-  };
-  const status = !job
-    ? { text: "No job found", cls: "" }
-    : job.isApplicationPage
-      ? { text: "Application", cls: "good" }
-      : { text: "Job posting", cls: "accent" };
+  function toggleTheme() {
+    const theme = dark ? "light" : "dark";
+    setState((s) => (s ? { ...s, prefs: { ...s.prefs, theme } } : s));
+    void send({ type: "WIDGET_THEME", theme });
+  }
+
+  const status = !job ? { text: "No job", cls: "" } : job.isApplicationPage ? { text: "Application", cls: "good" } : { text: "Job post", cls: "accent" };
 
   return (
-    <>
-      <div className="bubble-wrap" data-side={dock.side} style={bubbleStyle}>
-        <button
-          type="button"
-          className={`bubble${drag ? " dragging" : ""}`}
-          aria-label={open ? "Minimise Copilot" : "Open Copilot"}
-          aria-expanded={open}
-          title="Copilot · drag to move"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={() => {
-            pointer.current = null;
-            setDrag(null);
-          }}
-          onKeyDown={onBubbleKey}
-        >
-          <Logo size={26} />
-        </button>
-        {!open && form.ready > 0 && <span className="bubble-badge">{form.ready}</span>}
-        {!open && job?.isApplicationPage && <span className="bubble-dot" />}
-        {!open && !drag && (
+    <div className={`root${dark ? " dark" : ""}`}>
+      {!open && (
+        <div className="edge" style={{ top }}>
           <button
             type="button"
-            className="bubble-hide"
+            className={`edge-tab${dragY !== null ? " dragging" : ""}`}
+            aria-label="Open Copilot"
+            aria-expanded={false}
+            title="Copilot · drag to move"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={() => {
+              pointer.current = null;
+              setDragY(null);
+            }}
+            onKeyDown={onTabKey}
+          >
+            <Logo size={22} />
+            {form.ready > 0 && <span className="edge-badge">{form.ready}</span>}
+            {job?.isApplicationPage && <span className="edge-dot" />}
+          </button>
+          <button
+            type="button"
+            className="edge-hide"
             aria-label="Hide Copilot on this site"
             title="Hide on this site"
             onClick={() => {
@@ -233,87 +229,87 @@ export function Widget({ send, url }: { send: Send; url: () => string }) {
               void send({ type: "WIDGET_PREFS", prefs: { hideOnHost: location.hostname } });
             }}
           >
-            <X size={12} />
+            <X size={11} />
           </button>
-        )}
-      </div>
-
-      {open && (
-        <div
-          ref={panelRef}
-          className="panel"
-          style={panelStyle}
-          role="dialog"
-          aria-label="Copilot assistant"
-          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        >
-          <div className="head">
-            <span className="logo">
-              <Logo size={18} />
-            </span>
-            <div className="brand">
-              Copilot <span className={`chip ${status.cls}`}>{status.text}</span>
-            </div>
-            <button type="button" className="icon-btn" aria-label="Open the full side panel" title="Open side panel" onClick={openPanel}>
-              <PanelRight size={17} />
-            </button>
-            <button type="button" className="icon-btn" aria-label="Minimise" title="Minimise" onClick={() => setOpen(false)}>
-              <Minus size={17} />
-            </button>
-          </div>
-
-          {job && (
-            <div className="job">
-              <div className="job-text">
-                <div className="job-title">{job.title ?? "Untitled role"}</div>
-                <div className="job-company">{[job.company, state.tracked ? "Saved to tracker" : null].filter(Boolean).join(" · ")}</div>
-              </div>
-              {state.match?.score != null && <ScoreRing score={state.match.score} />}
-            </div>
-          )}
-
-          <div className="tabs" role="tablist" aria-label="Copilot sections">
-            {(
-              [
-                ["autofill", "Autofill", <Wand2 key="i" size={14} />],
-                ["match", "Match", <Gauge key="i" size={14} />],
-                ["profile", "Profile", <UserRound key="i" size={14} />],
-              ] as [Tab, string, ReactNode][]
-            ).map(([id, label, icon]) => (
-              <button key={id} type="button" role="tab" className="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-                {icon} {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="body" role="tabpanel">
-            {!state.signedIn ? (
-              <div className="card">
-                <div className="row-title">Sign in to Copilot</div>
-                <div className="note">Open the side panel and sign in to fill applications from your profile.</div>
-                <button type="button" className="primary" onClick={openPanel}>
-                  <PanelRight size={16} /> Open Copilot
-                </button>
-              </div>
-            ) : tab === "autofill" ? (
-              <AutofillTab
-                state={state}
-                busy={busy}
-                onFill={fill}
-                onForce={() => act({ type: "WIDGET_FORCE" }, "Looking for fields on this page…")}
-                onSave={() => act({ type: "WIDGET_SAVE_JOB" }, "Saved to your tracker.")}
-                onPanel={openPanel}
-              />
-            ) : tab === "match" ? (
-              <MatchTab state={state} />
-            ) : (
-              <ProfileTab state={state} copied={copied} onCopy={copy} />
-            )}
-            {notice && <div className={notice.kind === "ok" ? "success" : "error"} role="status">{notice.text}</div>}
-          </div>
         </div>
       )}
-    </>
+
+      <aside
+        className={`drawer${open ? " open" : ""}`}
+        aria-label="Copilot assistant"
+        aria-hidden={!open}
+        inert={!open}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+      >
+        <div className="head">
+          <span className="logo">
+            <Logo size={18} />
+          </span>
+          <div className="brand">
+            Copilot <span className={`chip ${status.cls}`}>{status.text}</span>
+          </div>
+          <button type="button" className="icon-btn" aria-label={dark ? "Light theme" : "Dark theme"} title={dark ? "Light theme" : "Dark theme"} onClick={toggleTheme}>
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button type="button" className="icon-btn" aria-label="Open the full side panel" title="Side panel" onClick={openPanel}>
+            <PanelRight size={17} />
+          </button>
+          <button type="button" className="icon-btn" aria-label="Close" title="Close" onClick={() => setOpen(false)}>
+            <ChevronsRight size={18} />
+          </button>
+        </div>
+
+        {job && (
+          <div className="job">
+            <div className="job-text">
+              <div className="job-title">{job.title ?? "Untitled role"}</div>
+              <div className="job-company">{[job.company, state.tracked ? "Saved" : null].filter(Boolean).join(" · ")}</div>
+            </div>
+            {state.match?.score != null && <ScoreRing score={state.match.score} />}
+          </div>
+        )}
+
+        <div className="tabs" role="tablist" aria-label="Copilot sections">
+          {(
+            [
+              ["autofill", "Autofill", <Wand2 key="i" size={14} />],
+              ["match", "Match", <Gauge key="i" size={14} />],
+              ["profile", "Profile", <UserRound key="i" size={14} />],
+            ] as [Tab, string, ReactNode][]
+          ).map(([id, label, icon]) => (
+            <button key={id} type="button" role="tab" className="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+              {icon} {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="body" role="tabpanel">
+          {!state.signedIn ? (
+            <button type="button" className="primary" onClick={openPanel}>
+              <PanelRight size={16} /> Sign in
+            </button>
+          ) : tab === "autofill" ? (
+            <AutofillTab
+              state={state}
+              busy={busy}
+              onFill={fill}
+              onForce={() => act({ type: "WIDGET_FORCE" }, "Scanning…")}
+              onSave={() => act({ type: "WIDGET_SAVE_JOB" }, "Saved")}
+              onPanel={openPanel}
+            />
+          ) : tab === "match" ? (
+            <MatchTab state={state} />
+          ) : (
+            <ProfileTab state={state} copied={copied} onCopy={copy} />
+          )}
+          {notice && (
+            <div className={notice.kind === "ok" ? "success" : "error"} role="status">
+              {notice.text}
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -335,7 +331,7 @@ function AutofillTab({
   const { job, form } = state;
   const saveButton = job && (
     <button type="button" className="secondary" onClick={onSave} disabled={busy || !!state.tracked}>
-      {state.tracked ? <BookmarkCheck size={16} /> : <Bookmark size={16} />} {state.tracked ? "Saved to tracker" : "Save job"}
+      {state.tracked ? <BookmarkCheck size={16} /> : <Bookmark size={16} />} {state.tracked ? "Saved" : "Save job"}
     </button>
   );
 
@@ -343,15 +339,11 @@ function AutofillTab({
     return (
       <>
         <div className="card">
-          <div className="row-title">{job ? "This is a job posting" : `Hi${state.firstName ? ` ${state.firstName}` : ""}, no application form here yet`}</div>
-          <div className="note">
-            {job
-              ? "Open the application form (click Apply on the page) and Copilot will fill it in. You can also fill any form on this page."
-              : "If this page has a form you want to fill, Copilot can fill whatever matches your profile."}
-          </div>
+          <div className="row-title">{job ? "Job post" : "No form found"}</div>
+          <div className="note">{job ? "Click Apply on the page to open the form." : "Fill any form here from your profile."}</div>
         </div>
         <button type="button" className="primary" onClick={onForce} disabled={busy}>
-          <Wand2 size={16} /> Fill this page anyway
+          <Wand2 size={16} /> Fill this page
         </button>
         {saveButton}
       </>
@@ -362,7 +354,7 @@ function AutofillTab({
     <>
       <button type="button" className="primary" onClick={onFill} disabled={busy || form.ready === 0}>
         <Sparkles size={16} />
-        {form.ready > 0 ? `Autofill ${form.ready} field${form.ready === 1 ? "" : "s"}` : form.filled > 0 ? "Everything ready is filled" : "Nothing to fill yet"}
+        {form.ready > 0 ? `Autofill ${form.ready} field${form.ready === 1 ? "" : "s"}` : form.filled > 0 ? "Ready" : "Nothing to fill"}
       </button>
       <div className="stats">
         <div className="stat"><b>{form.filled}</b><span>Filled</span></div>
@@ -376,8 +368,7 @@ function AutofillTab({
           <div className="row-main">
             <div className="row-title">Resume</div>
             <div className="row-sub">
-              {state.resumeName ?? "No resume uploaded"}
-              {state.resumeName && !form.hasResumeField ? " · no upload field on this step" : ""}
+              {state.resumeName ?? "Not uploaded"}
             </div>
           </div>
         </div>
@@ -385,17 +376,21 @@ function AutofillTab({
           <FileText size={18} className={form.hasCoverLetterField ? "ok" : ""} />
           <div className="row-main">
             <div className="row-title">Cover letter</div>
-            <div className="row-sub">{form.hasCoverLetterField ? "Field found · write it in the side panel" : "No field found"}</div>
+            <div className="row-sub">{form.hasCoverLetterField ? "Field found" : "No field"}</div>
           </div>
         </div>
       </div>
       {(form.review > 0 || form.questions > 0) && (
         <button type="button" className="secondary" onClick={onPanel}>
-          <PanelRight size={16} /> Review {form.review + form.questions} answer{form.review + form.questions === 1 ? "" : "s"} in the side panel
+          <PanelRight size={16} /> Review {form.review + form.questions}
+        </button>
+      )}
+      {form.needsPassword && (
+        <button type="button" className="secondary" onClick={onPanel}>
+          <KeyRound size={16} /> Set account password
         </button>
       )}
       {saveButton}
-      <div className="note">Copilot never submits. Check the form, then submit it yourself.</div>
     </>
   );
 }
@@ -405,8 +400,7 @@ function MatchTab({ state }: { state: WidgetState }) {
   if (!match) {
     return (
       <div className="card">
-        <div className="row-title">No job description found</div>
-        <div className="note">Open the job's description page to see how your profile matches it.</div>
+        <div className="row-title">No job description</div>
       </div>
     );
   }
@@ -417,17 +411,17 @@ function MatchTab({ state }: { state: WidgetState }) {
         {match.score != null && <ScoreRing score={match.score} />}
         <div className="row-main">
           <div className="row-title">{label}</div>
-          <div className="note">Based on the skills, experience and location in the job description.</div>
+
         </div>
       </div>
       <div className="card">
-        <div className="section-title">Skills you have ({match.matched.length})</div>
+        <div className="section-title">You have ({match.matched.length})</div>
         <div className="pills">
-          {match.matched.length ? match.matched.map((s) => <span key={s} className="pill good">{s}</span>) : <span className="muted">None of your skills are mentioned.</span>}
+          {match.matched.length ? match.matched.map((s) => <span key={s} className="pill good">{s}</span>) : <span className="muted">None</span>}
         </div>
-        <div className="section-title" style={{ marginTop: 6 }}>Mentioned, not in your profile ({match.missing.length})</div>
+        <div className="section-title" style={{ marginTop: 6 }}>Missing ({match.missing.length})</div>
         <div className="pills">
-          {match.missing.length ? match.missing.map((s) => <span key={s} className="pill warn">{s}</span>) : <span className="muted">Nothing missing.</span>}
+          {match.missing.length ? match.missing.map((s) => <span key={s} className="pill warn">{s}</span>) : <span className="muted">None</span>}
         </div>
       </div>
       <div className="card">
@@ -436,8 +430,8 @@ function MatchTab({ state }: { state: WidgetState }) {
           <div className="row-main">
             <div className="row-title">Experience</div>
             <div className="row-sub">
-              {match.requiredYears != null ? `Asks for ${match.requiredYears}+ years` : "No years mentioned"}
-              {match.haveYears != null ? ` · you have ${match.haveYears}` : ""}
+              {match.requiredYears != null ? `${match.requiredYears}+ yrs asked` : "Not stated"}
+              {match.haveYears != null ? ` · you: ${match.haveYears}` : ""}
             </div>
           </div>
         </div>
@@ -446,22 +440,21 @@ function MatchTab({ state }: { state: WidgetState }) {
           <div className="row-main">
             <div className="row-title">Location</div>
             <div className="row-sub">
-              {match.location ?? "Not mentioned"}
-              {match.locationOk === true ? " · fits your preferences" : match.locationOk === false ? " · outside your locations" : ""}
+              {match.location ?? "Not stated"}
             </div>
           </div>
         </div>
       </div>
-      <div className="note">Copilot's own estimate from keywords, not an employer's screening result. Add missing skills you really have to your profile.</div>
+      <div className="note">Keyword estimate, not an employer's screening.</div>
     </>
   );
 }
 
 function ProfileTab({ state, copied, onCopy }: { state: WidgetState; copied: string | null; onCopy: (label: string, value: string) => void }) {
-  if (state.profile.length === 0) return <div className="note">Your profile is empty. Upload a resume on the Copilot website.</div>;
+  if (state.profile.length === 0) return <div className="note">Profile is empty.</div>;
   return (
     <>
-      <div className="note">Click a value to copy it, for fields Copilot can't fill.</div>
+      <div className="note">Click to copy.</div>
       <div>
         {state.profile.map(({ label, value }) => (
           <button key={label} type="button" className="copy-row" onClick={() => onCopy(label, value)} aria-label={`Copy ${label}`}>
@@ -472,9 +465,6 @@ function ProfileTab({ state, copied, onCopy }: { state: WidgetState; copied: str
             {copied === label ? <Check size={16} className="ok" /> : <Copy size={15} className="copy-icon" />}
           </button>
         ))}
-      </div>
-      <div className="note">
-        <EyeOff size={12} style={{ verticalAlign: "-2px" }} /> Visible only to you; nothing is shared until you fill a form.
       </div>
     </>
   );

@@ -34,7 +34,7 @@ const autofill = new AutofillCoordinator(local, session, api, async (tabId, fram
 
 // Keep every open form's mapping current when the profile changes.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !("profile" in changes)) return;
+  if (area !== "local" || !("profile" in changes || "accountPassword" in changes)) return;
   void chrome.storage.session.get(null).then((all) => {
     const tabIds = Object.keys(all).filter((k) => k.startsWith("form:")).map((k) => Number(k.slice(5)));
     return autofill.remapAll(tabIds);
@@ -143,6 +143,9 @@ async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<u
         // Allowed because the click in the page is a user gesture.
         await chrome.sidePanel.open({ tabId, windowId: tab.windowId });
         return { ok: true };
+      case "WIDGET_THEME":
+        await local.set({ theme: message.theme });
+        return { ok: true };
       case "WIDGET_PREFS": {
         const current = { ...DEFAULT_WIDGET, ...(await local.get("widget")) };
         const { hideOnHost, ...position } = message.prefs;
@@ -184,6 +187,12 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         return { ok: true };
       case "FORCE_SCAN":
         return await forceScan(message.tabId);
+      case "SET_THEME":
+        await local.set({ theme: message.theme });
+        return { ok: true };
+      case "SET_ACCOUNT_PASSWORD":
+        await local.set({ accountPassword: message.password || null });
+        return { ok: true };
       case "SET_WIDGET_PREFS": {
         const current = { ...DEFAULT_WIDGET, ...(await local.get("widget")) };
         const { showOnAllHosts, ...rest } = message.prefs;

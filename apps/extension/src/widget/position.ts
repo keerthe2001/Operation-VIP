@@ -1,26 +1,12 @@
-/** Pure helpers for the floating bubble's position (kept separate so they can be tested). */
+/** The edge tab's vertical position (kept separate so it can be tested). */
 
-export const BUBBLE = 52;
+export const TAB_HEIGHT = 56;
+export const DRAWER_WIDTH = 380;
 const MARGIN = 12;
 
-export interface Dock {
-  side: "left" | "right";
-  y: number;
-}
-
-/** Keeps the bubble fully on screen vertically. */
+/** Keeps the tab fully on screen. */
 export function clampY(y: number, viewportHeight: number): number {
-  return Math.round(Math.min(Math.max(y, MARGIN), Math.max(MARGIN, viewportHeight - BUBBLE - MARGIN)));
-}
-
-/** Where a drag that ended with the bubble's top-left corner at (x, y) docks. */
-export function snap(x: number, y: number, viewportWidth: number, viewportHeight: number): Dock {
-  return { side: x + BUBBLE / 2 < viewportWidth / 2 ? "left" : "right", y: clampY(y, viewportHeight) };
-}
-
-/** Top of the panel so it sits next to the bubble without leaving the screen. */
-export function panelTop(dockY: number, panelHeight: number, viewportHeight: number): number {
-  return Math.round(Math.min(Math.max(dockY - 8, MARGIN), Math.max(MARGIN, viewportHeight - panelHeight - MARGIN)));
+  return Math.round(Math.min(Math.max(y, MARGIN), Math.max(MARGIN, viewportHeight - TAB_HEIGHT - MARGIN)));
 }
 
 /** A pointer that moved this far is dragging, not clicking. */

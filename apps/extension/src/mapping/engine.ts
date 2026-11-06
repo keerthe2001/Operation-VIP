@@ -27,7 +27,11 @@ const CONSENT = /\b(agree|consent|acknowledge|privacy|terms|certify|confirm that
 const KIND_TYPES: Record<FieldDescriptor["kind"], string> = {
   text: "text", email: "email", tel: "tel", url: "url", number: "number", date: "date", textarea: "text",
   select: "select", radio: "radio", checkbox: "checkbox", file: "file", contenteditable: "text", combobox: "select",
+  password: "password",
 };
+
+/** Shown instead of the account password; the real one is only read when filling. */
+export const PASSWORD_MASK = "••••••••";
 
 export interface Classification {
   key: string | null;
@@ -64,6 +68,7 @@ export function classify(field: FieldDescriptor): Classification {
     if (rule.exclude?.some((p) => p.test(label) || p.test(attrs))) continue;
     if (field.kind === "file" && rule.key !== "resume") continue;
     if (rule.key === "resume" && field.kind !== "file") continue;
+    if ((field.kind === "password") !== (rule.key === "account_password")) continue;
 
     let score = 0;
     if (rule.autocomplete?.some((token) => autocomplete.includes(token))) score = 0.97;
@@ -182,6 +187,7 @@ function profileValue(key: string, profile: ProfileData, resumeName: string | nu
     case "pronouns": return extra.pronouns;
     case "nationality": return extra.nationality;
     case "languages": return extra.languages;
+    case "account_password": return PASSWORD_MASK;
     case "earliest_start_date":
       return extra.earliest_start_date ?? (extra.notice_period ? `After my notice period of ${extra.notice_period}` : null);
     case "work_mode_preference": return extra.work_mode_preference;
