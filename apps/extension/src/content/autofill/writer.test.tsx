@@ -58,16 +58,16 @@ describe("scanner", () => {
       ["email", "Email *"],
       ["password", "pw"],
       ["select", "Degree"],
+      ["radio", "Relocate?"],
       ["file", "Resume/CV"],
       ["contenteditable", "Cover letter"],
-      ["radio", "Relocate?"],
     ]);
     expect(fields[0]).toMatchObject({ required: true, autocomplete: "email", name: "email" });
     // Password boxes are reported as filled or empty, never with their content.
     expect(fields[1]!.currentValue).toBe("••••••••");
     expect(fields[2]!.options).toEqual([{ value: "", label: "Choose" }, { value: "bs", label: "BSc" }]);
-    expect(fields[5]).toMatchObject({ options: [{ value: "y", label: "Yes" }, { value: "n", label: "No" }], currentValue: "No" });
-    expect(fields[3]!.accept).toBe(".pdf");
+    expect(fields[3]).toMatchObject({ options: [{ value: "y", label: "Yes" }, { value: "n", label: "No" }], currentValue: "No" });
+    expect(fields[4]!.accept).toBe(".pdf");
     // IDs are stable across scans.
     expect(scanFields().map((f) => f.id)).toEqual(fields.map((f) => f.id));
   });

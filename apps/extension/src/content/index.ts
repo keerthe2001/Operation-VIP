@@ -64,9 +64,33 @@ function schedule() {
   timer = setTimeout(() => report(), 600);
 }
 
-// Single-page apps and multi-step forms change content without reloading.
-new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+// Single-page apps and multi-step forms change content without reloading: new elements, and
+// existing ones shown or hidden through attributes (Workday toggles style/class/aria-hidden).
+const WATCHED = ["style", "class", "hidden", "aria-hidden", "disabled", "aria-expanded", "open"];
+const observer = new MutationObserver((mutations) => {
+  // Ignore Copilot's own drawer and the highlight it puts on fields while filling.
+  if (mutations.every((m) => (m.target as Element).closest?.("copilot-assistant") || (m.type === "attributes" && m.attributeName === "style" && filling))) return;
+  schedule();
+});
+const observe = (root: Node) => observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: WATCHED });
+observe(document.documentElement);
+// Open shadow roots (web-component forms) are watched as they're found.
+const watchedRoots = new WeakSet<ShadowRoot>();
+function watchShadowRoots() {
+  for (const host of document.querySelectorAll("*")) {
+    const root = host.shadowRoot;
+    if (root && !watchedRoots.has(root) && host.tagName !== "COPILOT-ASSISTANT") {
+      watchedRoots.add(root);
+      observe(root);
+    }
+  }
+}
+watchShadowRoots();
+setInterval(watchShadowRoots, 3000);
 document.addEventListener("change", schedule, true);
+// Clicks and focus often reveal the next part of a form (accordions, "Add", tabs).
+document.addEventListener("click", schedule, true);
+document.addEventListener("focusin", schedule, true);
 // Notice fields the user fills by hand, so the panel can move on to the next one.
 document.addEventListener("input", schedule, true);
 let lastUrl = location.href;

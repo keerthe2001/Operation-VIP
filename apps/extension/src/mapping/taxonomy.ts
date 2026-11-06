@@ -53,7 +53,7 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "phone", label: "Phone",
-    patterns: [/\b(phone|mobile|cell|telephone|contact (number|no)|whats ?app( number| no)?|mob no|ph no)\b/, /^contact$/],
+    patterns: [/\b(phone|mobile|cell|telephone|contact (number|no)|whats ?app( number| no)?|mob no|ph no)\b/, /^contact$/, /\bprimary (number|contact)\b/],
     attrPatterns: [/\b(phone|mobile|tel|cell|contact|whatsapp|mob)\b/],
     autocomplete: ["tel", "tel-national"],
     exclude: [/\b(country code|phone code|dial|extension|type|reference|emergency|device|alternate|alternative|secondary|other|landline|home|office|person)\b/],
@@ -167,6 +167,8 @@ export const RULES: FieldRule[] = [
   {
     key: "preferred_name", label: "Preferred name",
     patterns: [/\b(preferred|nick) ?(first )?name\b/, /\bname you (go by|prefer)\b/], attrPatterns: [/\b(preferred|nick) ?name\b/], autocomplete: ["nickname"],
+    // "I have a preferred name" is a yes/no box that reveals the field.
+    exclude: [/^(i have|i use|do you have)\b/],
   },
   {
     key: "phone_type", label: "Phone type",
@@ -320,7 +322,10 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "earliest_start_date", label: "Earliest start date",
-    patterns: [/\bwhen can you (start|join)\b/, /\bearliest (possible )?(start|joining) date\b/, /\bavailab(le|ility) to (start|join)\b/, /\b(desired|preferred|available|possible) start date\b/],
+    patterns: [
+      /\bwhen can you (start|join)\b/, /\bearliest (possible )?(start|joining) date\b/, /\bavailab(le|ility) to (start|join)\b/,
+      /\b(desired|preferred|available|possible) start date\b/, /\bdate (of )?availab(le|ility)\b/, /\bavailability date\b/,
+    ],
     // A bare "start date" usually belongs to a job or degree in the history sections.
     attrPatterns: [/\bavailability\b/],
     exclude: [/\b(employment|job|position held|degree|education|school)\b/],

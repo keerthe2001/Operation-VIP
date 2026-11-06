@@ -7,3 +7,21 @@
 body {
   min-width: 300px;
 }
+
+/* Docked in a page's drawer: fit its width exactly and scroll without visible scrollbars
+   (Windows scrollbars would otherwise take space and push the header sideways). */
+html.embedded,
+html.embedded body {
+  min-width: 0;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+html.embedded::-webkit-scrollbar,
+html.embedded body::-webkit-scrollbar,
+html.embedded *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+html.embedded * {
+  scrollbar-width: none;
+}

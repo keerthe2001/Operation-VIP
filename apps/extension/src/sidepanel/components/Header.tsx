@@ -36,11 +36,11 @@ export function Header({
   const theme = useLocal("theme");
   const dark = document.documentElement.classList.contains("dark");
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/90 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-10 flex min-w-0 items-center gap-1.5 border-b bg-background/90 px-3 py-2.5 backdrop-blur">
       <Logo />
-      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={sync.error ?? undefined}>
-        <span className={cn("size-2 rounded-full", status.dot)} aria-hidden="true" />
-        {status.label}
+      <span className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" title={sync.error ?? status.label}>
+        <span className={cn("size-2 shrink-0 rounded-full", status.dot)} aria-hidden="true" />
+        <span className="truncate max-[360px]:sr-only">{status.label}</span>
       </span>
       <span className="grid size-7 place-items-center rounded-full bg-secondary text-[11px] font-medium" title={user.email}>
         {initials(user)}

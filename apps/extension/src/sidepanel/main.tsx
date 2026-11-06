@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "@/sidepanel/App";
 
+if (new URLSearchParams(location.search).get("embed") === "1") document.documentElement.classList.add("embedded");
+
 // Theme: the user's choice (Settings or the page assistant), else the system setting.
 const media = window.matchMedia("(prefers-color-scheme: dark)");
 let choice: "system" | "light" | "dark" = "system";

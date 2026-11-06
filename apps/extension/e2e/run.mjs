@@ -256,6 +256,13 @@ const EXP_HTML = `<!doctype html><html><head><title>My Experience</title></head>
   });
 </script></body></html>`;
 
+// Fields revealed by a style change only (no new elements), as many multi-step forms do.
+const REVEAL_URL = "https://jobs.lever.co/pixelworks/reveal";
+const REVEAL_HTML = `<!doctype html><html><head><title>Apply</title></head><body><form>
+  <label for="a">First Name</label><input id="a"><label for="b">Last Name</label><input id="b"><label for="c">Email</label><input id="c" type="email">
+  <div id="more" style="display:none"><label for="d">Phone</label><input id="d" type="tel"><label for="e">City</label><input id="e"></div>
+</form><script>setTimeout(() => { document.getElementById("more").style.display = "block"; }, 2500);</script></body></html>`;
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -555,8 +562,11 @@ try {
   const drawer = await widget(naukri).locator(".drawer").boundingBox();
   const viewport = naukri.viewportSize();
   check(Math.round(drawer.x + drawer.width) === viewport.width && Math.round(drawer.height) === viewport.height, "drawer docks full-height on the right with the Copilot panel inside");
+  const panelDoc = naukri.frames().find((f) => f.url().includes("sidepanel/index.html"));
+  const fit = await panelDoc.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, bar: innerWidth - document.documentElement.clientWidth }));
+  check(fit.overflow <= 0 && fit.bar === 0, `docked panel fits its width with no visible scrollbars (${JSON.stringify(fit)})`);
   const pageWidth = await naukri.evaluate(() => document.documentElement.getBoundingClientRect().width);
-  check(Math.abs(pageWidth - (viewport.width - 380)) < 2, `page shrinks to make room for the drawer (${pageWidth}px)`);
+  check(Math.abs(pageWidth - (viewport.width - 360)) < 2, `page shrinks to make room for the drawer (${pageWidth}px)`);
   await clickUntil(panelIn(naukri).getByRole("tab", { name: /Match/ }), () => panelIn(naukri).getByText(/^Missing \(/).waitFor({ timeout: 5000 }).then(() => true));
   check(await panelIn(naukri).getByText("Snowflake").isVisible(), "Match tab lists skills missing from the profile");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
@@ -637,7 +647,7 @@ try {
   const creds = await account.evaluate(() => [document.getElementById("em").value, document.getElementById("pw").value, document.getElementById("pw2").value]);
   check(creds[0] === "priya.raman@example.com" && creds[1] === "Str0ng!Pass" && creds[2] === "Str0ng!Pass", "create-account page: email and both password boxes filled");
   const shellRight = await account.evaluate(() => document.getElementById("shell").getBoundingClientRect().right);
-  check(Math.abs(shellRight - (account.viewportSize().width - 380)) < 2, `full-screen app layer (Workday-style) moves out from under the drawer (right edge ${shellRight})`);
+  check(Math.abs(shellRight - (account.viewportSize().width - 360)) < 2, `full-screen app layer (Workday-style) moves out from under the drawer (right edge ${shellRight})`);
   const sessionDump = await worker.evaluate(async () => JSON.stringify(await chrome.storage.session.get(null)));
   check(!sessionDump.includes("Str0ng!Pass"), "the password never lands in the tab state");
   if (shots) await account.screenshot({ path: `${shots}/widget-account.png` });
@@ -733,6 +743,21 @@ try {
   check(atContinue.chips.length >= 3, `skills entered one at a time in the search box (${atContinue.chips.join(", ")})`);
   check(atContinue.cv === "Priya_Raman_Resume.pdf" && atContinue.linkedin.includes("linkedin.com"), "resume uploaded under its section heading, LinkedIn filled");
   await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
+
+  // 10h. Fields that appear through a style change are picked up without a reload.
+  await context.route(REVEAL_URL, (route) => route.fulfill({ contentType: "text/html", body: REVEAL_HTML }));
+  const reveal = await context.newPage();
+  await reveal.goto(REVEAL_URL);
+  const revealCount = async () =>
+    worker.evaluate(async (url) => {
+      const all = await chrome.storage.session.get(null);
+      return Object.values(all).find((v) => v?.url === url && Array.isArray(v.fields))?.fields.length ?? 0;
+    }, REVEAL_URL);
+  let shown = 0;
+  for (let i = 0; i < 20 && shown === 0; i++) { shown = await revealCount(); if (!shown) await reveal.waitForTimeout(150); }
+  let revealed = shown;
+  for (let i = 0; i < 40 && revealed <= shown; i++) { await reveal.waitForTimeout(200); revealed = await revealCount(); }
+  check(shown === 3 && revealed === 5, `fields revealed by a style change are detected on the fly (${shown} → ${revealed})`);
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

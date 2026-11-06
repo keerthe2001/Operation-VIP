@@ -106,10 +106,13 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
   ).filter(isFillable);
   const descriptors: FieldDescriptor[] = [];
   const radioGroups = new Map<string, HTMLInputElement[]>();
+  // Where each radio group sits among the other fields, so the list follows the page.
+  const radioSlots = new Map<string, number>();
 
   for (const el of controls) {
     if (el instanceof HTMLInputElement && el.type === "radio") {
       const key = `${el.form?.id ?? ""}|${el.name || fieldId(el)}`;
+      if (!radioGroups.has(key)) radioSlots.set(key, descriptors.length + radioSlots.size);
       radioGroups.set(key, [...(radioGroups.get(key) ?? []), el]);
       continue;
     }
@@ -157,11 +160,11 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     });
   }
 
-  for (const radios of radioGroups.values()) {
+  for (const [key, radios] of radioGroups) {
     const first = radios[0]!;
     const label = groupLabel(first);
     const checked = radios.find((r) => r.checked);
-    descriptors.push({
+    descriptors.splice(radioSlots.get(key) ?? descriptors.length, 0, {
       id: fieldId(first),
       kind: "radio",
       label: label.slice(0, 500),
@@ -175,6 +178,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       currentValue: checked ? labelFor(checked) || checked.value : "",
       accept: "",
       maxLength: null,
+      section: sectionOf(first),
     });
   }
   return descriptors.slice(0, MAX_FIELDS);

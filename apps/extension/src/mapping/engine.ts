@@ -80,14 +80,16 @@ export function classify(field: FieldDescriptor): Classification {
   const inWork = /\b(work experience|employment|experience)\b/.test(section) && !inEducation;
   const label = norm(base.label);
   if (inEducation) {
-    if (result.key === "employment_start" || /^from\b/.test(label)) return { key: "education_start", confidence: 0.9, question: false };
-    if (result.key === "employment_end" || /^to\b/.test(label)) return { key: "graduation_year", confidence: 0.9, question: false };
+    if (result.key === "employment_start" || /^(from|start)( date)?\b/.test(label)) return { key: "education_start", confidence: 0.9, question: false };
+    if (result.key === "employment_end" || /^(to|end)( date)?\b/.test(label)) return { key: "graduation_year", confidence: 0.9, question: false };
     if (/\b(overall result|gpa|grade|percentage)\b/.test(label)) return { key: "gpa", confidence: 0.9, question: false };
   }
   if (inWork && (result.key === "location" || result.key === "city" || /^location$/.test(label))) return { key: "job_location", confidence: 0.9, question: false };
   if (inWork && result.key === "currently_employed") return { key: "currently_working", confidence: 0.95, question: false };
   if (/\blanguages?\b/.test(section) && /^language$/.test(label)) return { key: "language_item", confidence: 0.92, question: false };
-  if (/\b(websites?|links?)\b/.test(section) && /\b(url|website|link)\b/.test(label)) return { key: "website_item", confidence: 0.9, question: false };
+  // A generic URL box in a "Websites" section; named ones (LinkedIn URL, GitHub URL) keep their key.
+  const named = result.key && ["linkedin", "github", "portfolio", "twitter", "behance", "dribbble"].includes(result.key);
+  if (!named && /\b(websites?|links?)\b/.test(section) && /\b(url|website|link)\b/.test(label)) return { key: "website_item", confidence: 0.9, question: false };
   if (part && result.key && !DATE_KEYS.has(result.key)) return { key: null, confidence: 0, question: false };
   return result;
 }
