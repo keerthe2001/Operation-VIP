@@ -98,12 +98,13 @@ const WIDGET_FORM_HTML = `<!doctype html><html><head><title>Apply - Pixelworks</
 
 // A Workday-style create-account step.
 const ACCOUNT_URL = "https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-9/apply/createAccount";
-const ACCOUNT_HTML = `<!doctype html><html><head><title>Create Account</title></head><body><h2>Create Account</h2><form>
+const ACCOUNT_HTML = `<!doctype html><html><head><title>Create Account</title></head><body>
+<div id="shell" style="position:fixed;top:0;left:0;right:0;bottom:0;overflow:auto"><h2>Create Account</h2><form>
   <label for="em">Email Address</label><input id="em" type="email">
   <label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password">
   <label for="pw2">Verify New Password</label><input id="pw2" type="password">
   <label><input type="checkbox" id="agree"> I agree to the terms</label>
-</form></body></html>`;
+</form></div></body></html>`;
 
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
@@ -452,6 +453,8 @@ try {
   await widget(account).getByText(/^Filled \d+$/).waitFor();
   const creds = await account.evaluate(() => [document.getElementById("em").value, document.getElementById("pw").value, document.getElementById("pw2").value]);
   check(creds[0] === "priya.raman@example.com" && creds[1] === "Str0ng!Pass" && creds[2] === "Str0ng!Pass", "create-account page: email and both password boxes filled");
+  const shellRight = await account.evaluate(() => document.getElementById("shell").getBoundingClientRect().right);
+  check(Math.abs(shellRight - (account.viewportSize().width - 380)) < 2, `full-screen app layer (Workday-style) moves out from under the drawer (right edge ${shellRight})`);
   const sessionDump = await worker.evaluate(async () => JSON.stringify(await chrome.storage.session.get(null)));
   check(!sessionDump.includes("Str0ng!Pass"), "the password never lands in the tab state");
 

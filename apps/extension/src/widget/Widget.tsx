@@ -23,6 +23,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Poin
 import type { Reply } from "@/shared/messages";
 import type { WidgetState } from "@/shared/types";
 import { clampY, DRAG_THRESHOLD, DRAWER_WIDTH } from "@/widget/position";
+import { shrinkPage } from "@/widget/shrink";
 
 export type Send = <T = unknown>(message: Record<string, unknown>) => Promise<Reply<T>>;
 type Tab = "autofill" | "match" | "profile";
@@ -101,15 +102,7 @@ export function Widget({ send, url }: { send: Send; url: () => string }) {
   const docked = open && !!state && !gone;
   useEffect(() => {
     if (!docked || window.innerWidth < 900) return;
-    const html = document.documentElement;
-    const before = { width: html.style.getPropertyValue("width"), priority: html.style.getPropertyPriority("width") };
-    html.style.setProperty("width", `calc(100% - ${DRAWER_WIDTH}px)`, "important");
-    window.dispatchEvent(new Event("resize"));
-    return () => {
-      if (before.width) html.style.setProperty("width", before.width, before.priority);
-      else html.style.removeProperty("width");
-      window.dispatchEvent(new Event("resize"));
-    };
+    return shrinkPage(DRAWER_WIDTH, document, document.querySelector("copilot-assistant") ?? undefined);
   }, [docked]);
 
   if (!state || gone) return null;
