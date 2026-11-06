@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { detectJob } from "@/content/detection/engine";
+import { scanFields } from "@/content/forms/scanner";
 import { PAGES } from "@/test/fixtures/pages";
 
 function detect(name: keyof typeof PAGES) {
@@ -24,6 +25,29 @@ describe("job detection", () => {
     expect(job!.company).toBe(company);
     expect(job!.isApplicationPage).toBe(true);
     expect(job!.confidence).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("recognizes a plain company careers form with a custom CV drop zone", () => {
+    // Floating-label theme: no <label for>, placeholders only, and a hidden file input
+    // behind a "Browse Files" button.
+    document.documentElement.innerHTML = `
+      <head><title>Career - Pixelworks</title></head>
+      <body><form>
+        <div><input type="text" name="your-name" placeholder="Name"></div>
+        <div><input type="tel" name="contact" placeholder="Contact number"></div>
+        <div><input type="email" name="your-email" placeholder="Email"></div>
+        <div><select name="post"><option>Backend Developer</option><option>Designer</option></select></div>
+        <div><textarea name="message" placeholder="MESSAGE"></textarea></div>
+        <div><input type="url" name="portfolio" placeholder="Portfolio Url"></div>
+        <div><p>Upload CV:</p><div class="dropzone"><input type="file" name="cv-file" style="display:none"><button type="button">Browse Files</button></div></div>
+      </form></body>`;
+    const job = detectJob(document, "https://pixelworks.example/career/")!;
+    expect(job).not.toBeNull();
+    expect(job.isApplicationPage).toBe(true);
+    expect(job.signals).toEqual(expect.arrayContaining(["resume-upload", "job-url"]));
+    // Autofill sees the hidden CV input too, labelled by the text next to it.
+    const cv = scanFields().find((f) => f.kind === "file");
+    expect(cv?.label).toMatch(/Upload CV/);
   });
 
   it("uses structured data on generic career sites", () => {

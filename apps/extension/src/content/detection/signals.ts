@@ -1,4 +1,4 @@
-import { labelFor } from "@/content/dom/labels";
+import { labelFor, nearbyText } from "@/content/dom/labels";
 import { isVisible } from "@/content/dom/visibility";
 
 /** Field purposes that strongly indicate a job application form. */
@@ -7,8 +7,10 @@ const APPLICATION_FIELDS: [string, RegExp][] = [
   ["last_name", /\blast\s*name|surname|family\s*name/i],
   ["full_name", /\bfull\s*name|^name\b|your name/i],
   ["email", /e-?mail/i],
-  ["phone", /phone|mobile|telephone/i],
+  ["phone", /phone|mobile|telephone|\bcell\b|contact\s*(?:number|no\b)|whats\s*app/i],
   ["resume", /resume|résumé|\bcv\b|curriculum/i],
+  ["portfolio", /portfolio|github|personal (?:website|site)/i],
+  ["position", /position|applying for|job title|role you|designation|vacancy/i],
   ["cover_letter", /cover\s*letter/i],
   ["linkedin", /linkedin/i],
   ["work_authorization", /authori[sz]ed to work|work authori[sz]ation|sponsorship|visa/i],
@@ -24,8 +26,12 @@ export interface FormSignals {
 const CONTROL_SELECTOR =
   "input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=search]):not([type=image]), textarea, select, [contenteditable='true']";
 
+const isFileInput = (el: Element) => el instanceof HTMLInputElement && el.type === "file";
+
 export function analyzeForms(root: Document | ShadowRoot): FormSignals {
-  const controls = [...root.querySelectorAll(CONTROL_SELECTOR)].filter(isVisible);
+  // Upload buttons are often custom drop zones that hide the real file input, so file
+  // inputs count even when hidden.
+  const controls = [...root.querySelectorAll(CONTROL_SELECTOR)].filter((el) => isFileInput(el) || isVisible(el));
   const matched = new Set<string>();
   let hasResumeUpload = false;
   for (const control of controls) {
@@ -35,8 +41,9 @@ export function analyzeForms(root: Document | ShadowRoot): FormSignals {
     for (const [key, pattern] of APPLICATION_FIELDS) {
       if (pattern.test(descriptor)) matched.add(key);
     }
-    if (control instanceof HTMLInputElement && control.type === "file" && /resume|résumé|\bcv\b/i.test(descriptor)) {
+    if (isFileInput(control) && /resume|résumé|\bcv\b|curriculum/i.test(`${descriptor} ${nearbyText(control)}`)) {
       hasResumeUpload = true;
+      matched.add("resume");
     }
   }
   return { fieldCount: controls.length, matchedFields: [...matched], hasResumeUpload };

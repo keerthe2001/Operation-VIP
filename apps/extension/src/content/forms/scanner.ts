@@ -1,4 +1,4 @@
-import { labelFor } from "@/content/dom/labels";
+import { labelFor, nearbyText } from "@/content/dom/labels";
 import { isVisible, text } from "@/content/dom/visibility";
 import type { FieldDescriptor, FieldKind } from "@/shared/fields";
 
@@ -37,6 +37,8 @@ function isFillable(el: Element): boolean {
   if (el.closest("[aria-hidden='true'], [hidden]")) return false;
   const descriptor = `${el.getAttribute("name") ?? ""} ${el.id}`.toLowerCase();
   if (/honeypot|captcha|recaptcha|\bbot\b/.test(descriptor)) return false;
+  // Custom "Browse files" buttons usually hide the real file input; it still accepts files.
+  if (el instanceof HTMLInputElement && el.type === "file") return true;
   return isVisible(el);
 }
 
@@ -109,7 +111,8 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else if (kind === "contenteditable") currentValue = text(el);
     else currentValue = input.value ?? "";
 
-    const label = labelFor(el);
+    let label = labelFor(el);
+    if (kind === "file" && (!label || label === el.getAttribute("name"))) label = nearbyText(el) || label;
     descriptors.push({
       id: fieldId(el),
       kind,

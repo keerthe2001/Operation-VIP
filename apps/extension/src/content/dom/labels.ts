@@ -30,3 +30,14 @@ export function labelFor(el: Element): string {
   if (sibling && !sibling.contains(el) && text(sibling)) return text(sibling);
   return el.getAttribute("placeholder")?.trim() || el.getAttribute("name") || "";
 }
+
+/** Short text around a control, e.g. "Upload CV:" above a custom "Browse Files" drop zone. */
+export function nearbyText(el: Element): string {
+  let node = el.parentElement;
+  for (let depth = 0; node && depth < 3; depth += 1, node = node.parentElement) {
+    const content = (node.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (content.length > 200) break;
+    if (content) return content;
+  }
+  return "";
+}
