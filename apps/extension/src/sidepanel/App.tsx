@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { summarize } from "@/sidepanel/autofill-model";
 import { send, useActiveTabId, useFormState, useLocal, useTabState, useTrackedApplication } from "@/sidepanel/chrome-state";
 import { AnswersSection } from "@/sidepanel/components/AnswersSection";
-import { AutofillSection } from "@/sidepanel/components/AutofillSection";
+import { AutofillSection, PageAction } from "@/sidepanel/components/AutofillSection";
 import { EmptyState } from "@/sidepanel/components/EmptyState";
-import { UpdateBanner } from "@/sidepanel/components/UpdateBanner";
+import { UpdateBanner, WhatsNew } from "@/sidepanel/components/UpdateBanner";
 import { ForceScanButton } from "@/sidepanel/components/ForceScanButton";
 import { Header } from "@/sidepanel/components/Header";
 import { JobCard } from "@/sidepanel/components/JobCard";
@@ -76,6 +76,7 @@ function Panel() {
     <>
       <Header user={auth.user!} sync={sync} onSettings={() => setSettings(true)} onClose={onClose} />
       <UpdateBanner />
+      <WhatsNew />
       <div role="tablist" aria-label="Copilot sections" className="mx-4 mt-4 grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
         {(
           [
@@ -122,6 +123,7 @@ function Panel() {
           )}
           {job && !job.isApplicationPage && <ForceScanButton tabId={tabId} variant="outline" />}
           {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
+            {job?.isApplicationPage && tabId !== null && form?.action && <PageAction tabId={tabId} label={form.action} />}
           {job?.isApplicationPage && tabId !== null && (
             <AnswersSection questions={formSummary.questions} tabId={tabId} job={job} data={profile} />
           )}

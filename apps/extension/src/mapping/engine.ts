@@ -13,21 +13,18 @@ export const REVIEW_THRESHOLD = 0.6;
 /** Never filled automatically: the user decides what to disclose. */
 const SENSITIVE_KEYS = new Set([
   "gender", "pronouns", "nationality", "work_authorization", "requires_sponsorship",
-  "ethnicity", "veteran_status", "disability_status",
+  "ethnicity", "veteran_status", "disability_status", "hispanic", "armed_forces", "lgbt",
 ]);
 
 /** Keys that belong to one job or one degree: repeated blocks map to the 1st, 2nd, … entry. */
 export const EXPERIENCE_KEYS = new Set(["current_company", "current_title", "job_duration", "employment_start", "employment_end"]);
 export const EDUCATION_KEYS = new Set(["school", "degree", "discipline", "graduation_year", "gpa"]);
-// Race, veteran and disability questions map to the user's own answers but always go to
-// review; these more personal ones are never touched.
-const EEO = /\b(sexual orientation|transgender|lgbtq)\b/;
 const CONSENT = /\b(agree|consent|acknowledge|privacy|terms|certify|confirm that)\b/;
 
 const KIND_TYPES: Record<FieldDescriptor["kind"], string> = {
   text: "text", email: "email", tel: "tel", url: "url", number: "number", date: "date", textarea: "text",
   select: "select", radio: "radio", checkbox: "checkbox", file: "file", contenteditable: "text", combobox: "select",
-  password: "password",
+  password: "password", listbox: "select",
 };
 
 /** Shown instead of the account password; the real one is only read when filling. */
@@ -60,7 +57,6 @@ export function classify(field: FieldDescriptor): Classification {
   const autocomplete = field.autocomplete.toLowerCase().split(/\s+/);
   const everything = `${label} ${placeholder} ${attrs}`;
 
-  if (EEO.test(everything)) return { key: null, confidence: 0, question: false };
   if (field.kind === "checkbox" && CONSENT.test(everything)) return { key: null, confidence: 0, question: false };
 
   let best: Classification = { key: null, confidence: 0, question: false };
@@ -104,6 +100,30 @@ export function classify(field: FieldDescriptor): Classification {
 
 type ProfileData = ExtensionProfile["profile"];
 type Value = string | number | boolean | string[] | null | undefined;
+
+const DIAL_CODES: [string, string][] = [
+  ["971", "United Arab Emirates"], ["966", "Saudi Arabia"], ["974", "Qatar"], ["977", "Nepal"], ["880", "Bangladesh"], ["353", "Ireland"],
+  ["91", "India"], ["44", "United Kingdom"], ["61", "Australia"], ["65", "Singapore"], ["49", "Germany"], ["33", "France"],
+  ["31", "Netherlands"], ["86", "China"], ["81", "Japan"], ["94", "Sri Lanka"], ["92", "Pakistan"], ["60", "Malaysia"],
+  ["63", "Philippines"], ["64", "New Zealand"], ["27", "South Africa"], ["1", "United States"],
+];
+
+/** "India (+91)" from "+91 98765 43210" (or from the country when the number has no code). */
+function phoneCountry(phone: string | null | undefined, country: string | null | undefined): string | null {
+  const digits = phone?.trim().startsWith("+") ? phone.replace(/[^\d]/g, "") : null;
+  const byCode = digits ? DIAL_CODES.find(([code]) => digits.startsWith(code)) : undefined;
+  const entry = byCode ?? DIAL_CODES.find(([, name]) => name.toLowerCase() === country?.toLowerCase());
+  return entry ? `${entry[1]} (+${entry[0]})` : null;
+}
+
+/** The number without its country code, for forms that ask for the code separately. */
+export function nationalNumber(phone: string): string {
+  const trimmed = phone.trim();
+  if (!trimmed.startsWith("+")) return trimmed;
+  const digits = trimmed.replace(/[^\d]/g, "");
+  const code = DIAL_CODES.find(([c]) => digits.startsWith(c))?.[0];
+  return code ? digits.slice(code.length) : trimmed;
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthYear = (date: string | null | undefined) => {
@@ -188,6 +208,25 @@ function profileValue(key: string, profile: ProfileData, resumeName: string | nu
     case "nationality": return extra.nationality;
     case "languages": return extra.languages;
     case "account_password": return PASSWORD_MASK;
+    case "website": return p.portfolio ?? p.github;
+    case "twitter": return p.twitter;
+    case "behance": return p.behance;
+    case "dribbble": return p.dribbble;
+    case "middle_name": return p.middle_name ?? (nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : null);
+    case "preferred_name": return p.preferred_name ?? p.first_name ?? nameParts[0];
+    case "phone_type": return p.phone ? "Mobile" : null;
+    case "phone_country": return phoneCountry(p.phone, p.country ?? place.country);
+    case "username": return p.email;
+    case "hispanic":
+      return extra.ethnicity ? /hispanic|latin/i.test(extra.ethnicity) : null;
+    case "armed_forces":
+      return extra.veteran_status ? !/\bnot\b|^no\b|don't|do not/i.test(extra.veteran_status) : null;
+    case "lgbt": return null;
+    case "referred_by": return extra.referred_by;
+    case "current_date": {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    }
     case "earliest_start_date":
       return extra.earliest_start_date ?? (extra.notice_period ? `After my notice period of ${extra.notice_period}` : null);
     case "work_mode_preference": return extra.work_mode_preference;
@@ -219,7 +258,7 @@ function formatDate(raw: string, field: FieldDescriptor): string {
 
 export function resolveValue(key: string, field: FieldDescriptor, profile: ProfileData, resumeName: string | null, index = 0): ResolvedValue | null {
   let raw = profileValue(key, profile, resumeName, index);
-  if (typeof raw === "string" && ["date_of_birth", "employment_start", "employment_end"].includes(key) && raw !== "Present") {
+  if (typeof raw === "string" && ["date_of_birth", "employment_start", "employment_end", "current_date"].includes(key) && raw !== "Present") {
     raw = formatDate(raw, field);
   }
   if (key === "employment_end" && raw === "Present" && field.kind === "date") return null;
@@ -280,11 +319,16 @@ export function fieldLabel(field: MappedField): string {
  */
 export function mapFields(fields: FieldDescriptor[], frameId: number, profile: ProfileData | null, resumeName: string | null): MappedField[] {
   const seen = new Map<string, number>();
-  return fields.map((field) => {
+  const mapped = fields.map((field) => {
     const first = mapField(field, frameId, profile, resumeName);
     if (!first.key || !(EXPERIENCE_KEYS.has(first.key) || EDUCATION_KEYS.has(first.key))) return first;
     const index = seen.get(first.key) ?? 0;
     seen.set(first.key, index + 1);
     return index === 0 ? first : mapField(field, frameId, profile, resumeName, index);
   });
+  // When the form asks for the country code separately, the phone box gets the number alone.
+  if (mapped.some((f) => f.key === "phone_country")) {
+    return mapped.map((f) => (f.key === "phone" && f.value ? { ...f, value: nationalNumber(f.value) } : f));
+  }
+  return mapped;
 }

@@ -63,7 +63,8 @@ describe("AutofillCoordinator", () => {
       [2, ["f1"]],
     ]);
     const file = sent[0]![1][1]!.file!;
-    expect(file).toMatchObject({ name: "priya.pdf", type: "application/pdf", base64: btoa("%PDF") });
+    // Uploaded under the user's name by default ("Name of the resume file you upload").
+    expect(file).toMatchObject({ name: "Priya_Raman_Resume.pdf", type: "application/pdf", base64: btoa("%PDF") });
     expect(api).toHaveBeenCalledWith("/api/v1/resumes/r1/file");
     const state = await coordinator.state(1);
     expect(state!.fields.find((f) => f.id === "f3" && f.frameId === 0)!.result).toBe("skipped");

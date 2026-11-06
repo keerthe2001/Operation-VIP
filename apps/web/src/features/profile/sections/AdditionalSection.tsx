@@ -99,6 +99,7 @@ export function AdditionalSection() {
         <Field label="Earliest start date" placeholder="e.g. Immediately, 1 Dec 2026" {...register("additional_info.earliest_start_date")} />
         <ChoiceField name="additional_info.work_mode_preference" label="Preferred work mode" options={["Remote", "Hybrid", "On-site", "Open to any"]} />
         <Field label="How you usually hear about jobs" placeholder="e.g. LinkedIn, Naukri, Referral" {...register("additional_info.referral_source")} />
+        <Field label="Referred by" placeholder="Name of the person who referred you" {...register("additional_info.referred_by")} />
       </div>
       <div className="mt-6 grid gap-1">
         <h3 className="text-sm font-medium">Voluntary self-identification</h3>

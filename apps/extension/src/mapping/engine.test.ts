@@ -35,7 +35,7 @@ describe("classify", () => {
     ["LinkedIn Profile", {}, "linkedin"],
     ["LinkedIn URL", { kind: "url" }, "linkedin"],
     ["GitHub URL", {}, "github"],
-    ["Website", {}, "portfolio"],
+    ["Website", {}, "website"],
     ["Portfolio", {}, "portfolio"],
     ["Current Company", {}, "current_company"],
     ["Current Title", {}, "current_title"],
@@ -76,10 +76,10 @@ describe("classify", () => {
     expect(classify(field("Cover letter", { kind: "textarea" })).question).toBe(false);
   });
 
-  it("keeps EEO questions to the user's own answers and skips the most personal ones", () => {
+  it("maps EEO questions to the user's own answers", () => {
     expect(classify(field("Are you a protected veteran?", { kind: "select" })).key).toBe("veteran_status");
     expect(classify(field("Race/Ethnicity", { kind: "select" })).key).toBe("ethnicity");
-    expect(classify(field("Sexual orientation", { kind: "select" })).key).toBeNull();
+    expect(classify(field("Sexual orientation", { kind: "select" })).key).toBe("lgbt");
     expect(classify(field("I agree to the privacy policy", { kind: "checkbox" })).key).toBeNull();
   });
 

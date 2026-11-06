@@ -26,6 +26,10 @@ function hasValue(el: HTMLElement, instruction: FillInstruction): boolean {
     return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`).some((r) => (r as HTMLInputElement).checked);
   }
   if (instruction.kind === "checkbox") return false;
+  if (instruction.kind === "listbox") {
+    const shown = (el.textContent ?? "").trim();
+    return shown !== "" && !/^(select|choose|please select|--|none selected)/i.test(shown);
+  }
   if (el instanceof HTMLSelectElement) return el.selectedIndex > 0 && el.value !== "";
   if (el instanceof HTMLInputElement && el.type === "file") return (el.files?.length ?? 0) > 0;
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value.trim() !== "";
@@ -50,26 +54,67 @@ function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function pickComboboxOption(input: HTMLInputElement, value: string): Promise<boolean> {
-  const listId = input.getAttribute("aria-controls") ?? input.getAttribute("aria-owns");
-  const target = value.toLowerCase();
-  for (let attempt = 0; attempt < 15; attempt += 1) {
-    const scope: ParentNode = (listId && input.ownerDocument.getElementById(listId)) || input.ownerDocument;
-    const options = [...scope.querySelectorAll("[role='option']")] as HTMLElement[];
-    const match =
-      options.find((o) => (o.textContent ?? "").trim().toLowerCase() === target) ??
-      options.find((o) => (o.textContent ?? "").trim().toLowerCase().startsWith(target)) ??
-      options.find((o) => (o.textContent ?? "").toLowerCase().includes(target));
+const norm = (text: string) => text.toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+
+/** The option that best matches a value: exact, then prefix, then containment, then shared words. */
+export function bestOption<T extends { text: string }>(options: T[], value: string): T | null {
+  const target = norm(value);
+  if (!target) return null;
+  const words = new Set(target.split(" "));
+  let best: { option: T; score: number } | null = null;
+  for (const option of options) {
+    const text = norm(option.text);
+    if (!text) continue;
+    let score: number;
+    if (text === target) score = 100;
+    else if (text.startsWith(target) || target.startsWith(text)) score = 80;
+    else if (text.includes(target) || target.includes(text)) score = 60;
+    else {
+      const shared = text.split(" ").filter((w) => words.has(w)).length;
+      score = shared ? (40 * shared) / Math.max(words.size, 1) : 0;
+    }
+    if (score > (best?.score ?? 0)) best = { option, score };
+  }
+  return best && best.score >= 20 ? best.option : null;
+}
+
+function press(el: Element) {
+  // Many dropdown libraries react to pointer/mouse down rather than click.
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    const Event = type.startsWith("pointer") && typeof PointerEvent !== "undefined" ? PointerEvent : MouseEvent;
+    el.dispatchEvent(new Event(type, { bubbles: true, cancelable: true, composed: true }));
+  }
+}
+
+function visibleOptions(doc: Document, listId: string | null): HTMLElement[] {
+  const scope: ParentNode = (listId && doc.getElementById(listId)) || doc;
+  return ([...scope.querySelectorAll("[role='option']")] as HTMLElement[]).filter((o) => {
+    if (o.getAttribute("aria-disabled") === "true" || o.closest("[hidden], [aria-hidden='true']")) return false;
+    const style = o.ownerDocument.defaultView?.getComputedStyle(o);
+    return !style || (style.display !== "none" && style.visibility !== "hidden");
+  });
+}
+
+async function pickOption(owner: HTMLElement, value: string, attempts = 20): Promise<boolean> {
+  const listId = owner.getAttribute("aria-controls") ?? owner.getAttribute("aria-owns");
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const options = visibleOptions(owner.ownerDocument, listId).map((el) => ({ el, text: el.textContent ?? "" }));
+    const match = bestOption(options, value);
     if (match) {
-      // Many dropdown libraries select on mousedown rather than click.
-      for (const type of ["mousedown", "mouseup", "click"]) {
-        match.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
-      }
+      match.el.scrollIntoView?.({ block: "nearest" });
+      press(match.el);
       return true;
     }
     await wait(100);
   }
   return false;
+}
+
+async function pickComboboxOption(input: HTMLInputElement, value: string): Promise<boolean> {
+  if (await pickOption(input, value, 6)) return true;
+  // Workday-style search prompts only list matches after Enter.
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+  return pickOption(input, value, 15);
 }
 
 export async function fillField(instruction: FillInstruction): Promise<FillResult> {
@@ -131,6 +176,17 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
         el.blur();
         break;
       }
+      case "listbox": {
+        // Open the dropdown, then choose the option that best matches the value.
+        el.scrollIntoView?.({ block: "center" });
+        press(el);
+        const picked = await pickOption(el, instruction.value ?? "");
+        if (!picked) {
+          el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          return { id: instruction.id, status: "failed", message: "No matching option; choose it yourself" };
+        }
+        break;
+      }
       case "combobox": {
         const input = el as HTMLInputElement;
         input.focus();
@@ -159,9 +215,31 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
   return { id: instruction.id, status: "filled" };
 }
 
-export async function fillFields(instructions: FillInstruction[]): Promise<FillResult[]> {
+export interface FillOptions {
+  /** Scroll to each field and pause briefly so the user can follow along. */
+  interactive?: boolean;
+  /** Called before and after each field. */
+  onProgress?: (id: string, status: "filling" | FillResult["status"], message?: string) => void;
+}
+
+const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+export async function fillFields(instructions: FillInstruction[], options: FillOptions = {}): Promise<FillResult[]> {
   const results: FillResult[] = [];
   // Sequential on purpose: dependent fields (e.g. country → state) need the page to react.
-  for (const instruction of instructions) results.push(await fillField(instruction));
+  for (const instruction of instructions) {
+    if (options.interactive) {
+      const el = findField(instruction.id);
+      if (el) {
+        el.scrollIntoView?.({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+        options.onProgress?.(instruction.id, "filling");
+        await wait(reducedMotion() ? 60 : 260);
+      }
+    }
+    const result = await fillField(instruction);
+    results.push(result);
+    options.onProgress?.(instruction.id, result.status, result.message);
+    if (options.interactive) await wait(90);
+  }
   return results;
 }

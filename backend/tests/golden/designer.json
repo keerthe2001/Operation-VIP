@@ -112,8 +112,10 @@
   "personal_information": {
     "address": null,
     "alternate_phone": null,
+    "behance": null,
     "city": null,
     "country": null,
+    "dribbble": null,
     "email": "elena.garcia@studio.design",
     "first_name": "Elena",
     "full_name": "Elena Garcia",
@@ -121,10 +123,13 @@
     "last_name": "Garcia",
     "linkedin": null,
     "location": "Brooklyn, NY",
+    "middle_name": null,
     "phone": "+16465550199",
     "portfolio": "https://elenagarcia.design/portfolio",
     "postal_code": null,
-    "state": null
+    "preferred_name": null,
+    "state": null,
+    "twitter": null
   },
   "professional_summary": {
     "current_designation": "Lead Product Designer",

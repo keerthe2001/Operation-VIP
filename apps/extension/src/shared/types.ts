@@ -89,5 +89,5 @@ export interface WidgetState {
   } | null;
   /** Quick-copy profile values. */
   profile: { label: string; value: string }[];
-  prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; y: number; hidden: boolean; theme: "system" | "light" | "dark" };
+  prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; y: number; hidden: boolean; theme: "system" | "light" | "dark"; showMatch: boolean };
 }

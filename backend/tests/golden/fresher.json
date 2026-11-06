@@ -121,8 +121,10 @@
   "personal_information": {
     "address": null,
     "alternate_phone": null,
+    "behance": null,
     "city": null,
     "country": null,
+    "dribbble": null,
     "email": "arjun.kumar2003@gmail.com",
     "first_name": "Arjun",
     "full_name": "Arjun Kumar",
@@ -130,10 +132,13 @@
     "last_name": "Kumar",
     "linkedin": "https://www.linkedin.com/in/arjunkumar03",
     "location": "Coimbatore, Tamil Nadu",
+    "middle_name": null,
     "phone": "+919876501234",
     "portfolio": null,
     "postal_code": null,
-    "state": null
+    "preferred_name": null,
+    "state": null,
+    "twitter": null
   },
   "professional_summary": {
     "current_designation": "Software Development Intern",

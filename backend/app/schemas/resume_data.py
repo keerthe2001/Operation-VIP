@@ -33,6 +33,11 @@ class PersonalInformation(_Model):
     linkedin: str | None = Field(default=None, max_length=500)
     github: str | None = Field(default=None, max_length=500)
     portfolio: str | None = Field(default=None, max_length=500)
+    twitter: str | None = Field(default=None, max_length=500)
+    behance: str | None = Field(default=None, max_length=500)
+    dribbble: str | None = Field(default=None, max_length=500)
+    middle_name: str | None = Field(default=None, max_length=100)
+    preferred_name: str | None = Field(default=None, max_length=100)
     # Split address for forms that ask for each part (filled from `location` when empty).
     address: str | None = Field(default=None, max_length=300)
     city: str | None = Field(default=None, max_length=100)
@@ -124,6 +129,7 @@ class AdditionalInfo(_Model):
     nationality: str | None = Field(default=None, max_length=100)
     languages: list[str] = []
     marital_status: str | None = Field(default=None, max_length=50)
+    referred_by: str | None = Field(default=None, max_length=200)
     father_name: str | None = Field(default=None, max_length=200)
     # Voluntary self-identification (EEO) questions; never filled without review.
     ethnicity: str | None = Field(default=None, max_length=100)

@@ -166,7 +166,7 @@ describe("smart autofill section", () => {
         fields: form.fields.map((f) => (f.status === "auto" ? { ...f, result: "filled", currentValue: f.value } : f)),
       },
     });
-    expect(await screen.findByText(/Filled 2 fields\. Review the form, then submit it yourself\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Filled 2 fields/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Everything ready is filled" })).toBeDisabled();
   });
 });

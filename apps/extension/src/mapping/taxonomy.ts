@@ -56,7 +56,7 @@ export const RULES: FieldRule[] = [
     patterns: [/\b(phone|mobile|cell|telephone|contact (number|no)|whats ?app( number| no)?|mob no|ph no)\b/, /^contact$/],
     attrPatterns: [/\b(phone|mobile|tel|cell|contact|whatsapp|mob)\b/],
     autocomplete: ["tel", "tel-national"],
-    exclude: [/\b(country code|extension|type|reference|emergency|device|alternate|alternative|secondary|other|landline|home|office|person)\b/],
+    exclude: [/\b(country code|phone code|dial|extension|type|reference|emergency|device|alternate|alternative|secondary|other|landline|home|office|person)\b/],
   },
   {
     key: "alternate_phone", label: "Alternate phone",
@@ -140,11 +140,67 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "portfolio", label: "Website / portfolio",
-    patterns: [/\b(portfolio|personal (web ?site|site)|web ?site|blog)\b/, /^other (website|links?)/],
-    attrPatterns: [/\b(portfolio|website|web site|url)\b/],
+    patterns: [/\b(portfolio|blog)\b/],
+    attrPatterns: [/\bportfolio\b/],
     autocomplete: ["url"],
     exclude: [/\b(linked ?in|git ?hub|company|twitter|facebook|instagram)\b/],
     types: ["url", "text"],
+  },
+  {
+    key: "website", label: "Website",
+    patterns: [/\b(personal )?web ?site\b/, /^other (website|links?)/, /\bpersonal site\b/, /^url$/],
+    attrPatterns: [/\b(website|web site|url)\b/],
+    autocomplete: ["url"],
+    exclude: [/\b(linked ?in|git ?hub|company|twitter|facebook|instagram|behance|dribbble)\b/],
+    types: ["url", "text"],
+  },
+  {
+    key: "twitter", label: "Twitter / X",
+    patterns: [/\btwitter\b/, /^x( profile| handle| url)?$/, /\bx \(twitter\)/], attrPatterns: [/\btwitter\b/],
+  },
+  { key: "behance", label: "Behance", patterns: [/\bbehance\b/], attrPatterns: [/\bbehance\b/] },
+  { key: "dribbble", label: "Dribbble", patterns: [/\bdribb?ble\b/], attrPatterns: [/\bdribb?ble\b/] },
+  {
+    key: "middle_name", label: "Middle name",
+    patterns: [/\bmiddle (name|initial)s?\b/], attrPatterns: [/\bmiddle ?name\b/], autocomplete: ["additional-name"],
+  },
+  {
+    key: "preferred_name", label: "Preferred name",
+    patterns: [/\b(preferred|nick) ?(first )?name\b/, /\bname you (go by|prefer)\b/], attrPatterns: [/\b(preferred|nick) ?name\b/], autocomplete: ["nickname"],
+  },
+  {
+    key: "phone_type", label: "Phone type",
+    patterns: [/\bphone (device |number )?type\b/, /\btype of phone\b/], attrPatterns: [/\bphone ?(device ?)?type\b/],
+  },
+  {
+    key: "phone_country", label: "Phone country",
+    patterns: [/\b(country|territory)( \/ territory)?( phone)? code\b/, /\bphone country\b/, /\bdiall?ing code\b/, /\bcountry code\b/],
+    attrPatterns: [/\b(country ?code|phone ?country|dial ?code)\b/],
+  },
+  {
+    key: "username", label: "Username",
+    patterns: [/\buser ?name\b/, /\blogin( id)?\b/, /\buser id\b/], attrPatterns: [/\buser ?name\b/, /\blogin\b/], autocomplete: ["username"],
+    exclude: [/\b(github|twitter|linked ?in|instagram|skype)\b/],
+  },
+  {
+    key: "hispanic", label: "Hispanic / Latino",
+    patterns: [/\bhispanic\b/, /\blatin[oax]\b/], attrPatterns: [/\bhispanic\b/],
+  },
+  {
+    key: "armed_forces", label: "Armed forces",
+    patterns: [/\barmed forces\b/, /\bmilitary (service|status|spouse)\b/, /\bserved in the\b/], attrPatterns: [/\b(military|armed ?forces)\b/],
+  },
+  {
+    key: "lgbt", label: "LGBTQ+",
+    patterns: [/\bsexual orientation\b/, /\blgbt/, /\btransgender\b/], attrPatterns: [/\b(orientation|lgbt)\b/],
+  },
+  {
+    key: "referred_by", label: "Referred by",
+    patterns: [/\breferred by\b/, /\b(referrer|referral|referring employee)('?s)? name\b/, /\bwho referred you\b/], attrPatterns: [/\breferr(er|ed ?by)\b/],
+  },
+  {
+    key: "current_date", label: "Today's date",
+    patterns: [/\b(today'?s|current) date\b/, /^date$/, /\bsignature date\b/, /^date signed\b/], attrPatterns: [/\b(today|current ?date|sign(ature)? ?date)\b/],
   },
   {
     key: "current_company", label: "Current company",

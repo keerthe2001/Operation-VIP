@@ -3,6 +3,7 @@ import { ArrowLeft, Globe, LogOut, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
 import { send, useLocal } from "@/sidepanel/chrome-state";
+import { AutofillSettings } from "@/sidepanel/components/AutofillSettings";
 import { WEB_URL } from "@/shared/config";
 import type { UserRead } from "@/shared/types";
 
@@ -66,6 +67,7 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
       <AccountPassword />
       <ThemeSettings />
       <WidgetSettings />
+      <AutofillSettings />
       <Button variant="outline" size="sm" className="justify-self-start text-destructive" onClick={() => send({ type: "SIGN_OUT" })}>
         <LogOut aria-hidden="true" /> Sign out
       </Button>
@@ -76,7 +78,6 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
 function WidgetSettings() {
   const widget = useLocal("widget");
   const modeId = useId();
-  const autoId = useId();
   return (
     <section className="grid gap-2">
       <h2 className="text-sm font-semibold">Copilot tab on pages</h2>
@@ -93,15 +94,6 @@ function WidgetSettings() {
         <option value="always">On every page Copilot runs on</option>
         <option value="off">Never</option>
       </NativeSelect>
-      <label htmlFor={autoId} className="flex items-center gap-2 text-xs">
-        <input
-          id={autoId}
-          type="checkbox"
-          checked={widget.autoOpen}
-          onChange={(e) => send({ type: "SET_WIDGET_PREFS", prefs: { autoOpen: e.target.checked } })}
-        />
-        Open automatically on application forms
-      </label>
       {widget.hiddenHosts.length > 0 && (
         <Button
           variant="outline"

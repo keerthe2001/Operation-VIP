@@ -1,5 +1,5 @@
 import { Alert, Badge, Button, cn } from "@copilot/ui";
-import { AlertTriangle, CheckCircle2, ChevronDown, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Sparkles, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { fieldLabel } from "@/mapping/engine";
@@ -117,12 +117,19 @@ export function AutofillSection({ tabId, form }: Props) {
   if (!form || summary.detected === 0) {
     return (
       <section className="rounded-xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
-        Looking for form fields… If the form is on another step, open it and Copilot will pick it up.
+        No fillable fields found yet. If the form is on another step, open it; if this site can't be filled, copy your
+        details from the Profile tab.
       </section>
     );
   }
 
   const last = form.lastFill;
+  const required = form.fields.filter((f) => f.required);
+  const requiredDone = required.filter(hasValue).length;
+  // Fields the page wouldn't take: offer their values to copy. If nothing could be filled,
+  // offer every value Copilot has for this form.
+  const notFillable = !!last && last.filled === 0 && last.failed > 0;
+  const copyable = form.fields.filter((f) => f.value && f.key !== "account_password" && (notFillable ? !hasValue(f) : f.result === "failed"));
   return (
     <section aria-labelledby="autofill-heading" className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -143,17 +150,31 @@ export function AutofillSection({ tabId, form }: Props) {
         ))}
       </dl>
 
-      {last && (
+      {required.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Required <span className="font-semibold text-foreground">{requiredDone} of {required.length}</span> filled
+        </p>
+      )}
+
+      {form.filling && <FillChecklist form={form} />}
+
+      {last && !form.filling && (
         <Alert className="flex items-start gap-2 text-xs">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
           <span>
             Filled {last.filled} field{last.filled === 1 ? "" : "s"}
             {last.skipped ? `, skipped ${last.skipped} already filled` : ""}
-            {last.failed ? `, ${last.failed} failed` : ""}. Review the form, then submit it yourself.
+            {last.failed ? `, ${last.failed} couldn't be filled` : ""}.
           </span>
         </Alert>
       )}
       {error && <Alert variant="destructive">{error}</Alert>}
+      {notFillable && (
+        <Alert variant="destructive" className="text-xs">
+          This page can't be filled automatically. Copy the values below into the form.
+        </Alert>
+      )}
+      {copyable.length > 0 && <CopyList fields={copyable} />}
 
       {!reviewing ? (
         <div className="grid gap-2">
@@ -213,5 +234,90 @@ export function AutofillSection({ tabId, form }: Props) {
         </p>
       )}
     </section>
+  );
+}
+
+const STATUS_ICON: Record<string, string> = { pending: "○", filling: "◌", filled: "✓", skipped: "–", failed: "!" };
+
+/** Live list while Copilot fills the form one field at a time. */
+function FillChecklist({ form }: { form: FormState }) {
+  const byKey = new Map(form.fields.map((f) => [keyOf(f), f]));
+  const items = (form.filling ?? []).flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : []));
+  const done = items.filter((f) => f.result).length;
+  return (
+    <div className="grid gap-1.5 rounded-lg border p-3" role="status" aria-live="polite">
+      <p className="text-sm font-semibold">
+        Filling {Math.min(done + 1, items.length)} of {items.length}…
+      </p>
+      <ul className="grid gap-1 text-xs">
+        {items.map((f) => (
+          <li key={keyOf(f)} className={cn("flex items-center gap-2", f.result === "filled" ? "text-foreground" : "text-muted-foreground")}>
+            <span
+              className={cn(
+                "grid size-4 place-items-center rounded-full border text-[10px]",
+                f.result === "filled" && "border-primary bg-primary text-primary-foreground",
+                f.result === "failed" && "border-warning text-warning-foreground",
+              )}
+              aria-hidden="true"
+            >
+              {STATUS_ICON[f.result ?? "pending"]}
+            </span>
+            <span className="truncate">{fieldLabel(f)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Values to paste by hand where filling didn't work. */
+function CopyList({ fields }: { fields: MappedField[] }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <div className="grid gap-1 rounded-lg border p-3">
+      <p className="text-xs font-semibold">Copy & paste</p>
+      <ul className="grid">
+        {fields.map((f) => (
+          <li key={keyOf(f)}>
+            <button
+              type="button"
+              aria-label={`Copy ${fieldLabel(f)}`}
+              className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-muted"
+              onClick={async () => {
+                await navigator.clipboard.writeText(f.value ?? "").catch(() => undefined);
+                setCopied(keyOf(f));
+                setTimeout(() => setCopied((c) => (c === keyOf(f) ? null : c)), 1500);
+              }}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">{fieldLabel(f)}</span>
+                <span className="block truncate text-xs text-muted-foreground">{f.value}</span>
+              </span>
+              {copied === keyOf(f) ? <Check className="size-3.5 text-success" aria-hidden="true" /> : <Copy className="size-3.5 text-muted-foreground" aria-hidden="true" />}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The page's own main button (Continue, Create Account…), pressed on the user's click. */
+export function PageAction({ tabId, label }: { tabId: number; label: string }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="grid gap-1">
+      <Button
+        className="w-full"
+        onClick={async () => {
+          setError(null);
+          const reply = await send({ type: "CLICK_ACTION", tabId });
+          if (!reply.ok) setError(reply.error);
+        }}
+      >
+        {label} <ChevronRight aria-hidden="true" />
+      </Button>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { FormState } from "@/shared/fields";
+import { DEFAULT_SETTINGS, type AutofillSettings } from "@/shared/settings";
 import type { AuthState, ExtensionProfile, SyncState, TabState, TrackedApplication } from "@/shared/types";
 
 /**
@@ -17,6 +18,9 @@ export interface LocalStore {
   /** Password for new accounts on job portals. Kept on this device only, never synced. */
   accountPassword: string | null;
   theme: "system" | "light" | "dark";
+  settings: AutofillSettings;
+  /** Last version whose "What's new" note was dismissed. */
+  seenVersion: string | null;
 }
 
 /** The floating in-page assistant. */
@@ -64,6 +68,8 @@ export const DEFAULT_LOCAL: LocalStore = {
   widget: DEFAULT_WIDGET,
   accountPassword: null,
   theme: "system",
+  settings: DEFAULT_SETTINGS,
+  seenVersion: null,
 };
 
 /** Small async key/value interface so background logic is testable without Chrome. */

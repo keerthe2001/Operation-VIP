@@ -50,8 +50,11 @@ function mount() {
     if (sender.id !== chrome.runtime.id) return false;
     const parsed = toWidgetSchema.safeParse(raw);
     if (!parsed.success) return false;
-    if (parsed.data.type === "WIDGET_TOGGLE") handle.current?.toggle();
-    else handle.current?.collapse();
+    const message = parsed.data;
+    if (message.type === "WIDGET_TOGGLE") handle.current?.toggle();
+    else if (message.type === "WIDGET_COLLAPSE") handle.current?.collapse();
+    else if (message.type === "WIDGET_PROGRESS") handle.current?.progress(message);
+    else handle.current?.submitted();
     sendResponse({ ok: true });
     return false;
   });

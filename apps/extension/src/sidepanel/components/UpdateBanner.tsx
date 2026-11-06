@@ -2,7 +2,7 @@ import { Button } from "@copilot/ui";
 import { RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { STALE_WORKER_EVENT } from "@/sidepanel/chrome-state";
+import { send, STALE_WORKER_EVENT, useLocal } from "@/sidepanel/chrome-state";
 
 /** Shown when the background is still running an older build of Copilot. */
 export function UpdateBanner() {
@@ -19,6 +19,35 @@ export function UpdateBanner() {
       <Button size="sm" onClick={() => chrome.runtime.reload()}>
         <RotateCw aria-hidden="true" /> Restart
       </Button>
+    </div>
+  );
+}
+
+const NOTES = [
+  "Fills one field at a time and shows its progress",
+  "Workday-style dropdowns, the page's Continue button, and copy-paste for fields it can't fill",
+  "More settings, including which fields to autofill",
+];
+
+/** A short note after each update (Settings → “What's new” notification). */
+export function WhatsNew() {
+  const settings = useLocal("settings");
+  const seen = useLocal("seenVersion");
+  const version = chrome.runtime.getManifest?.().version ?? "";
+  if (!settings.whatsNew || !version || seen === version) return null;
+  return (
+    <div className="mx-4 mt-4 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-xs">
+      <div className="flex items-center justify-between">
+        <p className="font-semibold">What's new in {version}</p>
+        <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Dismiss what's new" onClick={() => send({ type: "DISMISS_WHATS_NEW" })}>
+          ×
+        </button>
+      </div>
+      <ul className="list-disc pl-4 text-muted-foreground">
+        {NOTES.map((n) => (
+          <li key={n}>{n}</li>
+        ))}
+      </ul>
     </div>
   );
 }

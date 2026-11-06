@@ -517,6 +517,8 @@ export interface components {
             pronouns?: string | null;
             /** Referral Source */
             referral_source?: string | null;
+            /** Referred By */
+            referred_by?: string | null;
             /** Requires Sponsorship */
             requires_sponsorship?: boolean | null;
             /** Veteran Status */
@@ -982,10 +984,14 @@ export interface components {
             address?: string | null;
             /** Alternate Phone */
             alternate_phone?: string | null;
+            /** Behance */
+            behance?: string | null;
             /** City */
             city?: string | null;
             /** Country */
             country?: string | null;
+            /** Dribbble */
+            dribbble?: string | null;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -1000,14 +1006,20 @@ export interface components {
             linkedin?: string | null;
             /** Location */
             location?: string | null;
+            /** Middle Name */
+            middle_name?: string | null;
             /** Phone */
             phone?: string | null;
             /** Portfolio */
             portfolio?: string | null;
             /** Postal Code */
             postal_code?: string | null;
+            /** Preferred Name */
+            preferred_name?: string | null;
             /** State */
             state?: string | null;
+            /** Twitter */
+            twitter?: string | null;
         };
         /** ProfessionalSummary */
         ProfessionalSummary: {

@@ -11,6 +11,14 @@ export type Send = <T = unknown>(message: Record<string, unknown>) => Promise<Re
 export interface WidgetHandle {
   toggle(): void;
   collapse(): void;
+  progress(update: ProgressUpdate): void;
+  submitted(): void;
+}
+
+export interface ProgressUpdate {
+  phase: "start" | "field" | "done";
+  view: "popup" | "modal";
+  items: { id: string; label: string; status: "pending" | "filling" | "filled" | "skipped" | "failed" }[];
 }
 
 function Logo({ size = 22 }: { size?: number }) {
@@ -46,6 +54,9 @@ export function Widget({
   const [dragY, setDragY] = useState<number | null>(null);
   const [gone, setGone] = useState(false);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const [progress, setProgress] = useState<ProgressUpdate | null>(null);
+  const [askSubmitted, setAskSubmitted] = useState<"ask" | "done" | null>(null);
+  const hideProgress = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const autoOpened = useRef(new Set<string>());
   const pointer = useRef<{ startY: number; offset: number; moved: boolean } | null>(null);
 
@@ -70,6 +81,14 @@ export function Widget({
     },
     collapse() {
       setOpen(false);
+    },
+    progress(update) {
+      clearTimeout(hideProgress.current);
+      setProgress(update);
+      if (update.phase === "done") hideProgress.current = setTimeout(() => setProgress(null), 3500);
+    },
+    submitted() {
+      setAskSubmitted("ask");
     },
   }));
 
@@ -179,6 +198,11 @@ export function Widget({
           >
             <Logo size={22} />
             {ready > 0 && <span className="edge-badge">{ready}</span>}
+            {ready === 0 && state?.prefs.showMatch && state.match?.score != null && (
+              <span className="edge-badge" title="Match score">
+                {state.match.score}%
+              </span>
+            )}
             {state?.job?.isApplicationPage && <span className="edge-dot" />}
           </button>
           <button
@@ -195,6 +219,38 @@ export function Widget({
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {progress && <FillProgress update={progress} onClose={() => setProgress(null)} />}
+      {askSubmitted && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Application submitted?">
+          <div className="modal-card">
+            <Logo size={26} />
+            {askSubmitted === "ask" ? (
+              <>
+                <p className="modal-title">Did you submit this application?</p>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={async () => {
+                      const reply = await send({ type: "WIDGET_MARK_SUBMITTED" });
+                      setAskSubmitted(reply.ok ? "done" : null);
+                      if (reply.ok) setTimeout(() => setAskSubmitted(null), 1500);
+                    }}
+                  >
+                    Yes, mark submitted
+                  </button>
+                  <button type="button" className="btn-ghost" onClick={() => setAskSubmitted(null)}>
+                    Not yet
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="modal-title">Marked as submitted ✓</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -215,4 +271,40 @@ export function Widget({
       </aside>
     </div>
   );
+}
+
+const ICON: Record<ProgressUpdate["items"][number]["status"], string> = {
+  pending: "○",
+  filling: "◌",
+  filled: "✓",
+  skipped: "–",
+  failed: "!",
+};
+
+/** Live list of fields being filled: a popup at the top right or a blurred overlay. */
+function FillProgress({ update, onClose }: { update: ProgressUpdate; onClose: () => void }) {
+  const done = update.items.filter((i) => i.status === "filled").length;
+  const failed = update.items.filter((i) => i.status === "failed").length;
+  const finished = update.phase === "done";
+  const card = (
+    <div className={`progress-card ${update.view}`} role="status" aria-live="polite">
+      <div className="progress-head">
+        <span className="progress-title">{finished ? (failed ? `Done · ${failed} need you` : "Completed!") : `Filling ${done + 1 > update.items.length ? update.items.length : done + 1} of ${update.items.length}`}</span>
+        <button type="button" className="progress-close" aria-label="Close progress" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <ul className="progress-list">
+        {update.items.map((item) => (
+          <li key={item.id} className={`progress-item ${item.status}`}>
+            <span className="progress-icon" aria-hidden="true">
+              {ICON[item.status]}
+            </span>
+            <span className="progress-label">{item.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+  return update.view === "modal" ? <div className="progress-modal">{card}</div> : card;
 }

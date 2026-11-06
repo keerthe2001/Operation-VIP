@@ -5,6 +5,7 @@ import { ensureAllSitesScript } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
 import { ApplicationTracker } from "@/background/tracker";
 import { readyKeys, widgetState } from "@/background/widget";
+import { DEFAULT_SETTINGS, type AutofillSettings } from "@/shared/settings";
 import { API_URL, WEB_URL } from "@/shared/config";
 import {
   contentMessageSchema,
@@ -24,13 +25,71 @@ const api = createApi(API_URL, auth);
 const profileSync = new ProfileSync(api, local);
 const tracker = new ApplicationTracker(api, session);
 const autofill = new AutofillCoordinator(local, session, api, async (tabId, frameId, instructions) => {
-  const reply = (await chrome.tabs.sendMessage(tabId, { type: "FILL", instructions }, { frameId })) as
+  // Filled one by one, scrolling to each field, so the user can follow along.
+  const reply = (await chrome.tabs.sendMessage(tabId, { type: "FILL", instructions, interactive: true }, { frameId })) as
     | { ok: true; data: FillResult[] }
     | { ok: false; error: string }
     | undefined;
   if (!reply?.ok) throw new Error(reply && !reply.ok ? reply.error : "No response from page");
   return reply.data;
 });
+
+const settings = async () => ({ ...DEFAULT_SETTINGS, ...(await local.get("settings")) });
+
+/** Live fill progress on the page (popup or blurred modal, per Settings). */
+async function showProgress(tabId: number, phase: "start" | "field" | "done", items: ReturnType<AutofillCoordinator["progressItems"]>) {
+  const view = (await settings()).fillProgress;
+  if (view === "off" || items.length === 0) return;
+  await chrome.tabs.sendMessage(tabId, { type: "WIDGET_PROGRESS", phase, view, items }, { frameId: 0 }).catch(() => undefined);
+}
+autofill.onStart = (tabId, items) => void showProgress(tabId, "start", items);
+autofill.onDone = (tabId, items) => void showProgress(tabId, "done", items);
+
+/** Tabs where the user started autofill: later steps of the same application fill by themselves
+ * when "Continuously autofill multipage forms" is on. */
+const activeFill = new Map<number, { host: string; at: number }>();
+const filling = new Set<number>();
+
+/** Fills every ready field, then (if enabled) presses the page's Continue button. */
+async function fillReady(tabId: number) {
+  if (filling.has(tabId)) return { filled: 0, skipped: 0, failed: 0 };
+  filling.add(tabId);
+  try {
+    const state = await autofill.state(tabId);
+    const keys = readyKeys(state?.fields ?? []);
+    const summary = keys.length ? await autofill.fill(tabId, keys, false) : { filled: 0, skipped: 0, failed: 0 };
+    const after = await autofill.state(tabId);
+    const filled = after?.fields.filter((f) => f.result === "filled").length ?? 0;
+    void tracker.onFilled(tabId, (await session.get(tabKey(tabId)))?.job, filled);
+    if (state) activeFill.set(tabId, { host: new URL(state.url).hostname, at: Date.now() });
+    const requiredLeft = after?.fields.some((f) => f.required && !f.currentValue && f.result !== "filled") ?? true;
+    if ((await settings()).autoContinue && !requiredLeft) {
+      await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", continueOnly: true }, { frameId: 0 }).catch(() => undefined);
+    }
+    return summary;
+  } finally {
+    filling.delete(tabId);
+  }
+}
+
+const continueTimers = new Map<number, ReturnType<typeof setTimeout>>();
+async function maybeContinueFilling(tabId: number, url: string) {
+  const active = activeFill.get(tabId);
+  if (!active || active.host !== new URL(url).hostname || Date.now() - active.at > 60 * 60 * 1000) return;
+  if (!(await settings()).continuousFill) return;
+  clearTimeout(continueTimers.get(tabId));
+  // Wait for the new step to settle before filling it.
+  continueTimers.set(tabId, setTimeout(() => void fillReady(tabId), 800));
+}
+
+const promptedSubmission = new Set<string>();
+async function onSubmittedPage(tabId: number, url: string) {
+  const tracked = await tracker.get(tabId);
+  if (!(await settings()).submissionPrompt || promptedSubmission.has(url)) return;
+  if (tracked && ["submitted", "interview", "offer", "rejected"].includes(tracked.status)) return;
+  promptedSubmission.add(url);
+  await chrome.tabs.sendMessage(tabId, { type: "WIDGET_SUBMITTED" }, { frameId: 0 }).catch(() => undefined);
+}
 
 // Keep every open form's mapping current when the profile changes.
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -78,7 +137,10 @@ async function recordTab(tabId: number, frameId: number, url: string, job: Detec
   await session.set(tabEntry(tabId, state));
   await chrome.action.setBadgeText({ tabId, text: best?.isApplicationPage ? "●" : "" });
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#4f46e5" });
-  if (best?.isApplicationPage && (await auth.state()).status === "signed_in") void tracker.onDetected(tabId, best);
+  // "Applications you submit without autofill: track them" (otherwise only after autofill).
+  if (best?.isApplicationPage && (await auth.state()).status === "signed_in" && (await settings()).trackWithoutAutofill) {
+    void tracker.onDetected(tabId, best);
+  }
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -147,13 +209,12 @@ async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<u
     switch (message.type) {
       case "WIDGET_STATE":
         return { ok: true, data: await widgetState(tabId, tab.url, local, session) };
-      case "WIDGET_FILL": {
-        const keys = readyKeys((await autofill.state(tabId))?.fields ?? []);
-        if (keys.length === 0) return { ok: true, data: { filled: 0 } };
-        const summary = await autofill.fill(tabId, keys, false);
-        const filled = (await autofill.state(tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;
-        void tracker.onFilled(tabId, (await session.get(tabKey(tabId)))?.job, filled);
-        return { ok: true, data: summary };
+      case "WIDGET_FILL":
+        return { ok: true, data: await fillReady(tabId) };
+      case "WIDGET_MARK_SUBMITTED": {
+        const job = (await session.get(tabKey(tabId)))?.job;
+        if (!(await tracker.get(tabId)) && job) await tracker.save(tabId, job);
+        return { ok: true, data: await tracker.setStatus(tabId, "submitted") };
       }
       case "WIDGET_FORCE":
         return await forceScan(tabId);
@@ -237,10 +298,26 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       }
       case "FILL_FIELDS": {
         const summary = await autofill.fill(message.tabId, message.fields, message.overwrite);
-        const filled = (await autofill.state(message.tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;
+        const state = await autofill.state(message.tabId);
+        const filled = state?.fields.filter((f) => f.result === "filled").length ?? 0;
         void tracker.onFilled(message.tabId, (await session.get(tabKey(message.tabId)))?.job, filled);
+        if (state) activeFill.set(message.tabId, { host: new URL(state.url).hostname, at: Date.now() });
         return { ok: true, data: summary };
       }
+      case "CLICK_ACTION": {
+        const reply = (await chrome.tabs
+          .sendMessage(message.tabId, { type: "CLICK_ACTION" }, { frameId: 0 })
+          .catch(() => null)) as Reply | null;
+        return reply ?? { ok: false, error: "The page didn't respond." };
+      }
+      case "SET_SETTINGS": {
+        const next = { ...(await settings()), ...message.settings } as AutofillSettings;
+        await local.set({ settings: next });
+        return { ok: true };
+      }
+      case "DISMISS_WHATS_NEW":
+        await local.set({ seenVersion: chrome.runtime.getManifest().version });
+        return { ok: true };
       case "SET_APPLICATION_STATUS":
         return { ok: true, data: await tracker.setStatus(message.tabId, message.status) };
       case "INSERT_ANSWER": {
@@ -303,10 +380,22 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
       return true;
     }
     const frameId = sender.frameId ?? 0;
-    if (parsed.data.type === "PAGE_ANALYZED") {
-      void recordTab(sender.tab.id, frameId, sender.tab.url ?? parsed.data.url, parsed.data.job);
+    const tabId = sender.tab.id;
+    const message = parsed.data;
+    if (message.type === "PAGE_ANALYZED") {
+      void recordTab(tabId, frameId, sender.tab.url ?? message.url, message.job);
+      if (message.submitted && frameId === 0) void onSubmittedPage(tabId, sender.tab.url ?? message.url);
+    } else if (message.type === "FIELDS_SCANNED") {
+      const url = sender.tab.url ?? message.url;
+      void autofill
+        .onFieldsScanned(tabId, frameId, url, message.fields, message.action)
+        .then(() => {
+          if (!filling.has(tabId)) void maybeContinueFilling(tabId, url);
+        });
     } else {
-      void autofill.onFieldsScanned(sender.tab.id, frameId, sender.tab.url ?? parsed.data.url, parsed.data.fields);
+      void autofill.onProgress(tabId, frameId, message.id, message.status, message.message).then((items) => {
+        if (items) void showProgress(tabId, "field", items);
+      });
     }
     return false;
   }

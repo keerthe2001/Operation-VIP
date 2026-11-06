@@ -3,6 +3,8 @@ import { z } from "zod";
 export const FIELD_KINDS = [
   "text", "email", "tel", "url", "number", "date", "textarea", "select", "radio",
   "checkbox", "file", "contenteditable", "combobox", "password",
+  // A button that opens a list of options (Workday and other custom dropdowns).
+  "listbox",
 ] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number];
 
@@ -70,4 +72,8 @@ export interface FormState {
   fields: MappedField[];
   updatedAt: number;
   lastFill?: { at: number; filled: number; skipped: number; failed: number };
+  /** Fields being filled right now, in order (cleared when done). */
+  filling?: string[];
+  /** Text of the page's main button (Continue, Create Account…), if one was found. */
+  action?: string | null;
 }

@@ -169,8 +169,10 @@
   "personal_information": {
     "address": null,
     "alternate_phone": null,
+    "behance": null,
     "city": null,
     "country": null,
+    "dribbble": null,
     "email": "priya.raman@example.com",
     "first_name": "Priya",
     "full_name": "Priya Raman",
@@ -178,10 +180,13 @@
     "last_name": "Raman",
     "linkedin": "https://linkedin.com/in/priya-raman",
     "location": "Bengaluru, India",
+    "middle_name": null,
     "phone": "+919876543210",
     "portfolio": "https://priyaraman.dev",
     "postal_code": null,
-    "state": null
+    "preferred_name": null,
+    "state": null,
+    "twitter": null
   },
   "professional_summary": {
     "current_designation": "Senior Software Engineer",

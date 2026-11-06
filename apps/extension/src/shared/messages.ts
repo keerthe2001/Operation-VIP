@@ -23,8 +23,22 @@ export const detectedJobSchema = z.object({
 
 /** Messages sent by content scripts (sender.tab is required). */
 export const contentMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("PAGE_ANALYZED"), job: detectedJobSchema.nullable(), url: z.string().max(2048) }),
-  z.object({ type: z.literal("FIELDS_SCANNED"), url: z.string().max(2048), fields: z.array(fieldDescriptorSchema).max(300) }),
+  z.object({
+    type: z.literal("PAGE_ANALYZED"),
+    job: detectedJobSchema.nullable(),
+    url: z.string().max(2048),
+    /** The page looks like an application confirmation ("Thank you for applying"). */
+    submitted: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal("FIELDS_SCANNED"),
+    url: z.string().max(2048),
+    fields: z.array(fieldDescriptorSchema).max(300),
+    /** Text of the page's main button (Continue, Create Account…). */
+    action: z.string().max(80).nullable().optional(),
+  }),
+  /** One field done while filling one by one. */
+  z.object({ type: z.literal("FILL_PROGRESS"), id: z.string().max(40), status: z.enum(["filling", "filled", "skipped", "failed"]), message: z.string().max(300).optional() }),
 ]);
 
 /** Requests from the floating in-page assistant (a content script); each gets a reply. */
@@ -36,6 +50,7 @@ export const widgetMessageSchema = z.discriminatedUnion("type", [
   /** The drawer asks which tab it is in and for a one-time code for the embedded panel. */
   z.object({ type: z.literal("WIDGET_EMBED") }),
   z.object({ type: z.literal("WIDGET_THEME"), theme: z.enum(["light", "dark"]) }),
+  z.object({ type: z.literal("WIDGET_MARK_SUBMITTED") }),
   z.object({
     type: z.literal("WIDGET_PREFS"),
     prefs: z
@@ -60,6 +75,10 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("VERIFY_EMBED"), tabId: z.number().int(), nonce: z.string().max(100) }),
   z.object({ type: z.literal("COLLAPSE_EMBED"), tabId: z.number().int() }),
   z.object({ type: z.literal("SAVE_JOB"), tabId: z.number().int() }),
+  /** The user clicked the panel's copy of the page's main button. */
+  z.object({ type: z.literal("CLICK_ACTION"), tabId: z.number().int() }),
+  z.object({ type: z.literal("SET_SETTINGS"), settings: z.record(z.string(), z.unknown()) }),
+  z.object({ type: z.literal("DISMISS_WHATS_NEW") }),
   z.object({ type: z.literal("SET_ACCOUNT_PASSWORD"), password: z.string().max(128).nullable() }),
   z.object({
     type: z.literal("SET_WIDGET_PREFS"),
@@ -113,7 +132,9 @@ const fillInstructionSchema = z.object({
 export const toContentSchema = z.discriminatedUnion("type", [
   /** `force`: the user asked to fill this page, so treat any form on it as an application. */
   z.object({ type: z.literal("ANALYZE_PAGE"), force: z.boolean().optional() }),
-  z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300) }),
+  /** `interactive`: scroll to each field and fill it one by one, reporting progress. */
+  z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300), interactive: z.boolean().optional() }),
+  z.object({ type: z.literal("CLICK_ACTION"), continueOnly: z.boolean().optional() }),
 ]);
 
 export type ContentMessage = z.infer<typeof contentMessageSchema>;
@@ -128,4 +149,11 @@ export type Reply<T = undefined> = { ok: true; data?: T } | { ok: false; error: 
 export const toWidgetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("WIDGET_TOGGLE") }),
   z.object({ type: z.literal("WIDGET_COLLAPSE") }),
+  z.object({
+    type: z.literal("WIDGET_PROGRESS"),
+    phase: z.enum(["start", "field", "done"]),
+    view: z.enum(["popup", "modal"]),
+    items: z.array(z.object({ id: z.string().max(60), label: z.string().max(200), status: z.enum(["pending", "filling", "filled", "skipped", "failed"]) })).max(300),
+  }),
+  z.object({ type: z.literal("WIDGET_SUBMITTED") }),
 ]);

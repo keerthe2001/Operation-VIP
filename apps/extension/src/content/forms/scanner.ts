@@ -12,7 +12,8 @@ let counter = 0;
 export function deepQueryAll(root: Document | ShadowRoot | Element, selector: string): Element[] {
   const found = [...root.querySelectorAll(selector)];
   for (const host of root.querySelectorAll("*")) {
-    if (host.shadowRoot) found.push(...deepQueryAll(host.shadowRoot, selector));
+    // Never our own in-page drawer.
+    if (host.shadowRoot && host.tagName !== "COPILOT-ASSISTANT") found.push(...deepQueryAll(host.shadowRoot, selector));
   }
   return found;
 }
@@ -43,11 +44,18 @@ function isFillable(el: Element): boolean {
 }
 
 function kindOf(el: Element): FieldKind {
+  // Custom dropdowns: a button (or div) that opens a list of options.
+  if (!(el instanceof HTMLInputElement) && (el.getAttribute("aria-haspopup") === "listbox" || el.getAttribute("role") === "combobox")) {
+    return "listbox";
+  }
   if (el instanceof HTMLTextAreaElement) return "textarea";
   if (el instanceof HTMLSelectElement) return "select";
   if (el instanceof HTMLInputElement) {
     const role = el.getAttribute("role");
-    if (role === "combobox" || el.getAttribute("aria-autocomplete") === "list") return "combobox";
+    // Searchable dropdowns (Workday's "selectinput" prompts among them).
+    if (role === "combobox" || el.getAttribute("aria-autocomplete") === "list" || el.getAttribute("data-uxi-widget-type") === "selectinput") {
+      return "combobox";
+    }
     switch (el.type) {
       case "email": case "tel": case "url": case "number": case "date": case "radio": case "checkbox": case "file": case "password":
         return el.type;
@@ -92,7 +100,10 @@ function selectedLabel(el: HTMLSelectElement): string {
 }
 
 export function scanFields(root: Document = document): FieldDescriptor[] {
-  const controls = deepQueryAll(root, "input, textarea, select, [contenteditable='true'], [contenteditable='']").filter(isFillable);
+  const controls = deepQueryAll(
+    root,
+    "input, textarea, select, [contenteditable='true'], [contenteditable=''], button[aria-haspopup='listbox'], [role='combobox']:not(input)",
+  ).filter(isFillable);
   const descriptors: FieldDescriptor[] = [];
   const radioGroups = new Map<string, HTMLInputElement[]>();
 
@@ -109,6 +120,8 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else if (kind === "checkbox") currentValue = input.checked ? "checked" : "";
     else if (kind === "file") currentValue = input.files?.length ? input.files[0]!.name : "";
     else if (kind === "contenteditable") currentValue = text(el);
+    // A dropdown button shows its choice, or a prompt like "Select One" when empty.
+    else if (kind === "listbox") currentValue = /^(select|choose|please select|--|none selected)/i.test(text(el)) ? "" : text(el);
     // Never report what's typed in a password box, only whether it's filled.
     else if (kind === "password") currentValue = input.value ? "••••••••" : "";
     else currentValue = input.value ?? "";
@@ -156,4 +169,21 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     });
   }
   return descriptors.slice(0, MAX_FIELDS);
+}
+
+const ACTION_TEXT =
+  /^(save and continue|save & continue|continue|next|next step|create account|sign in|log ?in|review|submit( application)?|apply( now)?|send application)$/i;
+export const CONTINUE_TEXT = /^(save and continue|save & continue|continue|next|next step)$/i;
+
+/** The page's main button for this step (Continue, Create Account…), if there is one. */
+export function findAction(root: Document = document): HTMLElement | null {
+  const candidates = deepQueryAll(root, "button, input[type=submit], [role='button'], a[data-automation-id]")
+    .filter((el): el is HTMLElement => el instanceof HTMLElement && isVisible(el) && !el.closest("copilot-assistant"))
+    .filter((el) => !(el as HTMLButtonElement).disabled && ACTION_TEXT.test(actionText(el)));
+  // Prefer the last match: the main button usually sits at the end of the form.
+  return candidates.at(-1) ?? null;
+}
+
+export function actionText(el: HTMLElement): string {
+  return ((el instanceof HTMLInputElement ? el.value : el.textContent) ?? "").replace(/\s+/g, " ").trim();
 }

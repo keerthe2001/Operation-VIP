@@ -106,6 +106,39 @@ const ACCOUNT_HTML = `<!doctype html><html><head><title>Create Account</title></
   <label><input type="checkbox" id="agree"> I agree to the terms</label>
 </form></div></body></html>`;
 
+// A Workday-style "My Information" step: tall page, custom dropdowns that open a listbox,
+// a required consent box and the step's own Save and Continue button.
+const STEP_URL = "https://acme.wd1.myworkdayjobs.com/en-US/careers/job/Pune/Analyst_R-9/apply/myInformation";
+const STEP_HTML = `<!doctype html><html><head><title>My Information</title>
+<style>.gap{height:700px} [role=listbox]{position:absolute;background:#fff;border:1px solid #999;list-style:none;margin:0;padding:0}</style></head><body>
+<h2>My Information</h2>
+<label for="fn">First Name</label><input id="fn"><div class="gap"></div>
+<label id="ptl">Phone Device Type</label><button id="ptype" type="button" aria-haspopup="listbox" aria-labelledby="ptl">Select One</button><div class="gap"></div>
+<label id="pcl">Country / Territory Phone Code</label><button id="pcode" type="button" aria-haspopup="listbox" aria-labelledby="pcl">Select One</button>
+<label for="ph">Phone Number</label><input id="ph"><div class="gap"></div>
+<label><input type="checkbox" id="consent" required> I accept the privacy statement *</label>
+<button id="next" type="button">Save and Continue</button>
+<script>
+  let scrolls = []; addEventListener("scroll", () => scrolls.push(Math.round(scrollY)));
+  window.__scrolls = () => scrolls;
+  window.__continued = 0;
+  document.getElementById("next").addEventListener("click", () => window.__continued++);
+  const lists = { ptype: ["Landline", "Mobile", "Other"], pcode: ["Afghanistan (+93)", "India (+91)", "Indonesia (+62)", "United States of America (+1)"] };
+  for (const [id, items] of Object.entries(lists)) {
+    const button = document.getElementById(id);
+    button.addEventListener("click", () => {
+      document.querySelector("[role=listbox]")?.remove();
+      const list = document.createElement("ul"); list.setAttribute("role", "listbox");
+      for (const text of items) {
+        const li = document.createElement("li"); li.setAttribute("role", "option"); li.textContent = text;
+        li.addEventListener("click", () => { button.textContent = text; list.remove(); });
+        list.append(li);
+      }
+      document.body.append(list);
+    });
+  }
+</script></body></html>`;
+
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
   console.log(`ok - ${message}`);
@@ -241,7 +274,7 @@ try {
   check(label === "Autofill 7 fields", `autofill offers the confident fields (${label})`);
   if (shots) await panel.screenshot({ path: `${shots}/ext-autofill.png` });
   await autofillButton.click();
-  await panel.getByText(/Review the form, then submit it yourself/).waitFor();
+  await panel.getByText(/Filled \d+ fields?/).first().waitFor();
   const values = await job.evaluate(() => ({
     first: document.getElementById("first_name").value,
     last: document.getElementById("last_name").value,
@@ -258,7 +291,7 @@ try {
   check(values.email === "priya.raman@example.com" && values.phone === "+919876543210", `email and phone filled (${values.phone})`);
   check(values.linkedin === "https://linkedin.com/in/priya-raman", "LinkedIn filled");
   check(values.years === "6-10 years", `years select chose the right range (${values.years})`);
-  check(values.resume === "priya_raman_resume.pdf" && values.resumeSize > 1000, `resume attached (${values.resume}, ${values.resumeSize} bytes)`);
+  check(values.resume === "Priya_Raman_Resume.pdf" && values.resumeSize > 1000, `resume attached (${values.resume}, ${values.resumeSize} bytes)`);
   check(values.why === "", "free-text question left for the user");
   check(values.sponsor === null, "sensitive sponsorship question not filled automatically");
   if (shots) await panel.screenshot({ path: `${shots}/ext-autofill-done.png` });
@@ -351,7 +384,7 @@ try {
   await workday.click("#next");
   await panel.getByRole("button", { name: "Autofill 3 fields" }).waitFor({ timeout: 10000 });
   await panel.getByRole("button", { name: "Autofill 3 fields" }).click();
-  await panel.getByText(/Filled 3 fields/).waitFor();
+  await workday.waitForFunction(() => document.getElementById("degree")?.value !== "", null, { timeout: 15000 }).catch(() => undefined);
   const step2 = await workday.evaluate(() => [document.getElementById("school").value, document.getElementById("degree").value]);
   check(step2[0] === "Anna University" && step2[1] === "B.Tech", `Workday step 2 filled after re-scan (${step2.join(", ")})`);
 
@@ -372,7 +405,7 @@ try {
     cv: document.querySelector("[name=file-583]").files[0]?.name ?? null,
   }));
   check(
-    plainValues.name.startsWith("Priya") && plainValues.phone === "+919876543210" && plainValues.email === "priya.raman@example.com" && plainValues.cv === "priya_raman_resume.pdf",
+    plainValues.name.startsWith("Priya") && plainValues.phone === "+919876543210" && plainValues.email === "priya.raman@example.com" && plainValues.cv === "Priya_Raman_Resume.pdf",
     `plain careers form filled, CV attached to the hidden input (${JSON.stringify(plainValues)})`,
   );
   const weak = await context.newPage();
@@ -410,7 +443,7 @@ try {
   check(await panelIn(naukri).getByText("Snowflake").isVisible(), "Match tab lists skills missing from the profile");
   if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
   await panelIn(naukri).getByRole("tab", { name: /Autofill/ }).click();
-  await panelIn(naukri).getByRole("tab", { name: /Autofill/, selected: true }).waitFor();
+  await panelIn(naukri).getByRole("button", { name: "Save job" }).waitFor();
   await panelIn(naukri).getByRole("button", { name: "Save job" }).click();
   await panelIn(naukri).getByText(/^Tracked/).waitFor();
   check(true, "job saved to the tracker from the panel");
@@ -479,6 +512,37 @@ try {
   const sessionDump = await worker.evaluate(async () => JSON.stringify(await chrome.storage.session.get(null)));
   check(!sessionDump.includes("Str0ng!Pass"), "the password never lands in the tab state");
   if (shots) await account.screenshot({ path: `${shots}/widget-account.png` });
+
+  // 10e. Interactive fill on a Workday-style step: scrolls field by field, picks options in
+  // custom dropdowns, ticks the required consent, shows progress, and the panel's copy of the
+  // page's button presses Save and Continue.
+  await context.route(STEP_URL, (route) => route.fulfill({ contentType: "text/html", body: STEP_HTML }));
+  const step = await context.newPage();
+  await step.goto(STEP_URL);
+  const stepFill = panelIn(step).getByRole("button", { name: /^Autofill \d+ fields$/ });
+  await stepFill.waitFor({ timeout: 15000 });
+  await stepFill.click();
+  await widget(step).locator(".progress-card").waitFor({ timeout: 10000 });
+  if (shots) await step.screenshot({ path: `${shots}/fill-progress.png` });
+  await widget(step).getByText("Completed!").waitFor({ timeout: 20000 });
+  const stepValues = await step.evaluate(() => ({
+    first: document.getElementById("fn").value,
+    type: document.getElementById("ptype").textContent,
+    code: document.getElementById("pcode").textContent,
+    phone: document.getElementById("ph").value,
+    consent: document.getElementById("consent").checked,
+    scrolls: window.__scrolls(),
+  }));
+  check(stepValues.first === "Priya" && stepValues.type === "Mobile" && stepValues.code === "India (+91)", `custom dropdowns chosen like a person would (${stepValues.type}, ${stepValues.code})`);
+  check(stepValues.phone === "9876543210", `phone number without the country code when the form asks for it separately (${stepValues.phone})`);
+  check(stepValues.consent, "required consent box ticked");
+  const distinct = new Set(stepValues.scrolls.map((y) => Math.round(y / 200))).size;
+  check(distinct >= 3, `page scrolled to each field while filling (${distinct} scroll positions)`);
+  if (shots) await step.screenshot({ path: `${shots}/fill-done.png` });
+  const actionButton = panelIn(step).getByRole("button", { name: /^Save and Continue/ });
+  await actionButton.click();
+  await step.waitForFunction(() => window.__continued === 1);
+  check(true, "panel's “Save and Continue” presses the page's own button");
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

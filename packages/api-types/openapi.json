@@ -176,6 +176,18 @@
             ],
             "title": "Referral Source"
           },
+          "referred_by": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referred By"
+          },
           "requires_sponsorship": {
             "anyOf": [
               {
@@ -1688,6 +1700,18 @@
             ],
             "title": "Alternate Phone"
           },
+          "behance": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Behance"
+          },
           "city": {
             "anyOf": [
               {
@@ -1711,6 +1735,18 @@
               }
             ],
             "title": "Country"
+          },
+          "dribbble": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dribbble"
           },
           "email": {
             "anyOf": [
@@ -1796,6 +1832,18 @@
             ],
             "title": "Location"
           },
+          "middle_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
           "phone": {
             "anyOf": [
               {
@@ -1832,6 +1880,18 @@
             ],
             "title": "Postal Code"
           },
+          "preferred_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Name"
+          },
           "state": {
             "anyOf": [
               {
@@ -1843,6 +1903,18 @@
               }
             ],
             "title": "State"
+          },
+          "twitter": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twitter"
           }
         },
         "title": "PersonalInformation",

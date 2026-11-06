@@ -83,7 +83,9 @@ suggestion with placeholders and Insert; application tracking and "I submitted";
 an embedded Greenhouse iframe; a two-step Workday form; a plain careers form with a hidden CV
 input; "Fill this page anyway" on an unrecognised form; the in-page drawer with the embedded panel (no Chrome
 side panel; edge tab, page shrinks while open, toolbar toggle, Match/Profile tabs, save job, theme,
-tab drag, auto-open, autofill, create-account password, other sites can't embed the panel); no injection on unsupported sites;
+tab drag, auto-open, autofill, create-account password, other sites can't embed the panel); one-by-one
+fill on a Workday-style step (scrolls to each field, custom dropdowns, country code + national number,
+consent box, progress popup, the panel's Save and Continue); no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

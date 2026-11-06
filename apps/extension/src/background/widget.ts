@@ -51,7 +51,7 @@ export async function widgetState(
   local: KeyValueArea<LocalStore>,
   session: KeyValueArea<SessionStore>,
 ): Promise<WidgetState> {
-  const [auth, data, prefs, tab, form, tracked, theme] = await Promise.all([
+  const [auth, data, prefs, tab, form, tracked, theme, settings] = await Promise.all([
     local.get("auth"),
     local.get("profile"),
     local.get("widget"),
@@ -59,6 +59,7 @@ export async function widgetState(
     session.get(formKey(tabId)),
     session.get(appKey(tabId)),
     local.get("theme"),
+    local.get("settings"),
   ]);
   const widget = { ...DEFAULT_WIDGET, ...prefs };
   const host = url ? new URL(url).hostname : "";
@@ -99,6 +100,7 @@ export async function widgetState(
       autoOpen: widget.autoOpen,
       y: widget.y,
       theme: theme ?? "system",
+      showMatch: settings?.showMatch ?? true,
       hidden: widget.hiddenHosts.includes(host),
     },
   };

@@ -64,7 +64,7 @@ function makeState(overrides: Partial<WidgetState> = {}): WidgetState {
     signedIn: true, firstName: "Priya", job, tracked: null,
     form: { detected: 4, ready: 3, review: 1, missing: 0, questions: 0, filled: 0, hasCoverLetterField: false, hasResumeField: true, needsPassword: false },
     resumeName: "priya.pdf", match: null, profile: [],
-    prefs: { mode: "job_pages", autoOpen: true, y: 160, hidden: false, theme: "light" },
+    prefs: { mode: "job_pages", autoOpen: true, y: 160, hidden: false, theme: "light", showMatch: true },
     ...overrides,
   };
 }
