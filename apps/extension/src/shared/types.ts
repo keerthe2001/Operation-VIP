@@ -56,3 +56,36 @@ export interface SyncState {
   lastSyncedAt: number | null;
   error: string | null;
 }
+
+/** Everything the floating in-page assistant shows, computed by the background. */
+export interface WidgetState {
+  signedIn: boolean;
+  firstName: string | null;
+  job: DetectedJob | null;
+  tracked: TrackedApplication | null;
+  form: {
+    detected: number;
+    /** Ready to fill now (confident, still empty). */
+    ready: number;
+    review: number;
+    missing: number;
+    questions: number;
+    filled: number;
+    hasCoverLetterField: boolean;
+    hasResumeField: boolean;
+  };
+  resumeName: string | null;
+  match: {
+    score: number | null;
+    matched: string[];
+    missing: string[];
+    requiredYears: number | null;
+    haveYears: number | null;
+    experienceOk: boolean | null;
+    location: string | null;
+    locationOk: boolean | null;
+  } | null;
+  /** Quick-copy profile values. */
+  profile: { label: string; value: string }[];
+  prefs: { mode: "job_pages" | "always" | "off"; autoOpen: boolean; side: "left" | "right"; y: number; hidden: boolean };
+}

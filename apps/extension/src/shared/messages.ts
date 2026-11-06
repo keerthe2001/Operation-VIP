@@ -27,6 +27,25 @@ export const contentMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("FIELDS_SCANNED"), url: z.string().max(2048), fields: z.array(fieldDescriptorSchema).max(300) }),
 ]);
 
+/** Requests from the floating in-page assistant (a content script); each gets a reply. */
+export const widgetMessageSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("WIDGET_STATE") }),
+  z.object({ type: z.literal("WIDGET_FILL") }),
+  z.object({ type: z.literal("WIDGET_FORCE") }),
+  z.object({ type: z.literal("WIDGET_SAVE_JOB") }),
+  z.object({ type: z.literal("WIDGET_OPEN_PANEL") }),
+  z.object({
+    type: z.literal("WIDGET_PREFS"),
+    prefs: z
+      .object({
+        side: z.enum(["left", "right"]),
+        y: z.number().min(0).max(10_000),
+        hideOnHost: z.string().max(253),
+      })
+      .partial(),
+  }),
+]);
+
 /** Messages sent by the side panel (an extension page). */
 export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("SIGN_IN"), email: z.string().email().max(320), password: z.string().min(1).max(128) }),
@@ -35,6 +54,10 @@ export const panelMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("RESCAN_TAB"), tabId: z.number().int() }),
   z.object({ type: z.literal("FORCE_SCAN"), tabId: z.number().int() }),
   z.object({ type: z.literal("ENABLE_ALL_SITES") }),
+  z.object({
+    type: z.literal("SET_WIDGET_PREFS"),
+    prefs: z.object({ mode: z.enum(["job_pages", "always", "off"]), autoOpen: z.boolean(), showOnAllHosts: z.literal(true) }).partial(),
+  }),
   z.object({
     type: z.literal("FILL_FIELDS"),
     tabId: z.number().int(),
@@ -90,5 +113,6 @@ export type ContentMessage = z.infer<typeof contentMessageSchema>;
 export type PanelMessage = z.infer<typeof panelMessageSchema>;
 export type ExternalMessage = z.infer<typeof externalMessageSchema>;
 export type ToContentMessage = z.infer<typeof toContentSchema>;
+export type WidgetMessage = z.infer<typeof widgetMessageSchema>;
 
 export type Reply<T = undefined> = { ok: true; data?: T } | { ok: false; error: string; code?: string };

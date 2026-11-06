@@ -5,6 +5,7 @@ import { send, useActiveTabId, useFormState, useLocal, useTabState, useTrackedAp
 import { AnswersSection } from "@/sidepanel/components/AnswersSection";
 import { AutofillSection } from "@/sidepanel/components/AutofillSection";
 import { EmptyState } from "@/sidepanel/components/EmptyState";
+import { UpdateBanner } from "@/sidepanel/components/UpdateBanner";
 import { ForceScanButton } from "@/sidepanel/components/ForceScanButton";
 import { Header } from "@/sidepanel/components/Header";
 import { JobCard } from "@/sidepanel/components/JobCard";
@@ -45,6 +46,7 @@ export function App() {
   return (
     <>
       <Header user={auth.user!} sync={sync} onSettings={() => setSettings(true)} />
+      <UpdateBanner />
       <main className="grid gap-4 p-4">
         {job ? (
           <JobCard

@@ -28,6 +28,42 @@
             ],
             "title": "Date Of Birth"
           },
+          "disability_status": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disability Status"
+          },
+          "earliest_start_date": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Start Date"
+          },
+          "ethnicity": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ethnicity"
+          },
           "expected_salary": {
             "anyOf": [
               {
@@ -39,6 +75,18 @@
               }
             ],
             "title": "Expected Salary"
+          },
+          "father_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Father Name"
           },
           "gender": {
             "anyOf": [
@@ -59,6 +107,18 @@
             },
             "title": "Languages",
             "type": "array"
+          },
+          "marital_status": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marital Status"
           },
           "nationality": {
             "anyOf": [
@@ -104,6 +164,18 @@
             ],
             "title": "Pronouns"
           },
+          "referral_source": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referral Source"
+          },
           "requires_sponsorship": {
             "anyOf": [
               {
@@ -114,6 +186,18 @@
               }
             ],
             "title": "Requires Sponsorship"
+          },
+          "veteran_status": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Veteran Status"
           },
           "willing_to_relocate": {
             "anyOf": [
@@ -137,6 +221,18 @@
               }
             ],
             "title": "Work Authorization"
+          },
+          "work_mode_preference": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Mode Preference"
           }
         },
         "title": "AdditionalInfo",
@@ -1568,6 +1664,54 @@
       },
       "PersonalInformation": {
         "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "alternate_phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternate Phone"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
           "email": {
             "anyOf": [
               {
@@ -1675,6 +1819,30 @@
               }
             ],
             "title": "Portfolio"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
           }
         },
         "title": "PersonalInformation",

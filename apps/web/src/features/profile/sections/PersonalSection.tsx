@@ -15,6 +15,12 @@ const FIELDS = [
   ["linkedin", "LinkedIn", "url", "url"],
   ["github", "GitHub", "url", "url"],
   ["portfolio", "Portfolio / website", "url", "url"],
+  ["alternate_phone", "Alternate phone", "tel", "tel"],
+  ["address", "Address", "text", "street-address"],
+  ["city", "City", "text", "address-level2"],
+  ["state", "State / province", "text", "address-level1"],
+  ["country", "Country", "text", "country-name"],
+  ["postal_code", "PIN / ZIP code", "text", "postal-code"],
 ] as const;
 
 export function PersonalSection() {
@@ -22,7 +28,7 @@ export function PersonalSection() {
   const review = useFieldReview();
   const errors = formState.errors.personal_information;
   return (
-    <SectionCard id="personal" title="Personal & contact" description="Used for name, email, phone and link fields.">
+    <SectionCard id="personal" title="Personal & contact" description="Used for name, contact, address and link fields. City, state and country are taken from your location when left empty.">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {FIELDS.map(([key, label, type, autoComplete]) => (
           <Field

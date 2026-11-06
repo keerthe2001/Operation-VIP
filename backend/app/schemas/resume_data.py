@@ -33,6 +33,13 @@ class PersonalInformation(_Model):
     linkedin: str | None = Field(default=None, max_length=500)
     github: str | None = Field(default=None, max_length=500)
     portfolio: str | None = Field(default=None, max_length=500)
+    # Split address for forms that ask for each part (filled from `location` when empty).
+    address: str | None = Field(default=None, max_length=300)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=100)
+    country: str | None = Field(default=None, max_length=100)
+    postal_code: str | None = Field(default=None, max_length=20)
+    alternate_phone: str | None = Field(default=None, max_length=40)
 
 
 class ProfessionalSummary(_Model):
@@ -116,6 +123,15 @@ class AdditionalInfo(_Model):
     date_of_birth: str | None = Field(default=None, max_length=10)
     nationality: str | None = Field(default=None, max_length=100)
     languages: list[str] = []
+    marital_status: str | None = Field(default=None, max_length=50)
+    father_name: str | None = Field(default=None, max_length=200)
+    # Voluntary self-identification (EEO) questions; never filled without review.
+    ethnicity: str | None = Field(default=None, max_length=100)
+    veteran_status: str | None = Field(default=None, max_length=100)
+    disability_status: str | None = Field(default=None, max_length=100)
+    earliest_start_date: str | None = Field(default=None, max_length=50)
+    work_mode_preference: str | None = Field(default=None, max_length=50)
+    referral_source: str | None = Field(default=None, max_length=100)
 
 
 class ResumeData(_Model):

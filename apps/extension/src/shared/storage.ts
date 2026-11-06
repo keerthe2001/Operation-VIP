@@ -13,7 +13,23 @@ export interface LocalStore {
   profileEtag: string | null;
   sync: SyncState;
   allSitesEnabled: boolean;
+  widget: WidgetPrefs;
 }
+
+/** The floating in-page assistant. */
+export interface WidgetPrefs {
+  /** "job_pages": only where a job is detected; "always": on every page Copilot runs on. */
+  mode: "job_pages" | "always" | "off";
+  /** Expand the assistant by itself when an application form is found. */
+  autoOpen: boolean;
+  /** Bubble position: docked to a side, `y` in pixels from the top of the window. */
+  side: "left" | "right";
+  y: number;
+  /** Sites where the user closed the assistant. */
+  hiddenHosts: string[];
+}
+
+export const DEFAULT_WIDGET: WidgetPrefs = { mode: "job_pages", autoOpen: true, side: "right", y: 160, hiddenHosts: [] };
 
 export interface SessionStore {
   accessToken: string | null;
@@ -42,6 +58,7 @@ export const DEFAULT_LOCAL: LocalStore = {
   profileEtag: null,
   sync: { state: "idle", lastSyncedAt: null, error: null },
   allSitesEnabled: false,
+  widget: DEFAULT_WIDGET,
 };
 
 /** Small async key/value interface so background logic is testable without Chrome. */

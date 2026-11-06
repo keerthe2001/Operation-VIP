@@ -1,6 +1,6 @@
-import { Alert, Button } from "@copilot/ui";
+import { Alert, Button, NativeSelect } from "@copilot/ui";
 import { ArrowLeft, Globe, LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { send, useLocal } from "@/sidepanel/chrome-state";
 import { WEB_URL } from "@/shared/config";
@@ -63,9 +63,56 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
         )}
         {message && <Alert>{message}</Alert>}
       </section>
+      <WidgetSettings />
       <Button variant="outline" size="sm" className="justify-self-start text-destructive" onClick={() => send({ type: "SIGN_OUT" })}>
         <LogOut aria-hidden="true" /> Sign out
       </Button>
     </div>
+  );
+}
+
+function WidgetSettings() {
+  const widget = useLocal("widget");
+  const modeId = useId();
+  const autoId = useId();
+  return (
+    <section className="grid gap-2">
+      <h2 className="text-sm font-semibold">Floating assistant</h2>
+      <p className="text-xs text-muted-foreground">
+        A small Copilot button on job pages. Drag it anywhere; it docks to the nearest side. Click it to autofill, check your
+        match or copy profile details.
+      </p>
+      <label htmlFor={modeId} className="text-xs font-medium">
+        Show it
+      </label>
+      <NativeSelect
+        id={modeId}
+        value={widget.mode}
+        onChange={(e) => send({ type: "SET_WIDGET_PREFS", prefs: { mode: e.target.value as "job_pages" | "always" | "off" } })}
+      >
+        <option value="job_pages">On job pages</option>
+        <option value="always">On every page Copilot runs on</option>
+        <option value="off">Never</option>
+      </NativeSelect>
+      <label htmlFor={autoId} className="flex items-center gap-2 text-xs">
+        <input
+          id={autoId}
+          type="checkbox"
+          checked={widget.autoOpen}
+          onChange={(e) => send({ type: "SET_WIDGET_PREFS", prefs: { autoOpen: e.target.checked } })}
+        />
+        Open it automatically when an application form is found
+      </label>
+      {widget.hiddenHosts.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="justify-self-start"
+          onClick={() => send({ type: "SET_WIDGET_PREFS", prefs: { showOnAllHosts: true } })}
+        >
+          Show it again on {widget.hiddenHosts.length} hidden site{widget.hiddenHosts.length === 1 ? "" : "s"}
+        </Button>
+      )}
+    </section>
   );
 }

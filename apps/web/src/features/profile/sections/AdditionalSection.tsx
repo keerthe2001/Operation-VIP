@@ -30,6 +30,38 @@ function YesNo({ name, label }: { name: "additional_info.requires_sponsorship" |
   );
 }
 
+type ChoiceName =
+  | "additional_info.marital_status"
+  | "additional_info.work_mode_preference"
+  | "additional_info.veteran_status"
+  | "additional_info.disability_status";
+
+function ChoiceField({ name, label, options }: { name: ChoiceName; label: string; options: string[] }) {
+  const { control } = useFormContext<ProfileWrite>();
+  const id = useId();
+  return (
+    <div className="grid content-start gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Controller
+        control={control}
+        name={name}
+        render={({ field }) => (
+          <NativeSelect id={id} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value || null)}>
+            <option value="">Not specified</option>
+            {/* Keep a custom value (e.g. typed on another device) selectable. */}
+            {field.value && !options.includes(field.value) && <option value={field.value}>{field.value}</option>}
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </NativeSelect>
+        )}
+      />
+    </div>
+  );
+}
+
 export function AdditionalSection() {
   const { register, control } = useFormContext<ProfileWrite>();
   return (
@@ -59,9 +91,34 @@ export function AdditionalSection() {
             <TagInput className="sm:col-span-2 lg:col-span-3" label="Languages spoken" value={field.value ?? []} onChange={field.onChange} />
           )}
         />
+        <Field label="Date of birth" type="date" {...register("additional_info.date_of_birth")} />
+        <ChoiceField name="additional_info.marital_status" label="Marital status" options={["Single", "Married", "Prefer not to say"]} />
+        <Field label="Father's / guardian's name" hint="Some Indian application forms ask for it." {...register("additional_info.father_name")} />
         <Field label="Nationality" {...register("additional_info.nationality")} />
         <Field label="Pronouns" {...register("additional_info.pronouns")} />
+        <Field label="Earliest start date" placeholder="e.g. Immediately, 1 Dec 2026" {...register("additional_info.earliest_start_date")} />
+        <ChoiceField name="additional_info.work_mode_preference" label="Preferred work mode" options={["Remote", "Hybrid", "On-site", "Open to any"]} />
+        <Field label="How you usually hear about jobs" placeholder="e.g. LinkedIn, Naukri, Referral" {...register("additional_info.referral_source")} />
+      </div>
+      <div className="mt-6 grid gap-1">
+        <h3 className="text-sm font-medium">Voluntary self-identification</h3>
+        <p className="text-xs text-muted-foreground">
+          Some employers ask these optional equal-opportunity questions. Copilot never fills them without your review.
+        </p>
+      </div>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Gender" hint="Optional; some forms ask for it." {...register("additional_info.gender")} />
+        <Field label="Race / ethnicity" placeholder="e.g. Asian, Decline to self-identify" {...register("additional_info.ethnicity")} />
+        <ChoiceField
+          name="additional_info.veteran_status"
+          label="Veteran status"
+          options={["I am not a protected veteran", "I identify as one or more of the classifications of protected veteran", "I don't wish to answer"]}
+        />
+        <ChoiceField
+          name="additional_info.disability_status"
+          label="Disability status"
+          options={["No, I don't have a disability", "Yes, I have a disability (or previously had one)", "I don't wish to answer"]}
+        />
       </div>
     </SectionCard>
   );

@@ -31,7 +31,7 @@ describe("classify", () => {
     ["Phone", { kind: "tel" }, "phone"],
     ["Mobile phone number", {}, "phone"],
     ["Current location", {}, "location"],
-    ["City", {}, "location"],
+    ["City", {}, "city"],
     ["LinkedIn Profile", {}, "linkedin"],
     ["LinkedIn URL", { kind: "url" }, "linkedin"],
     ["GitHub URL", {}, "github"],
@@ -76,9 +76,10 @@ describe("classify", () => {
     expect(classify(field("Cover letter", { kind: "textarea" })).question).toBe(false);
   });
 
-  it("never maps voluntary EEO questions or consent boxes", () => {
-    expect(classify(field("Are you a protected veteran?", { kind: "select" })).key).toBeNull();
-    expect(classify(field("Race/Ethnicity", { kind: "select" })).key).toBeNull();
+  it("keeps EEO questions to the user's own answers and skips the most personal ones", () => {
+    expect(classify(field("Are you a protected veteran?", { kind: "select" })).key).toBe("veteran_status");
+    expect(classify(field("Race/Ethnicity", { kind: "select" })).key).toBe("ethnicity");
+    expect(classify(field("Sexual orientation", { kind: "select" })).key).toBeNull();
     expect(classify(field("I agree to the privacy policy", { kind: "checkbox" })).key).toBeNull();
   });
 
@@ -132,6 +133,17 @@ describe("mapField", () => {
   it("joins lists and respects maxLength", () => {
     expect(mapField(field("Skills"), 0, profile, null).value).toBe("Python, Go, Django, PostgreSQL, AWS, Git");
     expect(mapField(field("Full name", { maxLength: 5 }), 0, profile, null).value).toBe("Priya");
+  });
+
+  it("fills start date, work mode and source; keeps EEO answers for review", () => {
+    const extra = { ...profile.additional_info, notice_period: "30 days", work_mode_preference: "Hybrid", referral_source: "LinkedIn", veteran_status: "I am not a protected veteran" };
+    const p = makeProfile({ additional_info: extra });
+    expect(mapField(field("When can you start?"), 0, p, null).value).toBe("After my notice period of 30 days");
+    expect(mapField(field("Preferred work arrangement", { kind: "select", options: opts("Remote", "Hybrid", "On-site") }), 0, p, null).value).toBe("Hybrid");
+    expect(mapField(field("How did you hear about us?"), 0, p, null).value).toBe("LinkedIn");
+    const veteran = mapField(field("Veteran Status", { kind: "select", options: opts("I am not a protected veteran", "I identify as a protected veteran", "I don't wish to answer") }), 0, p, null);
+    expect(veteran).toMatchObject({ value: "I am not a protected veteran", status: "review" });
+    expect(mapField(field("Employment start date"), 0, p, null).key).not.toBe("earliest_start_date");
   });
 
   it("maps the resume upload to the primary resume", () => {

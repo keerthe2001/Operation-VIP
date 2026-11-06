@@ -23,6 +23,8 @@ const WEB_URL = process.env.WEB_URL ?? "http://localhost:5173";
 const define = {
   __API_URL__: JSON.stringify(API_URL),
   __WEB_URL__: JSON.stringify(WEB_URL),
+  // E2E builds open the assistant's shadow root so tests can reach it; real builds keep it closed.
+  __WIDGET_SHADOW__: JSON.stringify(process.env.E2E === "1" ? "open" : "closed"),
   "process.env.NODE_ENV": JSON.stringify(watch ? "development" : "production"),
 };
 const resolve = { alias: { "@": src } };
@@ -65,6 +67,23 @@ await build({
   logLevel: "warn",
 });
 
+// The floating assistant: React in a shadow root, top frame only.
+await build({
+  configFile: false,
+  publicDir: false,
+  define,
+  resolve,
+  plugins: [react()],
+  build: {
+    outDir: dist,
+    emptyOutDir: false,
+    sourcemap: watch ? "inline" : false,
+    watch: watch ? {} : null,
+    lib: { entry: `${src}/widget/index.tsx`, formats: ["iife"], name: "CopilotWidget", fileName: () => "widget.js" },
+  },
+  logLevel: "warn",
+});
+
 const pkg = JSON.parse(await readFile(`${root}package.json`, "utf8"));
 const key = (await readFile(`${root}extension-key.pub.txt`, "utf8")).trim();
 const apiOrigin = new URL(API_URL).origin;
@@ -80,6 +99,17 @@ const PORTALS = [
   "https://*.myworkday.com/*",
   "https://jobs.ashbyhq.com/*",
   "https://www.linkedin.com/jobs/*",
+  // More applicant tracking systems and job boards.
+  "https://jobs.smartrecruiters.com/*",
+  "https://*.icims.com/*",
+  "https://jobs.jobvite.com/*",
+  "https://*.bamboohr.com/*",
+  "https://*.taleo.net/*",
+  "https://*.successfactors.com/*",
+  "https://*.naukri.com/*",
+  "https://www.naukri.com/*",
+  "https://smartapply.indeed.com/*",
+  "https://wellfound.com/*",
 ];
 
 const manifest = {
@@ -97,7 +127,10 @@ const manifest = {
   permissions: ["storage", "sidePanel", "alarms", "scripting", "activeTab"],
   host_permissions: [`${apiOrigin}/*`, ...PORTALS],
   optional_host_permissions: ["https://*/*", "http://*/*"],
-  content_scripts: [{ matches: PORTALS, js: ["content.js"], run_at: "document_idle", all_frames: true }],
+  content_scripts: [
+    { matches: PORTALS, js: ["content.js"], run_at: "document_idle", all_frames: true },
+    { matches: PORTALS, js: ["widget.js"], run_at: "document_idle", all_frames: false },
+  ],
   externally_connectable: { matches: [`${webOrigin}/*`] },
   content_security_policy: { extension_pages: "script-src 'self'; object-src 'self'" },
 };

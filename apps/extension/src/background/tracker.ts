@@ -30,6 +30,13 @@ export class ApplicationTracker {
     return request;
   }
 
+  /** "Save job" from the in-page assistant: track any job page, not only applications. */
+  async save(tabId: number, job: DetectedJob): Promise<TrackedApplication | null> {
+    const known = await this.get(tabId);
+    if (known?.url === job.url) return known;
+    return this.report(tabId, job, 0);
+  }
+
   async onFilled(tabId: number, job: DetectedJob | null | undefined, filledCount: number): Promise<void> {
     if (!job?.isApplicationPage || filledCount <= 0) return;
     await this.report(tabId, job, filledCount);

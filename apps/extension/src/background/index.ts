@@ -4,15 +4,17 @@ import { AuthError, AuthManager } from "@/background/auth";
 import { ensureAllSitesScript } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
 import { ApplicationTracker } from "@/background/tracker";
+import { readyKeys, widgetState } from "@/background/widget";
 import { API_URL, WEB_URL } from "@/shared/config";
 import {
   contentMessageSchema,
   externalMessageSchema,
   panelMessageSchema,
+  widgetMessageSchema,
   type Reply,
 } from "@/shared/messages";
 import type { FillResult } from "@/shared/fields";
-import { appKey, chromeArea, DEFAULT_LOCAL, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
+import { appKey, chromeArea, DEFAULT_LOCAL, DEFAULT_WIDGET, formKey, tabEntry, tabKey, type LocalStore, type SessionStore } from "@/shared/storage";
 import type { DetectedJob, TabState } from "@/shared/types";
 
 const local = chromeArea<LocalStore>(chrome.storage.local);
@@ -100,6 +102,7 @@ async function forceScan(tabId: number): Promise<Reply> {
   }
   try {
     await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["widget.js"] }).catch(() => undefined);
     await ask();
     return { ok: true };
   } catch {
@@ -107,6 +110,49 @@ async function forceScan(tabId: number): Promise<Reply> {
       ok: false,
       error: "Copilot can't read this page yet. Click the Copilot icon in the toolbar while on this page, then try again.",
     };
+  }
+}
+
+/** Requests from the floating in-page assistant. */
+async function handleWidget(raw: unknown, tab: chrome.tabs.Tab): Promise<Reply<unknown>> {
+  const parsed = widgetMessageSchema.safeParse(raw);
+  if (!parsed.success || tab.id === undefined) return { ok: false, error: "Invalid message" };
+  const tabId = tab.id;
+  const message = parsed.data;
+  try {
+    switch (message.type) {
+      case "WIDGET_STATE":
+        return { ok: true, data: await widgetState(tabId, tab.url, local, session) };
+      case "WIDGET_FILL": {
+        const keys = readyKeys((await autofill.state(tabId))?.fields ?? []);
+        if (keys.length === 0) return { ok: true, data: { filled: 0 } };
+        const summary = await autofill.fill(tabId, keys, false);
+        const filled = (await autofill.state(tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;
+        void tracker.onFilled(tabId, (await session.get(tabKey(tabId)))?.job, filled);
+        return { ok: true, data: summary };
+      }
+      case "WIDGET_FORCE":
+        return await forceScan(tabId);
+      case "WIDGET_SAVE_JOB": {
+        const job = (await session.get(tabKey(tabId)))?.job;
+        if (!job) return { ok: false, error: "No job found on this page." };
+        const saved = await tracker.save(tabId, job);
+        return saved ? { ok: true, data: saved } : { ok: false, error: "Couldn't save the job. Are you signed in?" };
+      }
+      case "WIDGET_OPEN_PANEL":
+        // Allowed because the click in the page is a user gesture.
+        await chrome.sidePanel.open({ tabId, windowId: tab.windowId });
+        return { ok: true };
+      case "WIDGET_PREFS": {
+        const current = { ...DEFAULT_WIDGET, ...(await local.get("widget")) };
+        const { hideOnHost, ...position } = message.prefs;
+        const hiddenHosts = hideOnHost ? [...new Set([...current.hiddenHosts, hideOnHost])].slice(-200) : current.hiddenHosts;
+        await local.set({ widget: { ...current, ...position, hiddenHosts } });
+        return { ok: true };
+      }
+    }
+  } catch (error) {
+    return fail(error);
   }
 }
 
@@ -138,6 +184,12 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
         return { ok: true };
       case "FORCE_SCAN":
         return await forceScan(message.tabId);
+      case "SET_WIDGET_PREFS": {
+        const current = { ...DEFAULT_WIDGET, ...(await local.get("widget")) };
+        const { showOnAllHosts, ...rest } = message.prefs;
+        await local.set({ widget: { ...current, ...rest, ...(showOnAllHosts ? { hiddenHosts: [] } : {}) } });
+        return { ok: true };
+      }
       case "FILL_FIELDS": {
         const summary = await autofill.fill(message.tabId, message.fields, message.overwrite);
         const filled = (await autofill.state(message.tabId))?.fields.filter((f) => f.result === "filled").length ?? 0;
@@ -199,7 +251,11 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
   const fromExtensionPage = sender.url?.startsWith(chrome.runtime.getURL("")) ?? false;
   if (!fromExtensionPage && sender.tab?.id !== undefined) {
     const parsed = contentMessageSchema.safeParse(raw);
-    if (!parsed.success) return false;
+    if (!parsed.success) {
+      // Not a report: a request from the in-page assistant, answered asynchronously.
+      void handleWidget(raw, sender.tab).then(sendResponse);
+      return true;
+    }
     const frameId = sender.frameId ?? 0;
     if (parsed.data.type === "PAGE_ANALYZED") {
       void recordTab(sender.tab.id, frameId, sender.tab.url ?? parsed.data.url, parsed.data.job);

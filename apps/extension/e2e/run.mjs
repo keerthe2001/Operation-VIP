@@ -1,7 +1,8 @@
 /**
  * End-to-end check of the extension in real Chromium.
  *
- * Prerequisites: API on :8000 and web app on :5173 running, extension built (pnpm build).
+ * Prerequisites: API on :8000 and web app on :5173 running, extension built with E2E=1 (opens the
+ * assistant's shadow root so the test can reach it).
  * Usage: node e2e/run.mjs [screenshotDir]
  *
  * Job portals are not contacted: their URLs are intercepted and served from fixtures.
@@ -78,6 +79,22 @@ const PLAIN_HTML = `<!doctype html><html><head><title>Career - Pixelworks</title
 const WEAK_URL = "https://jobs.lever.co/pixelworks/newsletter";
 const WEAK_HTML = `<!doctype html><html><head><title>Newsletter</title></head><body><form>
   <input type="email" placeholder="Your email"></form></body></html>`;
+
+// A Naukri-style job posting with structured data: the floating assistant shows as a bubble.
+const NAUKRI_URL = "https://www.naukri.com/job-listings-data-scientist-northwind-bengaluru-2-to-4-years-061126000123";
+const NAUKRI_HTML = `<!doctype html><html><head><title>Data Scientist - Northwind - Bengaluru | Naukri.com</title>
+<script type="application/ld+json">${JSON.stringify({
+  "@context": "https://schema.org", "@type": "JobPosting", title: "Data Scientist",
+  hiringOrganization: { "@type": "Organization", name: "Northwind" },
+  description: "<p>Location: Bengaluru</p><p>We need 2+ years of experience with Python, PostgreSQL, Snowflake and Airflow.</p>",
+})}</script></head><body><h1>Data Scientist</h1><button>Apply</button></body></html>`;
+// An application form for the assistant's one-click autofill.
+const WIDGET_FORM_URL = "https://jobs.lever.co/pixelworks/apply-widget";
+const WIDGET_FORM_HTML = `<!doctype html><html><head><title>Apply - Pixelworks</title></head><body><form>
+  <label for="a">First Name</label><input id="a"><label for="b">Last Name</label><input id="b">
+  <label for="c">Email Address</label><input id="c" type="email"><label for="d">Mobile Number</label><input id="d" type="tel">
+  <label for="e">City</label><input id="e"><label for="f">Latest Employer Name</label><input id="f">
+</form></body></html>`;
 
 const check = (condition, message) => {
   if (!condition) throw new Error(`FAILED: ${message}`);
@@ -356,6 +373,52 @@ try {
   await panel.getByRole("button", { name: "Autofill 1 field" }).click();
   await panel.getByText(/Filled 1 field/).waitFor();
   check((await weak.inputValue("input[type=email]")) === "priya.raman@example.com", "\"Fill this page anyway\" fills an unrecognised form");
+
+  // 10c. Floating assistant: a bubble on job postings, auto-open + one-click fill on forms.
+  const widget = (p) => p.locator("copilot-assistant");
+  await context.route(NAUKRI_URL, (route) => route.fulfill({ contentType: "text/html", body: NAUKRI_HTML }));
+  const naukri = await context.newPage();
+  await naukri.goto(NAUKRI_URL);
+  const bubble = widget(naukri).getByRole("button", { name: "Open Copilot" });
+  await bubble.waitFor({ timeout: 15000 });
+  check(true, "assistant bubble shown on a Naukri job posting");
+  if (shots) await naukri.screenshot({ path: `${shots}/widget-bubble.png` });
+  await bubble.click();
+  await widget(naukri).getByText("This is a job posting").waitFor();
+  await widget(naukri).getByRole("tab", { name: /Match/ }).click();
+  await widget(naukri).getByText(/Mentioned, not in your profile/).waitFor();
+  const missingSkills = await widget(naukri).locator(".pill.warn").allInnerTexts();
+  check(missingSkills.includes("Snowflake"), `job match lists skills missing from the profile (${missingSkills.join(", ")})`);
+  if (shots) await naukri.screenshot({ path: `${shots}/widget-match.png` });
+  await widget(naukri).getByRole("tab", { name: /Autofill/ }).click();
+  await widget(naukri).getByRole("button", { name: "Save job" }).click();
+  await widget(naukri).getByText("Saved to your tracker.").waitFor();
+  check(true, "job saved to the tracker from the assistant");
+  // Drag the bubble to the left edge; it docks there and remembers it.
+  await widget(naukri).getByRole("button", { name: "Minimise", exact: true }).click();
+  const box = await bubble.boundingBox();
+  await naukri.mouse.move(box.x + 20, box.y + 20);
+  await naukri.mouse.down();
+  await naukri.mouse.move(200, 400, { steps: 8 });
+  await naukri.mouse.up();
+  const dockedLeft = await bubble.evaluate((el) => el.getBoundingClientRect().left < 100);
+  const savedSide = await worker.evaluate(async () => (await chrome.storage.local.get("widget")).widget?.side);
+  check(dockedLeft && savedSide === "left", "dragged bubble docks to the nearest side and the position is saved");
+
+  await context.route(WIDGET_FORM_URL, (route) => route.fulfill({ contentType: "text/html", body: WIDGET_FORM_HTML }));
+  const form = await context.newPage();
+  await form.goto(WIDGET_FORM_URL);
+  const fillButton = widget(form).getByRole("button", { name: /^Autofill \d+ fields$/ });
+  await fillButton.waitFor({ timeout: 15000 });
+  if (shots) await form.screenshot({ path: `${shots}/widget-autofill.png` });
+  await fillButton.click();
+  await widget(form).getByText(/Filled \d+ fields/).waitFor();
+  const formValues = await form.evaluate(() => ["a", "b", "c", "d", "e", "f"].map((id) => document.getElementById(id).value));
+  check(
+    formValues[0] === "Priya" && formValues[2] === "priya.raman@example.com" && formValues[4] !== "" && formValues[5] !== "",
+    `assistant opened by itself and filled the form in one click (${formValues.join(" | ")})`,
+  );
+  if (shots) await form.screenshot({ path: `${shots}/widget-filled.png` });
 
   // 11. Sign out from the panel.
   await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html?tab=${tabState.tabId}`);

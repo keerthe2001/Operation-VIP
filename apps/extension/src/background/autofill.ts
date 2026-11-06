@@ -1,5 +1,5 @@
 import type { Api } from "@/background/api";
-import { mapField } from "@/mapping/engine";
+import { mapFields } from "@/mapping/engine";
 import type { FieldDescriptor, FillInstruction, FillResult, FormState, MappedField } from "@/shared/fields";
 import type { KeyValueArea, LocalStore, SessionStore } from "@/shared/storage";
 import { formEntry, formKey } from "@/shared/storage";
@@ -52,8 +52,7 @@ export class AutofillCoordinator {
       : [];
     const results = new Map(previous?.fields.map((f) => [fieldKey(f), f]) ?? []);
     const { profile, resumeName } = await this.profileContext();
-    const mapped = fields.map((field) => {
-      const next = mapField(field, frameId, profile, resumeName);
+    const mapped = mapFields(fields, frameId, profile, resumeName).map((next) => {
       const before = results.get(fieldKey(next));
       return before?.result ? { ...next, result: before.result, resultMessage: before.resultMessage } : next;
     });
@@ -73,7 +72,10 @@ export class AutofillCoordinator {
     for (const tabId of tabIds) {
       const state = await this.state(tabId);
       if (!state) continue;
-      state.fields = state.fields.map((f) => ({ ...mapField(f, f.frameId, profile, resumeName), result: f.result, resultMessage: f.resultMessage }));
+      const frames = [...new Set(state.fields.map((f) => f.frameId))];
+      const remapped = frames.flatMap((frameId) => mapFields(state.fields.filter((f) => f.frameId === frameId), frameId, profile, resumeName));
+      const before = new Map(state.fields.map((f) => [fieldKey(f), f]));
+      state.fields = remapped.map((f) => ({ ...f, result: before.get(fieldKey(f))?.result, resultMessage: before.get(fieldKey(f))?.resultMessage }));
       await this.session.set(formEntry(tabId, state));
     }
   }

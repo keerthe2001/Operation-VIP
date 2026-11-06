@@ -485,8 +485,16 @@ export interface components {
             current_salary?: string | null;
             /** Date Of Birth */
             date_of_birth?: string | null;
+            /** Disability Status */
+            disability_status?: string | null;
+            /** Earliest Start Date */
+            earliest_start_date?: string | null;
+            /** Ethnicity */
+            ethnicity?: string | null;
             /** Expected Salary */
             expected_salary?: string | null;
+            /** Father Name */
+            father_name?: string | null;
             /** Gender */
             gender?: string | null;
             /**
@@ -494,6 +502,8 @@ export interface components {
              * @default []
              */
             languages: string[];
+            /** Marital Status */
+            marital_status?: string | null;
             /** Nationality */
             nationality?: string | null;
             /** Notice Period */
@@ -505,12 +515,18 @@ export interface components {
             preferred_locations: string[];
             /** Pronouns */
             pronouns?: string | null;
+            /** Referral Source */
+            referral_source?: string | null;
             /** Requires Sponsorship */
             requires_sponsorship?: boolean | null;
+            /** Veteran Status */
+            veteran_status?: string | null;
             /** Willing To Relocate */
             willing_to_relocate?: boolean | null;
             /** Work Authorization */
             work_authorization?: string | null;
+            /** Work Mode Preference */
+            work_mode_preference?: string | null;
         };
         /** AnswerTemplate */
         AnswerTemplate: {
@@ -962,6 +978,14 @@ export interface components {
         };
         /** PersonalInformation */
         PersonalInformation: {
+            /** Address */
+            address?: string | null;
+            /** Alternate Phone */
+            alternate_phone?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -980,6 +1004,10 @@ export interface components {
             phone?: string | null;
             /** Portfolio */
             portfolio?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** State */
+            state?: string | null;
         };
         /** ProfessionalSummary */
         ProfessionalSummary: {

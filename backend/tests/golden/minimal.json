@@ -73,6 +73,10 @@
     }
   },
   "personal_information": {
+    "address": null,
+    "alternate_phone": null,
+    "city": null,
+    "country": null,
     "email": "john.smith@mail.com",
     "first_name": "John",
     "full_name": "John Smith",
@@ -81,7 +85,9 @@
     "linkedin": null,
     "location": null,
     "phone": "+14155550134",
-    "portfolio": null
+    "portfolio": null,
+    "postal_code": null,
+    "state": null
   },
   "professional_summary": {
     "current_designation": "Barista",

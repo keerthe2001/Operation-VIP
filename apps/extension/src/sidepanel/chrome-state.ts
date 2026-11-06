@@ -61,9 +61,19 @@ function useSessionValue<T>(key: string | null): T | null {
 export const useTabState = (tabId: number | null) => useSessionValue<TabState>(tabId === null ? null : tabKey(tabId));
 export const useFormState = (tabId: number | null) => useSessionValue<FormState>(tabId === null ? null : formKey(tabId));
 
+export const STALE_WORKER_EVENT = "copilot:stale-worker";
+
 export async function send<T = unknown>(message: PanelMessage): Promise<Reply<T>> {
   try {
-    return ((await chrome.runtime.sendMessage(message)) as Reply<T>) ?? { ok: false, error: "No response" };
+    const reply = ((await chrome.runtime.sendMessage(message)) as Reply<T>) ?? { ok: false, error: "No response" };
+    // The panel only sends valid messages, so a rejection means the background is still
+    // running an older build: Chrome reloads panel files from disk but keeps the old
+    // service worker until the extension is reloaded.
+    if (!reply.ok && reply.error === "Invalid message") {
+      window.dispatchEvent(new Event(STALE_WORKER_EVENT));
+      return { ok: false, error: "Copilot was updated. Restart it to finish the update.", code: "STALE_WORKER" };
+    }
+    return reply;
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Extension error" };
   }

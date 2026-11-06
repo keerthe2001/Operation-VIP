@@ -50,7 +50,7 @@ export function analyzeForms(root: Document | ShadowRoot): FormSignals {
 }
 
 const APPLY_TEXT = /apply (?:for this|now|to this)|submit (?:your )?application|application form|easy apply/i;
-const JOB_URL = /\/(?:jobs?|careers?|positions?|openings?|vacanc(?:y|ies)|apply|application|postings?)(?:\/|$|\?)/i;
+const JOB_URL = /\/(?:jobs?|careers?|positions?|openings?|vacanc(?:y|ies)|apply|application|postings?)(?:\/|$|\?)|\/job-listings-|\/viewjob\b/i;
 
 export function pageSignals(doc: Document, url: URL) {
   const bodyText = doc.body?.innerText ?? doc.body?.textContent ?? "";

@@ -72,7 +72,7 @@ fixtures; no third-party site is contacted.
 
 ```bash
 # API on :8000 and web app on :5173 running, then:
-pnpm --filter @copilot/extension build
+E2E=1 pnpm --filter @copilot/extension build   # opens the assistant's shadow root for the test
 RESUME_PDF=path/to/resume.pdf node apps/extension/e2e/run.mjs [screenshot-dir]
 ```
 
@@ -81,7 +81,8 @@ storage; profile sync; Greenhouse detection; Autofill (text, select range, resum
 upload) while leaving questions and sensitive fields alone; Review & fill; answer library
 suggestion with placeholders and Insert; application tracking and "I submitted";
 an embedded Greenhouse iframe; a two-step Workday form; a plain careers form with a hidden CV
-input; "Fill this page anyway" on an unrecognised form; no injection on unsupported sites;
+input; "Fill this page anyway" on an unrecognised form; the floating assistant (bubble on a Naukri-style
+posting, job match, save job, drag-to-dock, auto-open and one-click autofill); no injection on unsupported sites;
 sign-out.
 
 ## Continuous integration

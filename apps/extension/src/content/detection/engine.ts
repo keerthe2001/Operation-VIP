@@ -20,6 +20,7 @@ const DESCRIPTION_SELECTORS = [
   "[data-automation-id='jobPostingDescription']", // Workday
   "[class*='descriptionText']", "[class*='job-description']", "[class*='jobDescription']", // Ashby / generic
   ".jobs-description__content", // LinkedIn
+  "[class*='job-desc']", "[class*='JDC']", "[class*='jobdescription']", "#jobDescriptionText", // Naukri, Indeed, generic
 ];
 
 function pageDescription(doc: Document): string | null {
