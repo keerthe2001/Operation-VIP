@@ -35,7 +35,12 @@ export function labelFor(el: Element): string {
 export function nearbyText(el: Element): string {
   let node = el.parentElement;
   for (let depth = 0; node && depth < 3; depth += 1, node = node.parentElement) {
-    const content = (node.textContent ?? "").replace(/\s+/g, " ").trim();
+    let content = node.textContent ?? "";
+    // Button captions ("Browse Files") don't say what the upload is for.
+    for (const button of node.querySelectorAll("button, [role='button']")) {
+      content = content.replace(button.textContent ?? "", " ");
+    }
+    content = content.replace(/\s+/g, " ").trim();
     if (content.length > 200) break;
     if (content) return content;
   }

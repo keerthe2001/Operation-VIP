@@ -39,7 +39,7 @@ describe("job detection", () => {
         <div><select name="post"><option>Backend Developer</option><option>Designer</option></select></div>
         <div><textarea name="message" placeholder="MESSAGE"></textarea></div>
         <div><input type="url" name="portfolio" placeholder="Portfolio Url"></div>
-        <div><p>Upload CV:</p><div class="dropzone"><input type="file" name="cv-file" style="display:none"><button type="button">Browse Files</button></div></div>
+        <div><p>Upload CV:</p><div class="dropzone"><input type="file" name="file-583" style="display:none"><button type="button">Browse Files</button></div></div>
       </form></body>`;
     const job = detectJob(document, "https://pixelworks.example/career/")!;
     expect(job).not.toBeNull();
