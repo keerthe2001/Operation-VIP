@@ -2,6 +2,7 @@
  * Writes values into form controls the way a user would, so that frameworks
  * (React, Vue, Angular) observe the change and update their own state.
  */
+import { isVisible } from "@/content/dom/visibility";
 import { deepQueryAll, findField } from "@/content/forms/scanner";
 import type { FillInstruction, FillResult } from "@/shared/fields";
 
@@ -26,6 +27,10 @@ function hasValue(el: HTMLElement, instruction: FillInstruction): boolean {
     return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`).some((r) => (r as HTMLInputElement).checked);
   }
   if (instruction.kind === "checkbox") return false;
+  if (instruction.kind === "checkboxes") {
+    const name = (el as HTMLInputElement).name;
+    return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(name)}"]`).some((b) => (b as HTMLInputElement).checked);
+  }
   if (instruction.kind === "combobox" && instruction.multi) return false;
   if (instruction.kind === "listbox") {
     const shown = (el.textContent ?? "").trim();
@@ -61,9 +66,13 @@ function needsTyping(el: HTMLElement): boolean {
 }
 
 /** Types a value the way a keyboard would: key events plus the value growing one character at a time. */
-async function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+async function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string, options: { keepFocus?: boolean } = {}) {
   input.focus();
-  input.select?.();
+  try {
+    input.select?.();
+  } catch {
+    // Some input types (email, number) can't be selected.
+  }
   setNativeValue(input, "");
   dispatch(input, "input");
   let typed = "";
@@ -72,21 +81,33 @@ async function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: st
     input.dispatchEvent(new KeyboardEvent("keydown", init));
     input.dispatchEvent(new KeyboardEvent("keypress", init));
     typed += char;
-    setNativeValue(input, typed);
-    input.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, data: char, inputType: "insertText" }));
+    // The browser's own text insertion fires a genuine input event, which React widgets
+    // (react-select and others) act on; fall back to setting the value directly.
+    const inserted = input.ownerDocument.activeElement === input && input.ownerDocument.execCommand?.("insertText", false, char);
+    if (!inserted) {
+      setNativeValue(input, typed);
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, data: char, inputType: "insertText" }));
+    }
     input.dispatchEvent(new KeyboardEvent("keyup", init));
     await wait(15);
   }
   dispatch(input, "change");
-  input.blur();
+  if (!options.keepFocus) input.blur();
 }
 
 const norm = (text: string) => text.toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
 
 /** The option that best matches a value: exact, then prefix, then containment, then shared words. */
+const DECLINE = /\b(decline|prefer not|don'?t wish|do not wish|not wish to|choose not|rather not|not to (say|disclose|answer|self.?identify)|not disclose)\b/i;
+
 export function bestOption<T extends { text: string }>(options: T[], value: string): T | null {
   const target = norm(value);
   if (!target) return null;
+  // "Decline" means the form's own way of not answering, whatever its wording.
+  if (DECLINE.test(value)) {
+    const decline = options.find((o) => DECLINE.test(o.text));
+    if (decline) return decline;
+  }
   const words = new Set(target.split(" "));
   let best: { option: T; score: number } | null = null;
   for (const option of options) {
@@ -106,20 +127,35 @@ export function bestOption<T extends { text: string }>(options: T[], value: stri
 }
 
 function press(el: Element) {
-  // Many dropdown libraries react to pointer/mouse down rather than click.
+  // Many dropdown libraries react to pointer/mouse down rather than click, and check that the
+  // primary button is held (react-select).
+  const view = el.ownerDocument.defaultView;
   for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
     const Event = type.startsWith("pointer") && typeof PointerEvent !== "undefined" ? PointerEvent : MouseEvent;
-    el.dispatchEvent(new Event(type, { bubbles: true, cancelable: true, composed: true }));
+    const down = type.endsWith("down");
+    const init = { bubbles: true, cancelable: true, composed: true, button: 0, buttons: down ? 1 : 0, pointerType: "mouse", isPrimary: true } as PointerEventInit;
+    let event: Event;
+    try {
+      event = new Event(type, { ...init, view });
+    } catch {
+      event = new Event(type, init); // test DOMs without a real window
+    }
+    el.dispatchEvent(event);
   }
+}
+
+/** The clickable box of a searchable dropdown (react-select's "control"), or the input itself. */
+function controlOf(input: HTMLElement): HTMLElement {
+  return (input.closest("[class*='__control'], [class*='-control'], [class*='Control']") as HTMLElement | null) ?? input;
 }
 
 function visibleOptions(doc: Document, listId: string | null): HTMLElement[] {
   const scope: ParentNode = (listId && doc.getElementById(listId)) || doc;
-  return ([...scope.querySelectorAll("[role='option']")] as HTMLElement[]).filter((o) => {
-    if (o.getAttribute("aria-disabled") === "true" || o.closest("[hidden], [aria-hidden='true']")) return false;
-    const style = o.ownerDocument.defaultView?.getComputedStyle(o);
-    return !style || (style.display !== "none" && style.visibility !== "hidden");
-  });
+  // Hidden lists stay in the page (intl-tel-input keeps ~240 country options in a closed
+  // dropdown), so check the option's real visibility, parents included.
+  return ([...scope.querySelectorAll("[role='option']")] as HTMLElement[]).filter(
+    (o) => o.getAttribute("aria-disabled") !== "true" && !o.closest("[hidden], [aria-hidden='true']") && isVisible(o),
+  );
 }
 
 async function pickOption(owner: HTMLElement, value: string, attempts = 20): Promise<boolean> {
@@ -137,11 +173,56 @@ async function pickOption(owner: HTMLElement, value: string, attempts = 20): Pro
   return false;
 }
 
+const SUGGESTIONS = "[role='option'], .dropdown-results > *, .pac-item, [class*='suggestion'] li, li[class*='suggestion'], [class*='autocomplete'] li, [class*='typeahead'] li";
+
+/** Suggestions a place box shows near itself (or Google Places' list at the end of the page). */
+function suggestionsFor(input: HTMLInputElement): HTMLElement[] {
+  let node: Element | null = input.parentElement;
+  for (let depth = 0; node && depth < 4; depth += 1, node = node.parentElement) {
+    const near = ([...node.querySelectorAll(SUGGESTIONS)] as HTMLElement[]).filter((o) => isVisible(o) && (o.textContent ?? "").trim());
+    if (near.length) return near;
+  }
+  return ([...input.ownerDocument.querySelectorAll(".pac-container .pac-item, [role='listbox'] [role='option']")] as HTMLElement[]).filter(isVisible);
+}
+
+/**
+ * Type the place's first part ("Bengaluru") the way a person would, then choose the
+ * suggestion that best matches the whole value. False when no suggestion list appears.
+ */
+async function pickSuggestion(input: HTMLInputElement, value: string): Promise<boolean> {
+  const query = value.split(",")[0]!.trim();
+  if (!query) return false;
+  await typeInto(input, query, { keepFocus: true });
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    await wait(120);
+    const options = suggestionsFor(input).map((el) => ({ el, text: el.textContent ?? "" }));
+    if (!options.length) continue;
+    const match = bestOption(options, value) ?? bestOption(options, query) ?? options[0]!;
+    match.el.scrollIntoView?.({ block: "nearest" });
+    press(match.el);
+    await wait(200);
+    input.blur();
+    return true;
+  }
+  // No list: put the full value back as plain text.
+  setNativeValue(input, value);
+  dispatch(input, "input", "change");
+  input.blur();
+  return false;
+}
+
 async function pickComboboxOption(input: HTMLInputElement, value: string): Promise<boolean> {
   if (await pickOption(input, value, 6)) return true;
   // Workday-style search prompts only list matches after Enter.
   input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-  return pickOption(input, value, 15);
+  if (await pickOption(input, value, 10)) return true;
+  // The search found nothing ("Decline" vs "I don't wish to answer"): clear it, open the
+  // whole list and choose from every option.
+  await typeInto(input, "", { keepFocus: true });
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+  if (await pickOption(input, value, 4)) return true;
+  press(controlOf(input));
+  return pickOption(input, value, 8);
 }
 
 export async function fillField(instruction: FillInstruction): Promise<FillResult> {
@@ -173,6 +254,21 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
         if (!radio.checked) {
           radio.checked = true;
           dispatch(radio, "input", "change");
+        }
+        break;
+      }
+      case "checkboxes": {
+        const name = (el as HTMLInputElement).name;
+        const boxes = deepQueryAll(el.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(name)}"]`) as HTMLInputElement[];
+        const wanted = new Set((instruction.optionValue ?? "").split("\n").filter(Boolean));
+        const targets = boxes.filter((b) => wanted.has(b.value) || wanted.has(b.getAttribute("data-copilot-field") ?? ""));
+        if (!targets.length) return { id: instruction.id, status: "failed", message: "Option not found" };
+        for (const box of targets) {
+          if (!box.checked) box.click();
+          if (!box.checked) {
+            box.checked = true;
+            dispatch(box, "input", "change");
+          }
         }
         break;
       }
@@ -220,9 +316,7 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
           const input = el as HTMLInputElement;
           let added = 0;
           for (const value of (instruction.value ?? "").split(/\s*,\s*/).filter(Boolean).slice(0, 12)) {
-            input.focus();
-            setNativeValue(input, value);
-            dispatch(input, "input");
+            await typeInto(input, value, { keepFocus: true });
             if (await pickComboboxOption(input, value)) added += 1;
             setNativeValue(input, "");
             dispatch(input, "input");
@@ -233,19 +327,31 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
           break;
         }
         const input = el as HTMLInputElement;
-        input.focus();
-        setNativeValue(input, instruction.value ?? "");
-        dispatch(input, "input");
+        // Open it like a click would, then type the start of the answer to narrow the list
+        // ("India" for "India (+91)").
+        press(controlOf(input));
+        const query = (instruction.value ?? "").split(/\s*[(,]/)[0]!.trim() || (instruction.value ?? "");
+        await typeInto(input, query, { keepFocus: true });
         const picked = await pickComboboxOption(input, instruction.value ?? "");
         if (!picked) {
-          dispatch(input, "change");
-          highlight(input);
-          return { id: instruction.id, status: "filled", message: "Typed the value; check the selection" };
+          input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+          // A free-text box with suggestions keeps the typed value; a pick-only list doesn't.
+          setNativeValue(input, instruction.value ?? "");
+          dispatch(input, "input", "change");
+          input.blur();
+          await wait(150);
+          if (input.value.trim()) {
+            highlight(input);
+            return { id: instruction.id, status: "filled", message: "Typed the value; check the selection" };
+          }
+          return { id: instruction.id, status: "failed", message: "No matching option; choose it yourself" };
         }
+        input.blur();
         break;
       }
       default: {
         const input = el as HTMLInputElement | HTMLTextAreaElement;
+        if (instruction.suggest && input instanceof HTMLInputElement && (await pickSuggestion(input, instruction.value ?? ""))) break;
         // Date spin boxes (Workday) and widgets that ignore a set value get it typed key by key.
         if (instruction.typing || needsTyping(input)) await typeInto(input, instruction.value ?? "");
         else {

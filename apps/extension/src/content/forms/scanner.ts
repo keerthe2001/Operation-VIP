@@ -1,4 +1,4 @@
-import { labelFor, nearbyText } from "@/content/dom/labels";
+import { labelFor, nearbyText, nearestCaption } from "@/content/dom/labels";
 import { isVisible, text } from "@/content/dom/visibility";
 import type { FieldDescriptor, FieldKind } from "@/shared/fields";
 
@@ -81,18 +81,38 @@ function describedText(el: Element): string {
 function groupLabel(first: HTMLInputElement): string {
   const legend = first.closest("fieldset")?.querySelector("legend");
   if (legend && text(legend)) return text(legend);
-  const group = first.closest("[role='radiogroup']");
-  if (group) {
+  const group = first.closest("[role='radiogroup'], [role='group']");
+  if (group && (group.getAttribute("aria-labelledby") || group.getAttribute("aria-label"))) {
     const label = labelFor(group);
     if (label) return label;
   }
+  const caption = nearestCaption(first);
+  if (caption) return caption;
   let container: Element | null = first.parentElement;
-  for (let depth = 0; container && depth < 4; depth += 1, container = container.parentElement) {
+  for (let depth = 0; container && depth < 6; depth += 1, container = container.parentElement) {
     const candidate = container.querySelector(":scope > label, :scope > .label, :scope > [class*='label'], :scope > p, :scope > span");
     if (candidate && !candidate.querySelector("input") && text(candidate)) return text(candidate);
   }
   return first.name;
 }
+
+/** What a searchable dropdown shows as chosen when its text box is empty (react-select and
+ * similar keep the choice in a separate "single value" or "chip" element). */
+function chosenInWidget(el: Element): string {
+  let node = el.parentElement;
+  for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+    // Stop before reaching another question's dropdown.
+    if (node.querySelectorAll("input[role='combobox'], [aria-autocomplete='list']").length > 1) break;
+    const single = node.querySelector("[class*='single-value'], [class*='singleValue'], [class*='SingleValue']");
+    if (single && text(single)) return text(single);
+    const chips = [...node.querySelectorAll("[class*='multi-value__label'], [class*='multiValue'] [class*='label']")].map((c) => text(c)).filter(Boolean);
+    if (chips.length) return chips.join(", ");
+  }
+  return "";
+}
+
+/** Upload inputs whose own label is only the button caption ("Attach", "Upload"). */
+const GENERIC_FILE_LABEL = /^(attach|upload|browse|choose( a)? file|select( a)? file|add file|drop files?( here)?|upload( a)? file|or)$/i;
 
 function selectedLabel(el: HTMLSelectElement): string {
   const option = el.selectedOptions[0];
@@ -106,6 +126,11 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
   ).filter(isFillable);
   const descriptors: FieldDescriptor[] = [];
   const radioGroups = new Map<string, HTMLInputElement[]>();
+  const checkboxGroups = new Map<string, HTMLInputElement[]>();
+  const checkboxNames = new Map<string, number>();
+  for (const el of controls) {
+    if (el instanceof HTMLInputElement && el.type === "checkbox" && el.name) checkboxNames.set(el.name, (checkboxNames.get(el.name) ?? 0) + 1);
+  }
   // Where each radio group sits among the other fields, so the list follows the page.
   const radioSlots = new Map<string, number>();
 
@@ -127,11 +152,22 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else if (kind === "listbox") currentValue = /^(select|choose|please select|--|none selected)/i.test(text(el)) ? "" : text(el);
     // Never report what's typed in a password box, only whether it's filled.
     else if (kind === "password") currentValue = input.value ? "••••••••" : "";
+    else if (kind === "combobox") currentValue = input.value || chosenInWidget(el);
     else currentValue = input.value ?? "";
 
+    // "Check all that apply": boxes sharing a name are one question (handled below).
+    if (el instanceof HTMLInputElement && el.type === "checkbox" && el.name && checkboxNames.get(el.name)! > 1) {
+      const key = `cb|${el.form?.id ?? ""}|${el.name}`;
+      if (!checkboxGroups.has(key)) radioSlots.set(key, descriptors.length + radioSlots.size);
+      checkboxGroups.set(key, [...(checkboxGroups.get(key) ?? []), el]);
+      continue;
+    }
     let label = labelFor(el);
     const section = sectionOf(el);
-    if (kind === "file" && (!label || label === el.getAttribute("name"))) label = nearbyText(el) || label;
+    if (kind === "file" && (!label || label === el.getAttribute("name") || GENERIC_FILE_LABEL.test(label))) {
+      const group = el.closest("[role='group'][aria-labelledby], [role='group'][aria-label]");
+      label = (group && labelFor(group)) || nearestCaption(el) || nearbyText(el) || label;
+    }
     // An upload box that only says "Drop files here" is named by its section ("Resume/CV").
     if (kind === "file" && !/resume|cv|cover|portfolio|transcript/i.test(label) && section) label = `${section} ${label}`.trim();
     // Split dates (Workday): "Month"/"Year" boxes take the name of their group ("From").
@@ -162,11 +198,13 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     });
   }
 
+  // Groups go back in at the place they appear on the page, in page order.
+  const groups: [number, FieldDescriptor][] = [];
   for (const [key, radios] of radioGroups) {
     const first = radios[0]!;
     const label = groupLabel(first);
     const checked = radios.find((r) => r.checked);
-    descriptors.splice(radioSlots.get(key) ?? descriptors.length, 0, {
+    groups.push([radioSlots.get(key) ?? Infinity, {
       id: fieldId(first),
       kind: "radio",
       label: label.slice(0, 500),
@@ -181,8 +219,29 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       accept: "",
       maxLength: null,
       section: sectionOf(first),
-    });
+    }]);
   }
+  for (const [key, boxes] of checkboxGroups) {
+    const first = boxes[0]!;
+    const label = groupLabel(first);
+    groups.push([radioSlots.get(key) ?? Infinity, {
+      id: fieldId(first),
+      kind: "checkboxes",
+      label: label.slice(0, 500),
+      name: first.name.slice(0, 200),
+      htmlId: first.id.slice(0, 200),
+      placeholder: "",
+      autocomplete: "",
+      helpText: describedText(first),
+      required: boxes.some((b) => b.required) || /[*✱]\s*$/.test(label) || !!first.closest(".required-field"),
+      options: boxes.map((b) => ({ value: (b.value || fieldId(b)).slice(0, 300), label: (labelFor(b) || b.value).slice(0, 300) })),
+      currentValue: boxes.filter((b) => b.checked).map((b) => labelFor(b) || b.value).join(", "),
+      accept: "",
+      maxLength: null,
+      section: sectionOf(first),
+    }]);
+  }
+  for (const [slot, descriptor] of groups.sort((a, b) => a[0] - b[0])) descriptors.splice(Math.min(slot, descriptors.length), 0, descriptor);
   return descriptors.slice(0, MAX_FIELDS);
 }
 
@@ -237,7 +296,11 @@ export function sectionOf(el: Element): string {
   let node = el.parentElement;
   for (let depth = 0; node && depth < 10; depth += 1, node = node.parentElement) {
     const before = [...node.querySelectorAll(HEADINGS)].filter(
-      (h) => !h.contains(el) && h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+      (h) =>
+        !h.contains(el) &&
+        h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING &&
+        // A legend names only its own fieldset (Greenhouse's hidden "Phone" legend).
+        !(h.tagName === "LEGEND" && !h.parentElement?.contains(el)),
     );
     const heading = before.at(-1);
     if (heading && text(heading)) return text(heading).slice(0, 200);

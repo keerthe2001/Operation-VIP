@@ -131,12 +131,13 @@ const fillInstructionSchema = z.object({
   id: z.string().max(40),
   kind: z.enum(FIELD_KINDS),
   value: z.string().max(20_000).nullable(),
-  optionValue: z.string().max(300).nullable(),
+  optionValue: z.string().max(2000).nullable(),
   checked: z.boolean().optional(),
   file: z.object({ name: z.string().max(255), type: z.string().max(127), base64: z.string().max(20_000_000) }).optional(),
   overwrite: z.boolean(),
   multi: z.boolean().optional(),
   typing: z.boolean().optional(),
+  suggest: z.boolean().optional(),
 });
 
 export const toContentSchema = z.discriminatedUnion("type", [

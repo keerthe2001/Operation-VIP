@@ -28,7 +28,7 @@ const CONSENT = /\b(agree|consent|acknowledge|privacy|terms|certify|confirm that
 const KIND_TYPES: Record<FieldDescriptor["kind"], string> = {
   text: "text", email: "email", tel: "tel", url: "url", number: "number", date: "date", textarea: "text",
   select: "select", radio: "radio", checkbox: "checkbox", file: "file", contenteditable: "text", combobox: "select",
-  password: "password", listbox: "select",
+  password: "password", listbox: "select", checkboxes: "radio",
 };
 
 /** Shown instead of the account password; the real one is only read when filling. */
@@ -92,6 +92,12 @@ export function classify(field: FieldDescriptor): Classification {
   }
   if (inWork && (result.key === "location" || result.key === "city" || /^location$/.test(label))) return { key: "job_location", confidence: 0.9, question: false };
   if (inWork && result.key === "currently_employed") return { key: "currently_working", confidence: 0.95, question: false };
+  // "Country" inside the phone block is the dialling country (Greenhouse, Lever, iCIMS).
+  if (/\bphone\b/.test(section) && /^country( code)?$/.test(label)) return { key: "phone_country", confidence: 0.95, question: false };
+  // "What is your location?" answered from a list of countries is the country.
+  if ((result.key === "location" || result.key === "city") && field.options.length > 40 && field.options.some((o) => /^(india|united states|united kingdom|germany|canada)\b/i.test(o.label))) {
+    return { key: "country", confidence: 0.9, question: false };
+  }
   if (/\blanguages?\b/.test(section) && /^language$/.test(label)) return { key: "language_item", confidence: 0.92, question: false };
   // A generic URL box in a "Websites" section; named ones (LinkedIn URL, GitHub URL) keep their key.
   const named = result.key && ["linkedin", "github", "portfolio", "twitter", "behance", "dribbble"].includes(result.key);
@@ -119,7 +125,8 @@ function classifyLabel(field: FieldDescriptor): Classification {
 
     let score = 0;
     if (rule.autocomplete?.some((token) => autocomplete.includes(token))) score = 0.97;
-    const onLabel = rule.patterns.some((p) => p.test(label));
+    const onSentence = rule.sentence?.some((p) => p.test(label)) ?? false;
+    const onLabel = onSentence || rule.patterns.some((p) => p.test(label));
     const onAttr = rule.attrPatterns?.some((p) => p.test(attrs)) ?? false;
     const onPlaceholder = rule.patterns.some((p) => p.test(placeholder));
     if (onLabel && onAttr) score = Math.max(score, 0.97);
@@ -131,7 +138,7 @@ function classifyLabel(field: FieldDescriptor): Classification {
     if (!score) continue;
 
     // A sentence-like label that merely mentions a keyword is weaker evidence.
-    if (onLabel && wordCount(label) > 8 && !["select", "radio", "combobox", "checkbox"].includes(field.kind)) score *= 0.75;
+    if (onLabel && !onSentence && wordCount(label) > 8 && !["select", "radio", "combobox", "checkbox", "checkboxes", "file"].includes(field.kind)) score *= 0.75;
     if (rule.types && !rule.types.includes(KIND_TYPES[field.kind])) score *= 0.8;
     if (score > best.confidence) best = { key: rule.key, confidence: score, question: false };
   }
@@ -342,6 +349,15 @@ export function resolveValue(key: string, field: FieldDescriptor, profile: Profi
       : typeof raw === "number" ? matchNumber(field.options, raw) ?? matchText(field.options, String(raw))
       : matchText(field.options, Array.isArray(raw) ? raw[0]! : String(raw));
     return option ? { value: option.label, optionValue: option.value } : null;
+  }
+  // "Check all that apply": tick every option the profile has ("English", "Hindi", …).
+  if (field.kind === "checkboxes" && field.options.length > 0) {
+    const wanted = typeof raw === "boolean" ? [raw] : Array.isArray(raw) ? raw : String(raw).split(/\s*[,;/]\s*/);
+    const picked = wanted
+      .map((w) => (typeof w === "boolean" ? matchBoolean(field.options, w) : matchText(field.options, String(w))))
+      .filter((o): o is NonNullable<typeof o> => !!o);
+    const unique = [...new Map(picked.map((o) => [o.value, o])).values()];
+    return unique.length ? { value: unique.map((o) => o.label).join(", "), optionValue: unique.map((o) => o.value).join("\n") } : null;
   }
   if (field.kind === "checkbox") {
     return typeof raw === "boolean" ? { value: raw ? "Yes" : "No", optionValue: raw ? "true" : "false" } : null;

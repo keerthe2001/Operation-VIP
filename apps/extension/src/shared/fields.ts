@@ -5,6 +5,8 @@ export const FIELD_KINDS = [
   "checkbox", "file", "contenteditable", "combobox", "password",
   // A button that opens a list of options (Workday and other custom dropdowns).
   "listbox",
+  // "Check all that apply": checkboxes that share one name and answer one question.
+  "checkboxes",
 ] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number];
 
@@ -68,6 +70,8 @@ export interface FillInstruction {
   multi?: boolean;
   /** Type the value key by key (for widgets that ignore a pasted value). */
   typing?: boolean;
+  /** A place box that only accepts one of its own suggestions (Lever, Google Places). */
+  suggest?: boolean;
 }
 
 export const fillResultSchema = z.object({

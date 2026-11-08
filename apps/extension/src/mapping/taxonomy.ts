@@ -15,6 +15,9 @@ export interface FieldRule {
   exclude?: RegExp[];
   /** Input types that fit this field (others lower the confidence). */
   types?: string[];
+  /** Patterns written for whole questions ("What's the name you'd prefer us to use…"), so a
+   * long label is not weaker evidence for them. */
+  sentence?: RegExp[];
 }
 
 export const RULES: FieldRule[] = [
@@ -67,7 +70,7 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "location", label: "Location",
-    patterns: [/^(current |present )?location\b/, /\bwhere are you (located|based)\b/, /\bcity,? state\b/, /\bcurrent (city|residence)\b/, /\bbased (in|out of)\b/],
+    patterns: [/^(current |present )?location\b/, /\bwhere are you (currently )?(located|based)\b/, /\bwhat is your (current )?location\b/, /\bcity,? state\b/, /\bcurrent (city|residence)\b/, /\bbased (in|out of)\b/],
     attrPatterns: [/\blocation\b/],
     exclude: [/\b(preferred|desired|willing|relocat|office|job location|work location)\b/],
   },
@@ -87,7 +90,13 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "country", label: "Country",
-    patterns: [/^(current |home )?country\b/, /\bcountry of residence\b/],
+    patterns: [
+      /^(current |home )?country\b/, /\bcountry of (current )?residence\b/, /\bcurrent country\b/,
+    ],
+    sentence: [
+      /\bcountry (in which|where) you (are|currently|live|reside)/, /\bwhich country (are you|do you)\b/, /\bwhat country\b.*\b(located|live|reside|based)\b/,
+      /\b(current )?country of (current )?residence\b/,
+    ],
     attrPatterns: [/\bcountry\b/],
     autocomplete: ["country", "country-name"],
     exclude: [/\b(code|dial|citizenship|birth|nationality|issu)\b/],
@@ -166,7 +175,8 @@ export const RULES: FieldRule[] = [
   },
   {
     key: "preferred_name", label: "Preferred name",
-    patterns: [/\b(preferred|nick) ?(first )?name\b/, /\bname you (go by|prefer)\b/], attrPatterns: [/\b(preferred|nick) ?name\b/], autocomplete: ["nickname"],
+    patterns: [/\b(preferred|nick) ?(first )?name\b/, /\bname you (go by|prefer)\b/],
+    sentence: [/\bname (you|you['’]d|you would) (like us|prefer)\b/, /\bwhat (should|would you like|do you want) (us to|we) call you\b/, /^preferred (first )?name\b/], attrPatterns: [/\b(preferred|nick) ?name\b/], autocomplete: ["nickname"],
     // "I have a preferred name" is a yes/no box that reveals the field.
     exclude: [/^(i have|i use|do you have)\b/],
   },
@@ -213,7 +223,11 @@ export const RULES: FieldRule[] = [
     ],
     attrPatterns: [/\b(current|latest|last|previous) ?(company|employer|organi[sz]ation)\b/, /\b(org|company|employer)( ?name)?$/],
     autocomplete: ["organization"],
-    exclude: [/\b(why|reference|referr|applying|address|location|city|phone|email|website|type|size|industry)\b/],
+    exclude: [
+      /\b(why|reference|referr|applying|address|location|city|phone|email|website|type|size|industry)\b/,
+      // Yes/no questions that only mention an employer ("Are you subject to agreements with your current employer?").
+      /\b(agreements?|restrictions?|subject to|non ?compete|relatives?|related to|know anyone|conflict)\b/, /^(are|have|do|did|were|is|will|would|has) (you|your|any)\b/,
+    ],
   },
   {
     key: "current_title", label: "Current title",
@@ -337,6 +351,7 @@ export const RULES: FieldRule[] = [
   {
     key: "referral_source", label: "How you heard about the job",
     patterns: [/\bhow did you (hear|learn|find out) about\b/, /\b(referral|application|candidate) source\b/, /\bwhere did you (hear|find|see)\b/],
+    sentence: [/\bhow (did )?you (hear|heard|learn|learned|found|find out) about (this|the|us|our)\b/],
     attrPatterns: [/\b(source|referral source|hear about)\b/],
     exclude: [/\breferr(er|ed by)\b.*\bname\b/],
   },
@@ -366,10 +381,16 @@ export const RULES: FieldRule[] = [
     key: "willing_to_relocate", label: "Willing to relocate",
     patterns: [/\b(willing|open) to relocat/, /\brelocat(e|ion)\b/], attrPatterns: [/\brelocat/],
   },
-  { key: "gender", label: "Gender", patterns: [/^gender\b/, /\bgender identity\b/], attrPatterns: [/\bgender\b/] },
+  {
+    key: "gender", label: "Gender", patterns: [/^gender\b/, /\bgender identity\b/], attrPatterns: [/\bgender\b/],
+    sentence: [/\b(describes|describe|identify) (your|you r) gender\b/, /\bwhat is your gender\b/],
+  },
   { key: "pronouns", label: "Pronouns", patterns: [/\bpronouns?\b/], attrPatterns: [/\bpronoun/] },
   { key: "nationality", label: "Nationality", patterns: [/\b(nationality|citizenship)\b/], attrPatterns: [/\b(nationality|citizenship)\b/] },
-  { key: "languages", label: "Languages", patterns: [/\blanguages? (you speak|spoken|known)\b/, /^languages?$/] },
+  {
+    key: "languages", label: "Languages", patterns: [/\blanguages? (you speak|spoken|known)\b/, /^languages?$/, /^language skills?\b/],
+    sentence: [/\bwhat languages\b/, /\blanguages? (do you|can you|you) (speak|read|write|know)\b/, /\blanguage (skills?|proficienc)/],
+  },
   {
     key: "role_description", label: "Role description",
     patterns: [/\b(role|job|position) description\b/, /\b(key )?responsibilities\b/, /\bdescribe your (role|work|responsibilities)\b/, /^description$/],

@@ -274,6 +274,7 @@ export class AutofillCoordinator {
       };
       if (field.kind === "checkbox") instruction.checked = field.optionValue === "true";
       if (field.key === "skills" && field.kind === "combobox") instruction.multi = true;
+      if (field.kind === "text" && ["location", "city", "job_location", "preferred_location"].includes(field.key ?? "")) instruction.suggest = true;
       if (options.typing) instruction.typing = true;
       if (field.key === "account_password") {
         const password = await this.local.get("accountPassword");
@@ -346,11 +347,14 @@ export function holdsValue(field: MappedField): boolean {
   const b = squash(value);
   if (!a || !b) return true;
   if (a === b || a.includes(b) || b.includes(a)) return true;
+  // A place chosen from the site's suggestions: "Bengaluru, Karnataka, IND" for "Bengaluru, India".
+  const place = squash(value.split(",")[0] ?? "");
+  if (place.length >= 3 && a.startsWith(place)) return true;
   // Dates and numbers: same digits ("07/2024" vs "2024-07", "+91 98765" vs "98765").
   const digits = (t: string) => t.replace(/\D/g, "");
   if (digits(current) && (digits(current) === digits(value) || digits(value).endsWith(digits(current)))) return true;
   // Choices: the chosen option shares a word with the intended answer ("India (+91)" vs "India").
-  if (["select", "radio", "listbox"].includes(field.kind)) {
+  if (["select", "radio", "listbox", "checkboxes"].includes(field.kind)) {
     const words = new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1));
     return current.toLowerCase().split(/[^a-z0-9]+/).some((w) => words.has(w));
   }
