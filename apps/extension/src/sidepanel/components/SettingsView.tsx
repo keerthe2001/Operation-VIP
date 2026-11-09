@@ -4,26 +4,13 @@ import { useId, useState } from "react";
 
 import { send, useLocal, useWidgetPrefs } from "@/sidepanel/chrome-state";
 import { AutofillSettings } from "@/sidepanel/components/AutofillSettings";
+import { useEverySite } from "@/sidepanel/components/EverySite";
 import { WEB_URL } from "@/shared/config";
 import type { UserRead } from "@/shared/types";
 
-const ALL_SITES = ["https://*/*", "http://*/*"];
-
 export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => void }) {
-  const allSites = useLocal("allSitesEnabled");
+  const { enabled: allSites, message, enable: enableAllSites } = useEverySite();
   const sync = useLocal("sync");
-  const [message, setMessage] = useState<string | null>(null);
-
-  async function enableAllSites() {
-    // Must run in the panel: permission prompts need a user gesture.
-    const granted = await chrome.permissions.request({ origins: ALL_SITES });
-    if (!granted) {
-      setMessage("Permission not granted. Copilot keeps working on the supported job portals.");
-      return;
-    }
-    const reply = await send<boolean>({ type: "ENABLE_ALL_SITES" });
-    setMessage(reply.ok ? "Copilot now checks company career sites too. Reload open tabs to start." : reply.error);
-  }
 
   return (
     <div className="grid gap-4 p-4">
@@ -50,16 +37,16 @@ export function SettingsView({ user, onBack }: { user: UserRead; onBack: () => v
       <section className="grid gap-2">
         <h2 className="text-sm font-semibold">Where Copilot works</h2>
         <p className="text-xs text-muted-foreground">
-          By default Copilot only runs on Greenhouse, Lever, Workday, Ashby and LinkedIn. You can allow it on company career
-          sites too. It only reads pages to find application forms.
+          Copilot runs on 50+ job portals (Workday, Greenhouse, Lever, Ashby, iCIMS, SuccessFactors, Oracle, Workable…). Allow
+          it on every site to fill company career pages too. It only reads pages on your device to find application forms.
         </p>
         {allSites ? (
           <p className="inline-flex items-center gap-1.5 text-xs text-success">
             <Globe className="size-3.5" aria-hidden="true" /> Enabled on all career sites
           </p>
         ) : (
-          <Button variant="outline" size="sm" className="justify-self-start" onClick={enableAllSites}>
-            <Globe aria-hidden="true" /> Enable on all career sites
+          <Button variant="outline" size="sm" className="justify-self-start" onClick={() => void enableAllSites()}>
+            <Globe aria-hidden="true" /> Turn on for every site
           </Button>
         )}
         {message && <Alert>{message}</Alert>}

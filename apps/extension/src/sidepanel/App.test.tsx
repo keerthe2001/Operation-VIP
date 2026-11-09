@@ -100,9 +100,24 @@ describe("side panel", () => {
     const fake = installFakeChrome({ local: { auth: { status: "signed_in", user }, profile } });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Settings" }));
-    await userEvent.click(screen.getByRole("button", { name: /Enable on all career sites/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Turn on for every site/ }));
     expect(fake.chrome.permissions.request).toHaveBeenCalledWith({ origins: ["https://*/*", "http://*/*"] });
     expect(fake.sendMessage).toHaveBeenCalledWith({ type: "ENABLE_ALL_SITES" });
+  });
+
+  it("offers every-site access at the top of the panel until it's on", async () => {
+    const fake = installFakeChrome({ local: { auth: { status: "signed_in", user }, profile } });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Turn on for every site/ }));
+    expect(fake.chrome.permissions.request).toHaveBeenCalledWith({ origins: ["https://*/*", "http://*/*"] });
+    expect(fake.sendMessage).toHaveBeenCalledWith({ type: "ENABLE_ALL_SITES" });
+  });
+
+  it("doesn't show the every-site prompt once it's on", async () => {
+    installFakeChrome({ local: { auth: { status: "signed_in", user }, profile, allSitesEnabled: true } });
+    render(<App />);
+    await screen.findByRole("tab", { name: /Autofill/ });
+    expect(screen.queryByRole("button", { name: /Turn on for every site/ })).not.toBeInTheDocument();
   });
 });
 

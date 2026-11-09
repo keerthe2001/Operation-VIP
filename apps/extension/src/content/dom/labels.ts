@@ -56,6 +56,12 @@ export function nearestCaption(el: Element): string {
       const value = text(candidate);
       if (value && value.length < 400) return value;
     }
+    // Plain text beside the control in its own block: <div><span>Current CTC</span><input></div>,
+    // or a table row <tr><td>Name</td><td><input></td></tr>.
+    // Not for a choice's own option text ("Yes", "English"): those questions are found by their group.
+    if (own || node.tagName === "LABEL") continue;
+    const loose = textOutside(node, el);
+    if (loose && loose.length <= 120 && !/^(select|choose|browse|upload|or)\b/i.test(loose)) return loose;
   }
   return "";
 }

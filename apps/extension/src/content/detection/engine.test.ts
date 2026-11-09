@@ -99,4 +99,43 @@ describe("job detection", () => {
     const job = detect("greenhouseListing");
     expect(job === null || !job.isApplicationPage).toBe(true);
   });
+
+  it("recognizes a WordPress-style careers form (Contact Form 7)", () => {
+    document.documentElement.innerHTML = `<head><title>Careers – Brightpath Solutions</title></head><body><h1>Careers</h1>
+      <form class="wpcf7-form">
+        <p><label>Your Name (required)<br><span class="wpcf7-form-control-wrap"><input type="text" name="your-name"></span></label></p>
+        <p><label>Your Email (required)<br><span><input type="email" name="your-email"></span></label></p>
+        <p><label>Phone<br><span><input type="tel" name="your-phone"></span></label></p>
+        <p><label>Position Applied For<br><select name="position"><option>Java Developer</option><option>Tester</option></select></label></p>
+        <p><label>Total Experience (Years)<br><input type="text" name="experience"></label></p>
+        <p><label>Upload Resume<br><input type="file" name="resume"></label></p>
+        <p><input type="submit" value="Submit"></p></form></body>`;
+    const job = detectJob(document, "https://brightpath.example/careers/")!;
+    expect(job).toMatchObject({ portal: "generic", isApplicationPage: true, company: "Brightpath Solutions" });
+  });
+
+  it("finds a careers form built from web components (shadow DOM)", () => {
+    document.documentElement.innerHTML = `<head><title>Apply – Nimbus</title></head><body><h1>Senior Data Engineer</h1><apply-form></apply-form></body>`;
+    const shadow = document.querySelector("apply-form")!.attachShadow({ mode: "open" });
+    shadow.innerHTML = `<form><label for="n">Full name</label><input id="n"><label for="e">Email</label><input id="e" type="email">
+      <label for="cv">Resume / CV</label><input id="cv" type="file"><label for="np">Notice period</label><input id="np"></form>`;
+    const job = detectJob(document, "https://nimbus.example/jobs/senior-data-engineer")!;
+    expect(job).toMatchObject({ isApplicationPage: true, title: "Senior Data Engineer" });
+    expect(scanFields().map((f) => f.label)).toEqual(["Full name", "Email", "Resume / CV", "Notice period"]);
+  });
+
+  it("does not take a contact form for a job application", () => {
+    document.documentElement.innerHTML = `<head><title>Contact us – Foo Ltd</title></head><body><h1>Get in touch</h1><form>
+      <input placeholder="Full name"><input type="email" placeholder="Email"><input type="tel" placeholder="Phone"><textarea placeholder="Message"></textarea>
+    </form></body>`;
+    expect(detectJob(document, "https://foo.example/contact")).toBeNull();
+  });
+
+  it("knows careers URLs in other forms (job ids, recruitment, other languages)", () => {
+    document.documentElement.innerHTML = `<body><form><input placeholder="Full name"><input type="email" placeholder="Email"><input type="tel" placeholder="Mobile"></form></body>`;
+    for (const url of ["https://acme.example/recruitment/form", "https://acme.example/opening?jobid=4411", "https://acme.example/karriere/bewerbung", "https://acme.example/work-with-us"]) {
+      expect(detectJob(document, url)?.isApplicationPage, url).toBe(true);
+    }
+  });
 });
+

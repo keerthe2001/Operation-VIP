@@ -5,7 +5,7 @@ import { linkedin } from "@/content/detection/adapters/linkedin";
 import type { PortalAdapter } from "@/content/detection/adapters/types";
 import { workday } from "@/content/detection/adapters/workday";
 import { readJobPosting } from "@/content/detection/jsonld";
-import { analyzeForms, pageSignals } from "@/content/detection/signals";
+import { analyzeForms, JOB_ONLY_FIELDS, pageSignals } from "@/content/detection/signals";
 import { clean, splitTitle } from "@/content/detection/text";
 import type { DetectedJob } from "@/shared/types";
 
@@ -56,7 +56,12 @@ export function detectJob(doc: Document, href: string): DetectedJob | null {
     confidence += 0.4;
     signals.push("structured-data");
   }
-  const applicationForm = forms.matchedFields.length >= 3 || (forms.hasResumeUpload && forms.matchedFields.length >= 2);
+  // Off the known portals, name + email + phone is also a contact or sign-up form: it takes a
+  // job-only field (CV, position, notice period…) or a careers context to call it an application.
+  const jobContext = !!adapterResult?.isJobPage || !!posting || page.jobUrl || page.applyText || page.jobMeta;
+  const jobFields = forms.matchedFields.filter((f) => JOB_ONLY_FIELDS.has(f)).length;
+  const applicationForm =
+    (forms.matchedFields.length >= 3 && (jobFields > 0 || jobContext)) || (forms.hasResumeUpload && forms.matchedFields.length >= 2);
   if (applicationForm) {
     confidence += 0.35;
     signals.push(`form-fields:${forms.matchedFields.length}`);
@@ -80,16 +85,19 @@ export function detectJob(doc: Document, href: string): DetectedJob | null {
   // A form that clearly asks for applicant details is enough on its own: name, email and
   // phone, or a couple of those next to a CV upload or on a careers URL.
   const strongForm =
-    forms.matchedFields.length >= 3 ||
+    (forms.matchedFields.length >= 3 && (jobFields > 0 || jobContext)) ||
     (forms.matchedFields.length >= 2 && (forms.hasResumeUpload || page.jobUrl || page.applyText));
   if (strongForm) confidence = Math.max(confidence, 0.6);
   confidence = Math.min(1, confidence);
   if (confidence < JOB_THRESHOLD) return null;
 
   const fallback = splitTitle(clean(doc.querySelector('meta[property="og:title"]')?.getAttribute("content")) ?? doc.title);
+  // On a custom careers page the job's name is usually the page's main heading.
+  const heading = clean(doc.querySelector("h1")?.textContent);
+  const headingTitle = !adapter && heading && heading.length <= 90 && !/^(apply|application|careers?|jobs?|join us|thank you)\b/i.test(heading) && page.jobUrl ? heading : null;
   return {
     portal: adapter?.id ?? "generic",
-    title: adapterResult?.title ?? posting?.title ?? fallback.title,
+    title: adapterResult?.title ?? posting?.title ?? headingTitle ?? fallback.title,
     company:
       adapterResult?.company ??
       posting?.company ??

@@ -189,7 +189,7 @@ function selectedLabel(el: HTMLSelectElement): string {
 export function scanFields(root: Document = document): FieldDescriptor[] {
   const controls = deepQueryAll(
     root,
-    "input, textarea, select, [contenteditable='true'], [contenteditable=''], button[aria-haspopup='listbox'], [role='combobox']:not(input)",
+    "input, textarea, select, [contenteditable='true'], [contenteditable=''], button[aria-haspopup='listbox'], [role='button'][aria-haspopup='listbox'], [role='combobox']:not(input)",
   ).filter(isFillable);
   const descriptors: FieldDescriptor[] = [];
   const radioGroups = new Map<string, HTMLInputElement[]>();

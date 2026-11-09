@@ -89,8 +89,9 @@ const key = (await readFile(`${root}extension-key.pub.txt`, "utf8")).trim();
 const apiOrigin = new URL(API_URL).origin;
 const webOrigin = new URL(WEB_URL).origin;
 
-// Content scripts run automatically only on supported portals; other sites are
-// opt-in through optional_host_permissions (requested from the side panel).
+// Content scripts run automatically on these job portals and applicant tracking systems.
+// Every other site (company career pages) needs the "every site" permission, which the
+// panel asks for with one tap (optional_host_permissions).
 const PORTALS = [
   "https://*.greenhouse.io/*",
   "https://jobs.lever.co/*",
@@ -110,6 +111,43 @@ const PORTALS = [
   "https://www.naukri.com/*",
   "https://smartapply.indeed.com/*",
   "https://wellfound.com/*",
+  // Applicant tracking systems that host many companies' career pages.
+  "https://*.workable.com/*",
+  "https://*.recruitee.com/*",
+  "https://*.teamtailor.com/*",
+  "https://*.breezy.hr/*",
+  "https://*.applytojob.com/*",
+  "https://*.jobs.personio.de/*",
+  "https://*.jobs.personio.com/*",
+  "https://*.oraclecloud.com/*",
+  "https://*.sapsf.com/*",
+  "https://*.sapsf.eu/*",
+  "https://*.jobvite.com/*",
+  "https://*.avature.net/*",
+  "https://*.eightfold.ai/*",
+  "https://*.zohorecruit.com/*",
+  "https://*.zohorecruit.in/*",
+  "https://*.freshteam.com/*",
+  "https://*.darwinbox.in/*",
+  "https://*.darwinbox.com/*",
+  "https://*.keka.com/*",
+  "https://ats.rippling.com/*",
+  "https://app.dover.com/*",
+  "https://jobs.gem.com/*",
+  "https://recruiting.paylocity.com/*",
+  "https://recruiting2.ultipro.com/*",
+  "https://recruiting.ultipro.com/*",
+  "https://*.dayforcehcm.com/*",
+  "https://workforcenow.adp.com/*",
+  "https://myjobs.adp.com/*",
+  "https://*.pinpointhq.com/*",
+  "https://*.csod.com/*",
+  "https://*.brassring.com/*",
+  "https://*.hirist.tech/*",
+  "https://*.instahyre.com/*",
+  "https://*.foundit.in/*",
+  "https://*.iimjobs.com/*",
+  "https://*.cutshort.io/*",
 ];
 
 const manifest = {

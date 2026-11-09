@@ -2,7 +2,7 @@ import { createApi } from "@/background/api";
 import { activeError, AutofillCoordinator, holdsValue } from "@/background/autofill";
 import { fieldLabel } from "@/mapping/engine";
 import { AuthError, AuthManager } from "@/background/auth";
-import { ensureAllSitesScript } from "@/background/content-scripts";
+import { ensureAllSitesScript, injectIntoOpenTabs, removeAllSitesScripts } from "@/background/content-scripts";
 import { ProfileSync } from "@/background/profile-sync";
 import { ApplicationTracker } from "@/background/tracker";
 import { readyKeys, widgetState } from "@/background/widget";
@@ -378,6 +378,20 @@ async function forceScan(tabId: number): Promise<Reply> {
 const embedKey = (tabId: number) => `embed:${tabId}`;
 
 // The toolbar icon opens the drawer on the current page, and closes it on the next click.
+// The user can grant or revoke "every site" from Chrome's own extension settings too.
+chrome.permissions.onAdded.addListener(() => {
+  void ensureAllSitesScript().then(async (enabled) => {
+    await local.set({ allSitesEnabled: enabled });
+    if (enabled) await injectIntoOpenTabs();
+  });
+});
+chrome.permissions.onRemoved.addListener(() => {
+  void ensureAllSitesScript().then(async (enabled) => {
+    if (!enabled) await removeAllSitesScripts().catch(() => undefined);
+    await local.set({ allSitesEnabled: enabled });
+  });
+});
+
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id === undefined) return;
   const tabId = tab.id;
@@ -585,6 +599,7 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       case "ENABLE_ALL_SITES": {
         const enabled = await ensureAllSitesScript();
         await local.set({ allSitesEnabled: enabled });
+        if (enabled) await injectIntoOpenTabs();
         return { ok: true, data: enabled };
       }
     }

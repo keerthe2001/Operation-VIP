@@ -32,3 +32,30 @@ export async function ensureAllSitesScript(): Promise<boolean> {
   }
   return true;
 }
+
+/**
+ * Start Copilot in tabs that were already open when "every site" was turned on, so the user
+ * doesn't have to reload them. Pages that can't be scripted (browser pages) are skipped.
+ */
+export async function injectIntoOpenTabs(): Promise<number> {
+  if (!(await hasAllSitesPermission())) return 0;
+  const tabs = await chrome.tabs.query({ url: ALL_SITES });
+  let started = 0;
+  for (const tab of tabs) {
+    if (tab.id === undefined || tab.discarded) continue;
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["content.js"] });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["widget.js"] });
+      started += 1;
+    } catch {
+      // Not scriptable (the Web Store, PDF viewer, error pages).
+    }
+  }
+  return started;
+}
+
+/** "Every site" was turned off in Chrome's settings: stop registering the scripts. */
+export async function removeAllSitesScripts(): Promise<void> {
+  const ids = (await chrome.scripting.getRegisteredContentScripts()).map((s) => s.id).filter((id) => id === SCRIPT_ID || id === WIDGET_ID);
+  if (ids.length) await chrome.scripting.unregisterContentScripts({ ids });
+}

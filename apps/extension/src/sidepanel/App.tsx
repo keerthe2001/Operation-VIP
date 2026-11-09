@@ -10,6 +10,7 @@ import { EmptyState } from "@/sidepanel/components/EmptyState";
 import { UpdateBanner, WhatsNew } from "@/sidepanel/components/UpdateBanner";
 import { ForceScanButton } from "@/sidepanel/components/ForceScanButton";
 import { GuidedFlow } from "@/sidepanel/components/GuidedFlow";
+import { EverySiteCard } from "@/sidepanel/components/EverySite";
 import { Header } from "@/sidepanel/components/Header";
 import { JobCard } from "@/sidepanel/components/JobCard";
 import { MatchView } from "@/sidepanel/components/MatchView";
@@ -111,6 +112,7 @@ function Panel() {
         </main>
       ) : (
         <main className="grid gap-4 p-4">
+          <EverySiteCard />
           {job?.isApplicationPage && tabId !== null && <AutofillSection tabId={tabId} form={form} />}
           {job?.isApplicationPage && tabId !== null && <GuidedFlow tabId={tabId} form={form} />}
           {job ? (

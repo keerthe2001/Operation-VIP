@@ -264,6 +264,29 @@ export const SAMPLES: Sample[] = [
     ],
   },
   {
+    name: "Custom careers pages · common frameworks",
+    html: `<h1>Senior Java Developer</h1>
+      <form class="wpcf7-form">
+        <p><label>Your Name (required)<br><span class="wpcf7-form-control-wrap"><input type="text" name="your-name"></span></label></p>
+        <p><label>Your Email (required)<br><span><input type="email" name="your-email"></span></label></p>
+      </form>
+      <div class="form-group"><label for="mob" class="control-label">Mobile No.</label><input id="mob" class="form-control" type="tel"></div>
+      <div class="MuiFormControl-root"><label class="MuiInputLabel-root" for=":r1:">Current Location</label><div class="MuiInputBase-root"><input id=":r1:" class="MuiInputBase-input"></div></div>
+      <div class="MuiFormControl-root"><label id="exp-label" class="MuiInputLabel-root">Total Experience</label><div role="button" aria-haspopup="listbox" aria-labelledby="exp-label" tabindex="0">&#8203;</div><input aria-hidden="true" tabindex="-1" class="MuiSelect-nativeInput" value=""></div>
+      <div class="ant-form-item"><div class="ant-form-item-label"><label for="ctc" title="Current CTC">Current CTC</label></div><div class="ant-form-item-control"><input id="ctc" class="ant-input"></div></div>
+      <mat-form-field><label class="mdc-floating-label" for="mat-input-3"><mat-label>Expected CTC</mat-label></label><input matinput id="mat-input-3"></mat-form-field>
+      <div class="question"><span>Notice Period</span><input type="text"></div>
+      <table><tr><td>Highest Qualification</td><td><input type="text"></td></tr><tr><td>Year of Passing</td><td><input type="text"></td></tr></table>
+      <div class="upload"><p>Attach your CV (PDF, max 2 MB)</p><input type="file"></div>
+      <div class="field"><input type="text" placeholder="LinkedIn profile URL"></div>
+      <div><label><input type="checkbox" required> I agree to the processing of my personal data *</label></div>`,
+    expect: [
+      ["Your Name", "full_name"], ["Your Email", "email"], ["Mobile No.", "phone"], ["Current Location", "location"], ["Total Experience", "years_experience"],
+      ["Current CTC", "current_salary"], ["Expected CTC", "expected_salary"], ["Notice Period", "notice_period"], ["Highest Qualification", "degree"],
+      ["Year of Passing", "graduation_year"], ["CV", "resume"], ["LinkedIn", "linkedin"], ["Consent", null],
+    ],
+  },
+  {
     name: "Greenhouse",
     html: `<form id="application_form">${f.text("First Name *", 'name="job_application[first_name]"')}${f.text("Last Name *", 'name="job_application[last_name]"')}
       ${f.text("Email *", 'name="job_application[email]"', "email")}${f.text("Phone", 'name="job_application[phone]"', "tel")}

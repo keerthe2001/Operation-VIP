@@ -239,6 +239,14 @@ const WDACC_HTML = `<!doctype html><html><head><title>Data Engineer</title></hea
   render();
 </script></body></html>`;
 
+// A company's own careers page that embeds its applicant tracking system's form in an iframe
+// (the usual "careers.company.com" setup). The page itself isn't a known portal.
+const EMBED_PAGE_URL = "https://www.acme-robotics.example/careers/backend-engineer";
+const EMBED_FRAME_URL = "https://boards.greenhouse.io/embed/job_app?for=acmecorp&token=4012345";
+const EMBED_PAGE_HTML = `<!doctype html><html><head><title>Backend Engineer – Acme Robotics Careers</title></head><body>
+<h1>Backend Engineer</h1><p>Join the team building our fleet software.</p>
+<iframe id="grnhse_iframe" src="${EMBED_FRAME_URL}" style="width:100%;height:1400px;border:0"></iframe></body></html>`;
+
 /** Clicks until `done()` resolves true: the embedded panel can re-layout while live updates arrive. */
 async function clickUntil(locator, done, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
@@ -848,6 +856,40 @@ try {
   check(acc.created.email === "priya.raman@example.com" && acc.created.same && acc.created.agreed, "created the account: email, both passwords, \"I agree\" ticked, pressed through the click overlay");
   check(acc.created.trap === "", "left Workday's bot-trap field empty");
   await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
+
+  // 10j. A company careers page embedding the application form in an iframe: Copilot works in
+  // the embedded form even though the company site itself isn't a portal.
+  await context.route(EMBED_PAGE_URL, (route) => route.fulfill({ contentType: "text/html", body: EMBED_PAGE_HTML }));
+  await context.route(EMBED_FRAME_URL, (route) => route.fulfill({ contentType: "text/html", body: GREENHOUSE_HTML }));
+  const embedTab = await context.newPage();
+  await embedTab.goto(EMBED_PAGE_URL);
+  let embedState = null;
+  for (let i = 0; i < 60 && !(embedState?.job?.isApplicationPage && embedState?.fields > 0); i++) {
+    // Chrome hides the URL of tabs on sites without host access, so find the tab through
+    // Copilot's own state for it.
+    embedState = await worker.evaluate(async (url) => {
+      const all = await chrome.storage.session.get(null);
+      const key = Object.keys(all).find((k) => k.startsWith("tab:") && all[k]?.url === url);
+      if (!key) return null;
+      const tabId = Number(key.slice(4));
+      const form = all[`form:${tabId}`];
+      return { tabId, job: all[key]?.job, fields: form?.fields?.length ?? 0, frames: [...new Set((form?.fields ?? []).map((f) => f.frameId))] };
+    }, EMBED_PAGE_URL);
+    if (!(embedState?.job?.isApplicationPage && embedState?.fields > 0)) await new Promise((r) => setTimeout(r, 250));
+  }
+  check(embedState?.job?.isApplicationPage && embedState.fields > 0 && !embedState.frames.includes(0), `application found inside the embedded form (${embedState?.fields} fields in frame ${embedState?.frames})`);
+  await panel.goto(panelUrl(embedState.tabId));
+  const embeddedFirst = embedTab.frameLocator("#grnhse_iframe").locator("#first_name");
+  await clickUntil(panel.getByRole("button", { name: /^Autofill \d+ fields?$/ }), async () => {
+    for (let i = 0; i < 80; i++) {
+      if ((await embeddedFirst.inputValue()) === "Priya") return true;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return false;
+  });
+  for (let i = 0; i < 40 && (await embedTab.frameLocator("#grnhse_iframe").locator("#email").inputValue()) === ""; i++) await new Promise((r) => setTimeout(r, 250));
+  const embeddedValues = await embedTab.frameLocator("#grnhse_iframe").locator("#email").inputValue();
+  check(embeddedValues === "priya.raman@example.com", "filled the embedded form from the panel");
 
   // 10h. Fields that appear through a style change are picked up without a reload.
   await context.route(REVEAL_URL, (route) => route.fulfill({ contentType: "text/html", body: REVEAL_HTML }));
