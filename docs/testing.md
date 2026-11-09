@@ -110,8 +110,9 @@ site's hosts (Workday also needs `wdN.myworkday.com`).
 RESUME_PDF=resume.pdf node apps/extension/e2e/live.mjs out-dir <url> ["click:Apply,Apply Manually|<url>"] …
 ```
 
-Last run: Greenhouse job-boards 14/14 filled, Lever 12/12, Ashby 11/11, Workday account pages
-recognized (email, both passwords, "I agree"; bot-trap field skipped). SmartRecruiters' apply page
+Last run: Greenhouse job-boards 14/14 filled, Lever 12/12, Ashby 11/11, Gem (no adapter, generic
+detection) 10/10, Workday account pages recognized (email, both passwords, "I agree"; bot-trap
+field skipped). SmartRecruiters' apply page
 is behind bot protection that blocks headless browsers, so it is covered by fixtures only.
 
 ## Continuous integration

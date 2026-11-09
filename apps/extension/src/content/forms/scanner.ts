@@ -47,9 +47,29 @@ function isFillable(el: Element): boolean {
   return isVisible(el);
 }
 
+/** The smallest element containing all of a group's options. */
+function commonBlock(elements: Element[]): Element {
+  let block: Element = elements[0]!;
+  while (block.parentElement && !elements.every((e) => block.contains(e))) block = block.parentElement;
+  return elements.length > 1 ? block : (elements[0]!.parentElement ?? elements[0]!);
+}
+
+/** What an empty home-made dropdown says. */
+export const SELECT_PROMPT = /^(please select|please choose|select( one| an option| an answer)?|choose( one| an option)?|-+ ?(select|choose) ?-+|select\.{3}|select…)$/i;
+
+/** Radios without a name (React forms): the ones sharing the nearest block are one question. */
+function unnamedRadioGroup(el: HTMLInputElement): string {
+  let node = el.parentElement;
+  for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+    const radios = [...node.querySelectorAll("input[type=radio]:not([name])")];
+    if (radios.length > 1) return `rg:${fieldId(radios[0]!)}`;
+  }
+  return fieldId(el);
+}
+
 function kindOf(el: Element): FieldKind {
   // Custom dropdowns: a button (or div) that opens a list of options.
-  if (!(el instanceof HTMLInputElement) && (el.getAttribute("aria-haspopup") === "listbox" || el.getAttribute("role") === "combobox")) {
+  if (!(el instanceof HTMLInputElement) && (el.getAttribute("aria-haspopup") === "listbox" || el.getAttribute("role") === "combobox" || el instanceof HTMLButtonElement)) {
     return "listbox";
   }
   if (el instanceof HTMLTextAreaElement) return "textarea";
@@ -82,7 +102,7 @@ function describedText(el: Element): string {
 }
 
 /** Question text for a radio group: fieldset legend, radiogroup label, or the text before the options. */
-function groupLabel(first: HTMLInputElement): string {
+function groupLabel(first: HTMLInputElement, all: HTMLInputElement[] = [first]): string {
   const fieldset = first.closest("fieldset");
   // Ashby captions its fieldsets with a <label> instead of a <legend>.
   const legend = fieldset?.querySelector(":scope > legend, :scope > label, :scope > div > legend");
@@ -92,7 +112,8 @@ function groupLabel(first: HTMLInputElement): string {
     const label = labelFor(group);
     if (label) return label;
   }
-  const caption = nearestCaption(first);
+  // Search from the block that holds all the options, so an option's own text isn't taken.
+  const caption = nearestCaption(commonBlock(all));
   if (caption) return caption;
   let container: Element | null = first.parentElement;
   for (let depth = 0; container && depth < 6; depth += 1, container = container.parentElement) {
@@ -187,10 +208,14 @@ function selectedLabel(el: HTMLSelectElement): string {
 }
 
 export function scanFields(root: Document = document): FieldDescriptor[] {
-  const controls = deepQueryAll(
-    root,
-    "input, textarea, select, [contenteditable='true'], [contenteditable=''], button[aria-haspopup='listbox'], [role='button'][aria-haspopup='listbox'], [role='combobox']:not(input)",
-  ).filter(isFillable);
+  const controls = [
+    ...deepQueryAll(
+      root,
+      "input, textarea, select, [contenteditable='true'], [contenteditable=''], button[aria-haspopup='listbox'], [role='button'][aria-haspopup='listbox'], [role='combobox']:not(input)",
+    ),
+    // Home-made dropdowns: a plain button that says "Please select".
+    ...deepQueryAll(root, "button:not([aria-haspopup])").filter((b) => SELECT_PROMPT.test(text(b))),
+  ].filter(isFillable);
   const descriptors: FieldDescriptor[] = [];
   const radioGroups = new Map<string, HTMLInputElement[]>();
   const checkboxGroups = new Map<string, HTMLInputElement[]>();
@@ -203,7 +228,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
 
   for (const el of controls) {
     if (el instanceof HTMLInputElement && el.type === "radio") {
-      const key = `${el.form?.id ?? ""}|${el.name || fieldId(el)}`;
+      const key = `${el.form?.id ?? ""}|${el.name || unnamedRadioGroup(el)}`;
       if (!radioGroups.has(key)) radioSlots.set(key, descriptors.length + radioSlots.size);
       radioGroups.set(key, [...(radioGroups.get(key) ?? []), el]);
       continue;
@@ -216,7 +241,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else if (kind === "file") currentValue = input.files?.length ? input.files[0]!.name : "";
     else if (kind === "contenteditable") currentValue = text(el);
     // A dropdown button shows its choice, or a prompt like "Select One" when empty.
-    else if (kind === "listbox") currentValue = /^(select|choose|please select|--|none selected)/i.test(text(el)) ? "" : text(el);
+    else if (kind === "listbox") currentValue = /^(select|choose|please (select|choose)|--|none selected)/i.test(text(el)) ? "" : text(el);
     // Never report what's typed in a password box, only whether it's filled.
     else if (kind === "password") currentValue = input.value ? "••••••••" : "";
     else if (kind === "combobox") currentValue = input.value || chosenInWidget(el);
@@ -270,7 +295,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
   const groups: [number, FieldDescriptor][] = [];
   for (const [key, radios] of radioGroups) {
     const first = radios[0]!;
-    const label = groupLabel(first);
+    const label = groupLabel(first, radios);
     const checked = radios.find((r) => r.checked);
     groups.push([radioSlots.get(key) ?? Infinity, {
       id: fieldId(first),
@@ -291,7 +316,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
   }
   for (const [key, boxes] of checkboxGroups) {
     const first = boxes[0]!;
-    const label = groupLabel(first);
+    const label = groupLabel(first, boxes);
     groups.push([radioSlots.get(key) ?? Infinity, {
       id: fieldId(first),
       kind: "checkboxes",
@@ -315,7 +340,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
 }
 
 const ACTION_TEXT =
-  /^(save and continue|save & continue|continue|next|next step|create account|sign up|register|sign in|log ?in|(sign in|log ?in|continue) with (e-?mail|email address)|verify|review|submit( application| my application)?|apply( now| manually)?|start (your |my )?application|send application|finish)$/i;
+  /^(save and continue|save & continue|continue|next|next step|create account|sign up|register|sign in|log ?in|(sign in|log ?in|continue) with (e-?mail|email address)|verify|review|submit( application| my application)?|apply( now| manually| and save| without saving)?|apply for (this|the) (job|position|role)|submit and apply|start (your |my )?application|send( application)?|finish)$/i;
 export const CONTINUE_TEXT = /^(save and continue|save & continue|continue|next|next step|review)$/i;
 const ACCOUNT_TEXT = /^(create account|sign up|register|sign in|log ?in|(sign in|log ?in|continue) with (e-?mail|email address)|verify)$/i;
 const START_TEXT = /^(apply( now| manually)?|start (your |my )?application)$/i;
@@ -323,10 +348,12 @@ const SIGN_IN_LINK = /^(sign in|log ?in|already have an account\?? ?sign in)$/i;
 const CREATE_ACCOUNT_LINK = /^(create (an )?account|sign up|register|new user\?? ?(create|register).*)$/i;
 
 export type ActionKind = "start" | "continue" | "account" | "submit";
-export function actionKind(text: string): ActionKind {
+/** `onForm`: the page already shows the application's fields, so a plain "Apply" button sends
+ * them (custom careers forms); without fields it opens the application. */
+export function actionKind(text: string, onForm = false): ActionKind {
   if (CONTINUE_TEXT.test(text)) return "continue";
   if (ACCOUNT_TEXT.test(text)) return "account";
-  if (START_TEXT.test(text)) return "start";
+  if (START_TEXT.test(text) && (!onForm || /manually|start (your |my )?application/i.test(text))) return "start";
   return "submit";
 }
 

@@ -25,10 +25,7 @@ function hasValue(el: HTMLElement, instruction: FillInstruction): boolean {
   if (instruction.kind === "radio" && !(el instanceof HTMLInputElement)) {
     return [...(el.parentElement?.children ?? [])].some((b) => b.getAttribute("aria-pressed") === "true");
   }
-  if (instruction.kind === "radio") {
-    const name = (el as HTMLInputElement).name;
-    return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`).some((r) => (r as HTMLInputElement).checked);
-  }
+  if (instruction.kind === "radio") return radioGroup(el as HTMLInputElement).some((r) => r.checked);
   if (instruction.kind === "checkbox") return false;
   if (instruction.kind === "checkboxes") return groupBoxes(el as HTMLInputElement).some((b) => b.checked);
   if (instruction.kind === "combobox" && instruction.multi) return false;
@@ -173,12 +170,50 @@ async function pickOption(owner: HTMLElement, value: string, attempts = 20): Pro
   return false;
 }
 
+/** A radio's group: same name, or (no name) the radios in its nearest block. */
+function radioGroup(first: HTMLInputElement): HTMLInputElement[] {
+  if (first.name) return deepQueryAll(first.getRootNode() as Document, `input[type=radio][name="${CSS.escape(first.name)}"]`) as HTMLInputElement[];
+  let node = first.parentElement;
+  for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+    const radios = [...node.querySelectorAll("input[type=radio]:not([name])")] as HTMLInputElement[];
+    if (radios.length > 1) return radios;
+  }
+  return [first];
+}
+
 /** The boxes of a "check all that apply" question: same name, or the same fieldset/group. */
 function groupBoxes(first: HTMLInputElement): HTMLInputElement[] {
   const named = first.name ? (deepQueryAll(first.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(first.name)}"]`) as HTMLInputElement[]) : [];
   if (named.length > 1) return named;
   const root = first.closest("fieldset, [role='group']");
   return root ? ([...root.querySelectorAll("input[type=checkbox]")] as HTMLInputElement[]) : [first];
+}
+
+const MENU_ITEMS = "[role='option'], [role='menuitem'], [role='menuitemradio'], li, [role='button'], button, [tabindex], div, span";
+
+function menuItems(doc: Document): HTMLElement[] {
+  return ([...doc.querySelectorAll(MENU_ITEMS)] as HTMLElement[]).filter((e) => isVisible(e) && e.childElementCount <= 3);
+}
+
+/**
+ * Home-made dropdowns without ARIA roles: the items that appeared when it opened are its
+ * options. Chooses the best match among them.
+ */
+async function pickNewItem(owner: HTMLElement, before: Set<HTMLElement>, value: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const fresh = menuItems(owner.ownerDocument)
+      .filter((e) => !before.has(e) && !owner.contains(e) && !e.closest("copilot-assistant"))
+      .map((el) => ({ el, text: (el.textContent ?? "").replace(/\s+/g, " ").trim() }))
+      .filter((o) => o.text && o.text.length <= 80);
+    const match = bestOption(fresh, value);
+    if (match) {
+      match.el.scrollIntoView?.({ block: "nearest" });
+      press(match.el);
+      return true;
+    }
+    await wait(100);
+  }
+  return false;
 }
 
 const SUGGESTIONS = "[role='option'], .dropdown-results > *, .pac-item, [class*='suggestion'] li, li[class*='suggestion'], [class*='autocomplete'] li, [class*='typeahead'] li";
@@ -259,10 +294,7 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
           if (target.getAttribute("aria-pressed") !== "true") press(target);
           break;
         }
-        const name = (el as HTMLInputElement).name;
-        const radios = name
-          ? (deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`) as HTMLInputElement[])
-          : [el as HTMLInputElement];
+        const radios = radioGroup(el as HTMLInputElement);
         const radio = radios.find((r) => r.value === instruction.optionValue || r.getAttribute("data-copilot-field") === instruction.optionValue);
         if (!radio) return { id: instruction.id, status: "failed", message: "Option not found" };
         if (!radio.checked) radio.click();
@@ -316,8 +348,9 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
       case "listbox": {
         // Open the dropdown, then choose the option that best matches the value.
         el.scrollIntoView?.({ block: "center" });
+        const before = new Set(menuItems(el.ownerDocument));
         press(el);
-        const picked = await pickOption(el, instruction.value ?? "");
+        const picked = (await pickOption(el, instruction.value ?? "", 12)) || (await pickNewItem(el, before, instruction.value ?? ""));
         if (!picked) {
           el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
           return { id: instruction.id, status: "failed", message: "No matching option; choose it yourself" };

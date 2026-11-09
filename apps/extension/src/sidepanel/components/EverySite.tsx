@@ -1,6 +1,6 @@
 import { Alert, Button } from "@copilot/ui";
 import { Globe } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { send, useLocal } from "@/sidepanel/chrome-state";
 
@@ -10,6 +10,15 @@ const ALL_SITES = ["https://*/*", "http://*/*"];
 export function useEverySite() {
   const enabled = useLocal("allSitesEnabled");
   const [message, setMessage] = useState<string | null>(null);
+  // Known once storage has answered (read after useLocal's own read, so its value is in).
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void chrome.storage.local.get("allSitesEnabled").then(() => active && setLoaded(true));
+    return () => {
+      active = false;
+    };
+  }, []);
   async function enable() {
     const granted = await chrome.permissions.request({ origins: ALL_SITES });
     if (!granted) {
@@ -19,13 +28,13 @@ export function useEverySite() {
     const reply = await send<boolean>({ type: "ENABLE_ALL_SITES" });
     setMessage(reply.ok ? "On for every career site, including tabs already open." : reply.error);
   }
-  return { enabled, message, enable };
+  return { enabled, loaded, message, enable };
 }
 
 /** Top-of-panel prompt until Copilot may run on company career sites too. */
 export function EverySiteCard() {
-  const { enabled, message, enable } = useEverySite();
-  if (enabled && !message) return null;
+  const { enabled, loaded, message, enable } = useEverySite();
+  if (!loaded || (enabled && !message)) return null; // no flash before the setting is read
   return (
     <section aria-label="Every career site" className="grid gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
       {enabled ? (

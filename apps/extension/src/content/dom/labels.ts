@@ -45,7 +45,7 @@ export function nearestCaption(el: Element): string {
   let node = el.parentElement;
   for (let depth = 0; node && depth < 6 && node !== el.ownerDocument.body; depth += 1, node = node.parentElement) {
     // Stop once the block holds other questions' controls too.
-    const others = [...node.querySelectorAll(CONTROLS)].filter((c) => c !== el && !(own && (c as HTMLInputElement).name === own));
+    const others = [...node.querySelectorAll(CONTROLS)].filter((c) => c !== el && !el.contains(c) && !(own && (c as HTMLInputElement).name === own));
     if (others.length > 0) break;
     for (const candidate of node.querySelectorAll(CAPTION)) {
       if (candidate.contains(el) || candidate.querySelector(CONTROLS)) continue;
@@ -60,8 +60,8 @@ export function nearestCaption(el: Element): string {
     // or a table row <tr><td>Name</td><td><input></td></tr>.
     // Not for a choice's own option text ("Yes", "English"): those questions are found by their group.
     if (own || node.tagName === "LABEL") continue;
-    const loose = textOutside(node, el);
-    if (loose && loose.length <= 120 && !/^(select|choose|browse|upload|or)\b/i.test(loose)) return loose;
+    const loose = captionBefore(node, el);
+    if (loose && loose.length <= 200 && !/^(select|choose|browse|upload|or|click to|drag|drop|attach)\b/i.test(loose)) return loose;
   }
   return "";
 }
@@ -71,8 +71,8 @@ function textOutside(label: Element, el: Element): string {
   if (!label.contains(el) || label === el) return text(label);
   let branch: Node = el;
   while (branch.parentNode && branch.parentNode !== label) branch = branch.parentNode;
-  // The control sits directly in the label: <label><input> Yes</label> keeps its text.
-  if (branch === el) return text(label);
+  // The control sits directly in a label: <label><input> Yes</label> keeps its text.
+  if (branch === el && label.tagName === "LABEL") return text(label);
   const parts: string[] = [];
   for (const child of label.childNodes) {
     if (child === branch) continue;
@@ -93,6 +93,29 @@ export function nearbyText(el: Element): string {
     content = content.replace(/\s+/g, " ").trim();
     if (content.length > 200) break;
     if (content) return content;
+  }
+  return "";
+}
+
+/** The first piece of text before the control inside `block` (captions precede their field;
+ * "Click to upload" hints and help paragraphs come after the caption or the field). */
+function captionBefore(block: Element, el: Element): string {
+  let branch: Node = el;
+  while (branch.parentNode && branch.parentNode !== block) branch = branch.parentNode;
+  for (const child of block.childNodes) {
+    if (child === branch) break;
+    const first = firstText(child);
+    if (first) return first;
+  }
+  return "";
+}
+
+function firstText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return (node.textContent ?? "").replace(/\s+/g, " ").trim();
+  if (!(node instanceof Element) || node.matches("script, style, svg, button, [aria-hidden='true']")) return "";
+  const walker = node.ownerDocument.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if ((t.textContent ?? "").trim()) return text(t.parentElement === node ? node : (t.parentElement ?? node));
   }
   return "";
 }

@@ -98,3 +98,37 @@ describe("Ashby choices", () => {
     expect(scanFields().find((f) => /sponsor/.test(f.label))!.currentValue).toBe("No");
   });
 });
+
+describe("home-made forms", () => {
+  it("fills a 'Please select' button dropdown whose options are plain elements", async () => {
+    const { fillField } = await import("@/content/autofill/writer");
+    document.body.innerHTML = SAMPLES.find((s) => s.name.startsWith("Custom React form"))!.html;
+    const button = [...document.querySelectorAll("button")].find((b) => /Please select/.test(b.textContent ?? ""))!;
+    // The menu appears when the button is pressed, as plain divs with no roles.
+    button.addEventListener("click", () => {
+      const menu = document.createElement("div");
+      menu.innerHTML = `<div class="opt">Male</div><div class="opt">Female</div><div class="opt">Decline to self-identify</div>`;
+      menu.querySelectorAll(".opt").forEach((o) => o.addEventListener("click", () => { button.textContent = o.textContent; menu.remove(); }));
+      document.body.append(menu);
+    });
+    const gender = scanFields().find((f) => f.label === "Gender")!;
+    expect(gender.kind).toBe("listbox");
+    const result = await fillField({ id: gender.id, kind: "listbox", value: "Decline to self identify", optionValue: null, overwrite: true });
+    expect(result.status).toBe("filled");
+    expect(button.textContent).toBe("Decline to self-identify");
+  });
+
+  it("answers name-less radio groups and treats 'Apply and save' on a form as the final submit", async () => {
+    const { fillField } = await import("@/content/autofill/writer");
+    const { actionKind, actionText, findAction } = await import("@/content/forms/scanner");
+    document.body.innerHTML = SAMPLES.find((s) => s.name.startsWith("Custom React form"))!.html;
+    const sponsor = scanFields().find((f) => /sponsorship/.test(f.label))!;
+    expect(sponsor.options.map((o) => o.label)).toEqual(["Yes", "No", "N/A"]);
+    const no = sponsor.options.find((o) => o.label === "No")!;
+    await fillField({ id: sponsor.id, kind: "radio", value: "No", optionValue: no.value, overwrite: true });
+    expect((document.getElementById("r2") as HTMLInputElement).checked).toBe(true);
+    expect((document.getElementById("r1") as HTMLInputElement).checked).toBe(false);
+    expect(actionKind(actionText(findAction()!), true)).toBe("submit"); // never pressed without the user's OK
+    expect(actionKind("Apply", false)).toBe("start");
+  });
+});

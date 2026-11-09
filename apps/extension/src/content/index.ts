@@ -49,7 +49,7 @@ function report(force = false) {
   const fields = job?.isApplicationPage ? scanFields() : [];
   const actionEl = job?.isApplicationPage || window === window.top ? findAction() : null;
   const action = actionEl ? actionText(actionEl).slice(0, 80) : null;
-  const kind = action ? actionKind(action) : null;
+  const kind = action ? actionKind(action, fields.length > 0) : null;
   const exists = !!job?.isApplicationPage && accountExists();
   const errors = job?.isApplicationPage ? pageErrors() : [];
   const fieldsPayload = JSON.stringify({ fields, action, exists, errors });
@@ -125,7 +125,7 @@ function start() {
     if (parsed.data.type === "CLICK_ACTION") {
       const button = findAction();
       // Only the kinds of step the caller allows (Submit only after the user's OK).
-      if (!button || !parsed.data.kinds.includes(actionKind(actionText(button)))) {
+      if (!button || !parsed.data.kinds.includes(actionKind(actionText(button), scanFields().length > 0))) {
         sendResponse({ ok: false, error: "No button to click on this page." });
         return false;
       }

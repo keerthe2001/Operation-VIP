@@ -287,6 +287,23 @@ export const SAMPLES: Sample[] = [
     ],
   },
   {
+    name: "Custom React form (Gem-style: no names, no ARIA)",
+    html: `<form>
+      <div><span>First name<span> *</span></span><div><div><input type="text"></div></div></div>
+      <div><span>Last name<span> *</span></span><div><div><input type="text"></div></div></div>
+      <div><span>Email<span> *</span></span><div><div><input type="text"></div></div></div>
+      <div><span>Phone number<span> *</span></span><div><div><input type="text"></div></div></div>
+      <div><span>Resume<span> *</span></span><div><div><div role="presentation" tabindex="0"><input accept=".pdf,.doc,.docx" tabindex="-1" type="file"><div><i></i><span>Click to upload or drag and drop here</span></div></div></div></div></div>
+      <div><div><span>Will you now or in the future require sponsorship for employment visa status in the United States?<span> *</span></span><div><div><div>We may provide immigration and sponsorship support to new employees based on their unique circumstances, so please answer honestly here.</div></div></div></div>
+        <div><div><input id="r1" type="radio"><label for="r1"><div>Yes</div></label></div><div><input id="r2" type="radio"><label for="r2"><div>No</div></label></div><div><input id="r3" type="radio"><label for="r3"><div>N/A</div></label></div></div></div>
+      <div><div>Gender</div><button type="button"><div>Please select<i></i></div></button></div>
+      <button type="button">Apply and save</button></form>`,
+    expect: [
+      ["First name", "first_name"], ["Last name", "last_name"], ["Email", "email"], ["Phone number", "phone"], ["Resume", "resume"],
+      ["Sponsorship", "requires_sponsorship"], ["Gender", "gender"],
+    ],
+  },
+  {
     name: "Greenhouse",
     html: `<form id="application_form">${f.text("First Name *", 'name="job_application[first_name]"')}${f.text("Last Name *", 'name="job_application[last_name]"')}
       ${f.text("Email *", 'name="job_application[email]"', "email")}${f.text("Phone", 'name="job_application[phone]"', "tel")}
