@@ -90,6 +90,44 @@ const wdx = {
   },
 };
 
+/** Greenhouse's job-boards UI: react-select dropdowns (options load on open), a phone block
+ * whose hidden legend must not name later fields, and uploads labelled only "Attach". */
+const ghr = {
+  text(id: string, label: string, r = false) {
+    return `<div class="field-wrapper"><div class="input-wrapper"><label id="${id}-label" for="${id}" class="label">${label}${r ? '<span aria-hidden="true">*</span>' : ""}</label><input id="${id}" class="input" aria-label="${label}" aria-required="${r}" type="text"></div></div>`;
+  },
+  select(id: string, label: string, r = false) {
+    return `<div class="field-wrapper"><div class="select"><div class="select__container"><label id="${id}-label" for="${id}" class="label select__label">${label}${r ? '<span aria-hidden="true">*</span>' : ""}</label><div class="select-shell"><div class="select__control"><div class="select__value-container"><div class="select__placeholder">Select...</div><div class="select__input-container"><input class="select__input" id="${id}" type="text" aria-autocomplete="list" aria-expanded="false" aria-haspopup="true" aria-labelledby="${id}-label" aria-required="${r}" role="combobox" value=""></div></div></div><input required="" tabindex="-1" aria-hidden="true" value=""></div></div></div></div>`;
+  },
+  upload(id: string, label: string) {
+    return `<div class="field-wrapper"><div role="group" aria-labelledby="upload-label-${id}" class="file-upload"><div id="upload-label-${id}" class="label upload-label">${label}</div><div class="file-upload__wrapper"><button type="button">Attach</button><label class="visually-hidden" for="${id}">Attach</label><input id="${id}" class="visually-hidden" type="file" accept=".pdf,.doc,.docx"></div></div></div>`;
+  },
+};
+
+/** Lever: <label> wraps caption and control (plus dropdown hints); custom questions keep the
+ * caption in ".application-label .text"; "check all that apply" boxes share one name. */
+const lv = {
+  text(name: string, label: string, r = false, extra = "") {
+    return `<li class="application-question"><label><div class="application-label">${label}${r ? ' <span class="required">✱</span>' : ""}</div><div class="application-field"><input type="text" name="${name}" ${r ? "required" : ""}>${extra}</div></label></li>`;
+  },
+  choice(name: string, label: string, type: "radio" | "checkbox", options: string[], r = true) {
+    return `<li class="application-question custom-question"><div><div class="application-label full-width"><div class="text">${label}${r ? '<span class="required">✱</span>' : ""}</div></div><div class="application-field full-width${r ? " required-field" : ""}"><ul>${options.map((o) => `<li><label><input type="${type}" name="${name}" value="${o}"><span class="application-answer-alternative">${o}</span></label></li>`).join("")}</ul></div></div></li>`;
+  },
+  select(name: string, label: string, options: string[]) {
+    return `<li class="application-question custom-question"><div><div class="application-label full-width"><div class="text">${label}<span class="required">✱</span></div></div><div class="application-field full-width"><select name="${name}" required><option value="">Select ...</option>${options.map((o) => `<option value="${o}">${o}</option>`).join("")}</select></div></div></li>`;
+  },
+};
+
+/** Workday's account step: real submit button hidden behind a click overlay, a bot trap field. */
+const wdAccount = (create: boolean) => `<div data-automation-id="signInContent"><h3>${create ? "Create Account" : "Sign In"}</h3><form data-automation-id="signInFormo">
+  <div data-automation-id="formField-email"><label for="e1"><span>Email Address<abbr aria-hidden="true">*</abbr></span></label><input type="text" data-automation-id="email" id="e1" aria-required="true" autocomplete="email"></div>
+  <div data-automation-id="formField-password"><label for="p1"><span>Password<abbr aria-hidden="true">*</abbr></span></label><input type="password" data-automation-id="password" id="p1" aria-required="true"></div>
+  ${create ? `<div data-automation-id="formField-verifyPassword"><label for="p2"><span>Verify New Password<abbr aria-hidden="true">*</abbr></span></label><input type="password" data-automation-id="verifyPassword" id="p2" aria-required="true"></div>
+  <div data-automation-id="formField-"><input id="c1" type="checkbox" data-automation-id="createAccountCheckbox"><label for="c1">I agree</label></div>` : ""}
+  <div data-automation-id="noCaptchaWrapper"><div aria-label="${create ? "Create Account" : "Submit"}" role="button" tabindex="0" data-automation-id="click_filter"></div><button type="submit" data-automation-id="${create ? "createAccountSubmitButton" : "signInSubmitButton"}" tabindex="-2" aria-hidden="true">${create ? "Create Account" : "Sign In"}</button></div>
+</form><div>${create ? 'Already have an account?<button data-automation-id="signInLink">Sign In</button>' : 'Don\'t have an account yet?<button data-automation-id="createAccountLink">Create Account</button>'}</div></div>
+<div><label for="bc">Enter website. This input is for robots only, do not enter if you're human.</label><input data-automation-id="beecatcher" id="bc" name="website" type="text"></div>`;
+
 export const SAMPLES: Sample[] = [
   {
     name: "Workday · My Information",
@@ -144,6 +182,54 @@ export const SAMPLES: Sample[] = [
       ["From · Month", "employment_start"], ["From · Year", "employment_start"], ["To · Month", "employment_end"], ["To · Year", "employment_end"],
       ["Role Description", "role_description"], ["School", "school"], ["Degree", "degree"], ["Field of Study", "discipline"], ["GPA", "gpa"],
       ["Skills", "skills"], ["Resume", "resume"], ["Website", "website_item"], ["LinkedIn", "linkedin"],
+    ],
+  },
+  {
+    name: "Workday · Sign In (email form, bot trap)",
+    html: wdAccount(false),
+    expect: [["Email Address", "email"], ["Password", "account_password"]],
+  },
+  {
+    name: "Workday · Create Account",
+    html: wdAccount(true),
+    expect: [["Email Address", "email"], ["Password", "account_password"], ["Verify New Password", "account_password"], ["I agree", null]],
+  },
+  {
+    name: "Greenhouse · job-boards (react-select)",
+    html: `<form><h2>Apply for this job</h2>${ghr.text("first_name", "First Name", true)}${ghr.text("last_name", "Last Name", true)}${ghr.text("email", "Email", true)}
+      <div><fieldset class="phone-input"><legend class="visually-hidden">Phone</legend>${ghr.select("country", "Country")}
+        <div class="input-wrapper"><label id="phone-label" for="phone" class="label">Phone</label><input id="phone" aria-label="Phone" type="tel"></div></fieldset></div>
+      ${ghr.upload("resume", 'Resume/CV<span class="required">*</span>')}${ghr.upload("cover_letter", "Cover Letter")}
+      ${ghr.text("q1", "LinkedIn Profile")}${ghr.text("q2", "What's the name you'd prefer us to use throughout the interview process?")}
+      ${ghr.select("q3", "Please choose the country in which you are located.")}
+      ${ghr.select("q4", "Are you subject to any employment agreements and/or post-employment restrictions with your current employer or a past employer?", true)}
+      ${ghr.select("q5", "Have you previously worked at or consulted for Acme?", true)}${ghr.select("q6", "What is your current country of residence?", true)}
+      <h2>Voluntary Self-Identification</h2>${ghr.select("gender", "Gender")}${ghr.select("hispanic_ethnicity", "Are you Hispanic/Latino?")}${ghr.select("veteran_status", "Veteran Status")}</form>`,
+    expect: [
+      ["First Name", "first_name"], ["Last Name", "last_name"], ["Email", "email"], ["Phone · Country", "phone_country"], ["Phone", "phone"],
+      ["Resume/CV", "resume"], ["Cover Letter", null], ["LinkedIn", "linkedin"], ["Preferred name", "preferred_name"], ["Country located", "country"],
+      ["Employment agreements", null], ["Worked here before", null], ["Country of residence", "country"],
+      ["Gender", "gender"], ["Hispanic", "hispanic"], ["Veteran", "veteran_status"],
+    ],
+  },
+  {
+    name: "Lever · question blocks and checkbox groups",
+    html: `<form><h4>Submit your application</h4><ul>
+      <li class="application-question"><label><div class="application-label">Resume/CV <span class="required">✱</span></div><div class="application-field"><a class="awesome">ATTACH RESUME/CV</a><input type="file" name="resume" style="display:none"><span>Couldn't auto-read resume.</span><span>Analyzing resume.</span></div></label></li>
+      ${lv.text("name", "Full name", true)}${lv.text("email", "Email", true)}${lv.text("phone", "Phone")}
+      ${lv.text("location", "Current location", true, '<div class="dropdown-container"><div class="dropdown-results"></div><div class="dropdown-no-results">No location found. Try entering a different location</div></div>')}
+      ${lv.text("org", "Current company")}</ul><h4>Links</h4><ul>${lv.text("urls[LinkedIn]", "LinkedIn URL")}${lv.text("urls[GitHub]", "GitHub URL")}</ul>
+      <h4>Supplementary Questions</h4><ul>${lv.choice("cards[a][field0]", "Language Skill(s) (Check all that apply)", "checkbox", ["English (ENG)", "Hindi (HIN)", "Tamil (TAM)"])}
+      ${lv.text("cards[a][field1]", "Preferred Name | What would you like us to call you?")}
+      ${lv.choice("cards[b][field0]", "Are you legally authorized to work in the country for which you are applying?", "radio", ["Yes", "No"])}
+      ${lv.choice("cards[c][field0]", "Have you ever been previously employed by Acme?", "checkbox", ["No", "Yes - Intern", "Yes - Full Time Employment"])}
+      ${lv.select("cards[d][field0]", "Please tell us how you heard about this opportunity.", ["LinkedIn", "Referral", "Job board"])}
+      ${lv.select("cards[e][field0]", "What is your location?", ["India", "United States", "United Kingdom", "Germany", "Canada", ...Array.from({ length: 40 }, (_, i) => `Country ${i}`)])}
+      ${lv.choice("cards[f][field0]", "What best describes your gender?", "radio", ["Man", "Woman", "Prefer not to say"])}</ul></form>`,
+    expect: [
+      ["Resume/CV", "resume"], ["Full name", "full_name"], ["Email", "email"], ["Phone", "phone"], ["Current location", "location"], ["Current company", "current_company"],
+      ["LinkedIn URL", "linkedin"], ["GitHub URL", "github"], ["Language skills", "languages"], ["Preferred name", "preferred_name"],
+      ["Authorized to work", "work_authorization"], ["Previously employed", null], ["How did you hear", "referral_source"], ["What is your location", "country"], ["Gender", "gender"],
     ],
   },
   {

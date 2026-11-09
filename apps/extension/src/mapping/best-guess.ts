@@ -44,7 +44,10 @@ export function bestGuess(fields: MappedField[], context: GuessContext): MappedF
     let answer: { value: string; optionValue: string | null } | null = null;
 
     if (f.kind === "checkbox") {
-      if (CONSENT.test(text) && !MARKETING.test(text) && (f.required || /\*\s*$/.test(f.label))) answer = { value: "Yes", optionValue: "true" };
+      // Required consent boxes, and the bare "I agree" box of an account form (Workday marks it
+      // required only when you press Create Account).
+      const bareAgree = /^\s*(i agree|i accept|agree|accept)\s*[.*]?\s*$/i.test(f.label) || /createAccountCheckbox/.test(f.automationId ?? "");
+      if (CONSENT.test(text) && !MARKETING.test(text) && (f.required || /\*\s*$/.test(f.label) || bareAgree)) answer = { value: "Yes", optionValue: "true" };
     } else if (isChoice(f)) {
       if (f.key && EEO_KEYS.has(f.key)) {
         answer = pick(f, (t) => DECLINE.test(t)) ?? (opensLater(f) ? { value: "Decline to self identify", optionValue: null } : null);

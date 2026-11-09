@@ -144,7 +144,9 @@ async function runFlow(tabId: number) {
   if ((await auth.state()).status !== "signed_in") return;
   const job = (await session.get(tabKey(tabId)))?.job;
   const state = await autofill.state(tabId);
-  if (!job?.isApplicationPage || !state || (state.fields.length === 0 && !state.action)) return;
+  // Workday's "Start Your Application" dialog appears on the job page once the user pressed Apply.
+  const startDialog = state?.actionKind === "start" && /\b(manually|start (your |my )?application)\b/i.test(state.action ?? "");
+  if ((!job?.isApplicationPage && !startDialog) || !state || (state.fields.length === 0 && !state.action)) return;
 
   const step = `${state.url}|${state.action ?? ""}|${state.fields.map((f) => f.id).join(",")}`;
   const done = handledSteps.get(tabId) ?? new Set<string>();
@@ -155,6 +157,12 @@ async function runFlow(tabId: number) {
     done.add(`signin|${state.url}`);
     await log(tabId, "Account already exists: signing in");
     await chrome.tabs.sendMessage(tabId, { type: "CLICK_SIGN_IN" }, { frameId: 0 }).catch(() => undefined);
+    return;
+  }
+  if (startDialog && !done.has(`start|${state.url}`)) {
+    done.add(`start|${state.url}`);
+    await log(tabId, `${state.action}…`);
+    await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", kinds: ["start"] }, { frameId: 0 }).catch(() => undefined);
     return;
   }
 
@@ -200,6 +208,25 @@ async function runFlow(tabId: number) {
 
   const kind = state.actionKind;
   if (!kind || !state.action) return;
+  // A sign-in that the site refused: no account yet, so create one (once). Never retry a
+  // password, which can lock the account.
+  const signingIn = kind === "account" && /^(sign in|log ?in)$/i.test(state.action);
+  if (signingIn && done.has(`signin-tried|${state.url}`)) {
+    const errors = [...(latest.pageErrors ?? []), ...latest.fields.map((f) => activeError(f)).filter(Boolean)];
+    if (!errors.length) return; // still signing in
+    if (!done.has(`create|${state.url}`) && !done.has(`signin|${state.url}`)) {
+      done.add(`create|${state.url}`);
+      await log(tabId, "No account with this email yet: creating one");
+      await chrome.tabs.sendMessage(tabId, { type: "CLICK_CREATE_ACCOUNT" }, { frameId: 0 }).catch(() => undefined);
+      return;
+    }
+    if (!done.has(`stuck|${state.url}`)) {
+      done.add(`stuck|${state.url}`);
+      await log(tabId, `Sign in didn't work: ${errors[0]!.slice(0, 100)}. Please sign in yourself`, "need");
+    }
+    return;
+  }
+  if (signingIn) done.add(`signin-tried|${state.url}`);
   if (clicks > 0) {
     // Still on the same step after pressing the button: the page refused. Read its errors,
     // put back what it rejected or cleared, then press again (three tries at most).
@@ -485,7 +512,7 @@ async function handlePanel(raw: unknown): Promise<Reply<unknown>> {
       case "CLICK_ACTION": {
         // The user pressed it in the panel: any step except the final submit (see below).
         const reply = (await chrome.tabs
-          .sendMessage(message.tabId, { type: "CLICK_ACTION", kinds: ["continue", "account"] }, { frameId: 0 })
+          .sendMessage(message.tabId, { type: "CLICK_ACTION", kinds: ["start", "continue", "account"] }, { frameId: 0 })
           .catch(() => null)) as Reply | null;
         return reply ?? { ok: false, error: "The page didn't respond." };
       }

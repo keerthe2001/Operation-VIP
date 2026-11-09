@@ -104,4 +104,5 @@ export interface FormState {
 }
 
 /** What the page's main button does. */
-export type ActionKind = "continue" | "account" | "submit";
+/** "start": the button that opens an application ("Apply", Workday's "Apply Manually"). */
+export type ActionKind = "start" | "continue" | "account" | "submit";

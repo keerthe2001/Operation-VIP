@@ -41,3 +41,34 @@ describe("Workday validation errors", () => {
     expect(pageErrors().join(" ")).toContain("Errors Found");
   });
 });
+
+describe("live-site details", () => {
+  it("names Workday's account buttons by the real button behind the click overlay", async () => {
+    const { actionKind, actionText, findAction, findCreateAccount, findSignIn } = await import("@/content/forms/scanner");
+    const signIn = SAMPLES.find((s) => s.name.startsWith("Workday · Sign In"))!;
+    document.body.innerHTML = `<header data-automation-id="utilityButtonBar"><button data-automation-id="utilityButtonSignIn">Sign In</button></header>${signIn.html}`;
+    const action = findAction()!;
+    expect(action.getAttribute("data-automation-id")).toBe("click_filter");
+    expect(actionText(action)).toBe("Sign In");
+    expect(actionKind(actionText(action))).toBe("account"); // never mistaken for the final Submit
+    expect(findCreateAccount()?.getAttribute("data-automation-id")).toBe("createAccountLink");
+
+    const create = SAMPLES.find((s) => s.name === "Workday · Create Account")!;
+    document.body.innerHTML = `<header data-automation-id="utilityButtonBar"><button data-automation-id="utilityButtonSignIn">Sign In</button></header>${create.html}`;
+    expect(actionText(findAction()!)).toBe("Create Account");
+    expect(findSignIn()?.getAttribute("data-automation-id")).toBe("signInLink"); // not the header's
+  });
+
+  it("starts Workday's application from its dialog and offers email sign-in over SSO", async () => {
+    const { actionKind, actionText, findAction } = await import("@/content/forms/scanner");
+    document.body.innerHTML = `<div role="dialog"><h2>Start Your Application</h2><a data-automation-id="autofillWithResume">Autofill with Resume</a><a data-automation-id="applyManually">Apply Manually</a></div>`;
+    expect(actionKind(actionText(findAction()!))).toBe("start");
+    document.body.innerHTML = `<button data-automation-id="GoogleSignInButton">Sign in with Google</button><button data-automation-id="SignInWithEmailButton">Sign in with email</button>`;
+    expect(actionText(findAction()!)).toBe("Sign in with email");
+  });
+
+  it("reads what a react-select shows as chosen", () => {
+    document.body.innerHTML = `<label id="g-label" for="g">Gender</label><div class="select__control"><div class="select__value-container"><div class="select__single-value">Decline To Self Identify</div><div class="select__input-container"><input id="g" role="combobox" aria-labelledby="g-label" value=""></div></div></div>`;
+    expect(scanFields()[0]).toMatchObject({ kind: "combobox", currentValue: "Decline To Self Identify" });
+  });
+});

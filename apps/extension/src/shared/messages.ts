@@ -36,7 +36,7 @@ export const contentMessageSchema = z.discriminatedUnion("type", [
     fields: z.array(fieldDescriptorSchema).max(300),
     /** Text of the page's main button (Continue, Create Account…). */
     action: z.string().max(80).nullable().optional(),
-    actionKind: z.enum(["continue", "account", "submit"]).nullable().optional(),
+    actionKind: z.enum(["start", "continue", "account", "submit"]).nullable().optional(),
     accountExists: z.boolean().optional(),
     /** Page-level error messages (a "please fix the errors" banner). */
     pageErrors: z.array(z.string().max(300)).max(20).optional(),
@@ -146,9 +146,10 @@ export const toContentSchema = z.discriminatedUnion("type", [
   /** `interactive`: scroll to each field and fill it one by one, reporting progress. */
   z.object({ type: z.literal("FILL"), instructions: z.array(fillInstructionSchema).max(300), interactive: z.boolean().optional() }),
   /** Press the page's main button, only if it does one of `kinds`. */
-  z.object({ type: z.literal("CLICK_ACTION"), kinds: z.array(z.enum(["continue", "account", "submit"])).max(3) }),
+  z.object({ type: z.literal("CLICK_ACTION"), kinds: z.array(z.enum(["start", "continue", "account", "submit"])).max(4) }),
   /** The account exists: go to the site's Sign In form. */
   z.object({ type: z.literal("CLICK_SIGN_IN") }),
+  z.object({ type: z.literal("CLICK_CREATE_ACCOUNT") }),
   /** Press "Add" in repeatable sections so there's a block for each profile entry. */
   z.object({
     type: z.literal("EXPAND_SECTIONS"),

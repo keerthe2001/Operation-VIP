@@ -182,6 +182,63 @@ const FLOW_HTML = `<!doctype html><html><head><title>Apply - Analyst</title></he
   render();
 </script></body></html>`;
 
+// Workday's real account step, as on live tenants: "Start Your Application" dialog, SSO buttons
+// with "Sign in with email", the real submit hidden behind a click overlay, a bot trap field.
+// Sign-in fails for a new user, so Copilot must switch to Create Account (once) and tick "I agree".
+const WDACC_URL = "https://globex.wd5.myworkdayjobs.com/en-US/External/job/Chennai/Data-Engineer_R-99";
+const WDACC_HTML = `<!doctype html><html><head><title>Data Engineer</title></head><body>
+<header data-automation-id="utilityButtonBar"><button type="button" data-automation-id="utilityButtonSignIn">Sign In</button></header>
+<main id="app"></main>
+<script>
+  const app = document.getElementById("app");
+  window.__clicks = [];
+  const trap = '<div><label for="bc">Enter website. This input is for robots only, do not enter if you\\'re human.</label><input data-automation-id="beecatcher" id="bc" name="website" type="text"></div>';
+  const overlay = (label, real) => \`<div data-automation-id="noCaptchaWrapper"><div aria-label="\${label}" role="button" tabindex="0" data-automation-id="click_filter" id="go" style="display:inline-block;width:120px;height:30px;background:#7a0"></div><button type="submit" tabindex="-2" aria-hidden="true">\${real}</button></div>\`;
+  const steps = {
+    job: () => \`<h2 data-automation-id="jobPostingHeader">Data Engineer</h2><a href="#" id="apply" data-automation-id="adventureButton">Apply</a>\`,
+    start: () => \`<h2 data-automation-id="jobPostingHeader">Data Engineer</h2><div role="dialog"><h2>Start Your Application</h2>
+      <a href="#" id="manual" data-automation-id="applyManually">Apply Manually</a><a href="#" data-automation-id="useMyLastApplication">Use My Last Application</a></div>\`,
+    sso: () => \`<div data-automation-id="applyFlowPage"><h3 data-automation-id="jobTitleHeading">Data Engineer</h3><h3>Sign In</h3>
+      <button type="button" data-automation-id="GoogleSignInButton" id="google">Sign in with Google</button>
+      <button type="button" data-automation-id="SignInWithEmailButton" id="withEmail">Sign in with email</button></div>\`,
+    signin: () => \`<div data-automation-id="applyFlowPage"><h3>Sign In</h3>\${window.__wrong ? '<div data-automation-id="errorMessage" role="alert">Wrong email address or password.</div>' : ""}
+      <form data-automation-id="signInFormo" onsubmit="return false">
+      <div data-automation-id="formField-email"><label for="em">Email Address*</label><input id="em" data-automation-id="email" type="text" aria-required="true"></div>
+      <div data-automation-id="formField-password"><label for="pw">Password*</label><input id="pw" data-automation-id="password" type="password" aria-required="true"></div>
+      \${overlay("Submit", "Sign In")}</form>
+      <div>Don't have an account yet?<button type="button" data-automation-id="createAccountLink" id="toCreate">Create Account</button></div>\${trap}</div>\`,
+    create: () => \`<div data-automation-id="applyFlowPage"><h3>Create Account</h3><form data-automation-id="signInFormo" onsubmit="return false">
+      <div data-automation-id="formField-email"><label for="em">Email Address*</label><input id="em" data-automation-id="email" type="text" aria-required="true"></div>
+      <div data-automation-id="formField-password"><label for="pw">Password*</label><input id="pw" data-automation-id="password" type="password" aria-required="true"></div>
+      <div data-automation-id="formField-verifyPassword"><label for="pw2">Verify New Password*</label><input id="pw2" data-automation-id="verifyPassword" type="password" aria-required="true"></div>
+      <div data-automation-id="formField-"><input id="agree" type="checkbox" data-automation-id="createAccountCheckbox"><label for="agree">I agree</label></div>
+      \${overlay("Create Account", "Create Account")}</form>
+      <div>Already have an account?<button type="button" data-automation-id="signInLink">Sign In</button></div>\${trap}</div>\`,
+    info: () => \`<div data-automation-id="applyFlowPage"><h3>My Information</h3><p>Account created.</p></div>\`,
+  };
+  let step = "job";
+  const render = () => { app.innerHTML = steps[step](); };
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("#apply, #manual, #google, #withEmail, #toCreate, #go");
+    if (!t) return;
+    e.preventDefault();
+    window.__clicks.push(t.id + ":" + step);
+    if (t.id === "apply") step = "start";
+    else if (t.id === "manual") step = "sso";
+    else if (t.id === "google") window.__sso = true;
+    else if (t.id === "withEmail") step = "signin";
+    else if (t.id === "toCreate") step = "create";
+    else if (t.id === "go" && step === "signin") window.__wrong = (window.__signInTries = (window.__signInTries ?? 0) + 1);
+    else if (t.id === "go" && step === "create") {
+      window.__created = { email: document.getElementById("em").value, same: document.getElementById("pw").value === document.getElementById("pw2").value && !!document.getElementById("pw").value, agreed: document.getElementById("agree").checked, trap: document.getElementById("bc").value };
+      if (window.__created.agreed && window.__created.same) step = "info";
+    }
+    else return;
+    render();
+  });
+  render();
+</script></body></html>`;
+
 /** Clicks until `done()` resolves true: the embedded panel can re-layout while live updates arrive. */
 async function clickUntil(locator, done, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
@@ -772,6 +829,24 @@ try {
   check(atContinue.schools[0] === expCounts.school, `education filled (${atContinue.schools[0]})`);
   check(atContinue.chips.length >= 3, `skills entered one at a time in the search box (${atContinue.chips.join(", ")})`);
   check(atContinue.cv === "Priya_Raman_Resume.pdf" && atContinue.linkedin.includes("linkedin.com"), "resume uploaded under its section heading, LinkedIn filled");
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
+
+  // 10i. Workday's real account step in Auto mode: the user presses Apply; Copilot picks
+  // "Apply Manually", "Sign in with email", tries to sign in, sees it fail, creates the account.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "auto", fillProgress: "off" } }));
+  await context.route(WDACC_URL, (route) => route.fulfill({ contentType: "text/html", body: WDACC_HTML }));
+  const wdacc = await context.newPage();
+  await wdacc.goto(WDACC_URL);
+  await wdacc.waitForTimeout(2500);
+  check(await wdacc.evaluate(() => window.__clicks.length === 0), "auto mode leaves the job page's Apply to the user");
+  await wdacc.click("#apply");
+  await wdacc.waitForFunction(() => window.__created?.agreed, null, { timeout: 60000 });
+  const acc = await wdacc.evaluate(() => ({ created: window.__created, clicks: window.__clicks, tries: window.__signInTries ?? 0, sso: !!window.__sso }));
+  if (shots) await wdacc.screenshot({ path: `${shots}/workday-account.png` });
+  check(acc.clicks.includes("manual:start") && acc.clicks.includes("withEmail:sso") && !acc.sso, `chose "Apply Manually" and "Sign in with email", never SSO (${acc.clicks.join(" → ")})`);
+  check(acc.tries === 1, `tried the password once, then switched to Create Account (${acc.tries} sign-in attempt)`);
+  check(acc.created.email === "priya.raman@example.com" && acc.created.same && acc.created.agreed, "created the account: email, both passwords, \"I agree\" ticked, pressed through the click overlay");
+  check(acc.created.trap === "", "left Workday's bot-trap field empty");
   await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual" } }));
 
   // 10h. Fields that appear through a style change are picked up without a reload.

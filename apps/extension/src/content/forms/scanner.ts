@@ -32,12 +32,16 @@ function fieldId(el: Element): string {
   return id;
 }
 
+const HONEYPOT_LABEL = /\b(for robots|robots only|bots only|if you('| a)re (a )?human|are human,? (do not|don'?t|leave)|leave (this|it) (field )?(blank|empty)|do not (fill|enter|complete) (this|in))\b/i;
+
 function isFillable(el: Element): boolean {
   if (el instanceof HTMLInputElement && (SKIPPED_TYPES.has(el.type) || el.readOnly)) return false;
   if ((el as HTMLInputElement).disabled) return false;
   if (el.closest("[aria-hidden='true'], [hidden]")) return false;
-  const descriptor = `${el.getAttribute("name") ?? ""} ${el.id}`.toLowerCase();
-  if (/honeypot|captcha|recaptcha|\bbot\b/.test(descriptor)) return false;
+  const descriptor = `${el.getAttribute("name") ?? ""} ${el.id} ${el.getAttribute("data-automation-id") ?? ""}`.toLowerCase();
+  if (/honeypot|captcha|recaptcha|\bbot\b|beecatcher|hp_field/.test(descriptor)) return false;
+  // Trap fields for bots ("This input is for robots only, do not enter if you're human").
+  if (HONEYPOT_LABEL.test(labelFor(el))) return false;
   // Custom "Browse files" buttons usually hide the real file input; it still accepts files.
   if (el instanceof HTMLInputElement && el.type === "file") return true;
   return isVisible(el);
@@ -246,17 +250,23 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
 }
 
 const ACTION_TEXT =
-  /^(save and continue|save & continue|continue|next|next step|create account|sign up|register|sign in|log ?in|verify|review|submit( application| my application)?|apply( now)?|send application|finish)$/i;
+  /^(save and continue|save & continue|continue|next|next step|create account|sign up|register|sign in|log ?in|(sign in|log ?in|continue) with (e-?mail|email address)|verify|review|submit( application| my application)?|apply( now| manually)?|start (your |my )?application|send application|finish)$/i;
 export const CONTINUE_TEXT = /^(save and continue|save & continue|continue|next|next step|review)$/i;
-const ACCOUNT_TEXT = /^(create account|sign up|register|sign in|log ?in|verify)$/i;
+const ACCOUNT_TEXT = /^(create account|sign up|register|sign in|log ?in|(sign in|log ?in|continue) with (e-?mail|email address)|verify)$/i;
+const START_TEXT = /^(apply( now| manually)?|start (your |my )?application)$/i;
 const SIGN_IN_LINK = /^(sign in|log ?in|already have an account\?? ?sign in)$/i;
+const CREATE_ACCOUNT_LINK = /^(create (an )?account|sign up|register|new user\?? ?(create|register).*)$/i;
 
-export type ActionKind = "continue" | "account" | "submit";
+export type ActionKind = "start" | "continue" | "account" | "submit";
 export function actionKind(text: string): ActionKind {
   if (CONTINUE_TEXT.test(text)) return "continue";
   if (ACCOUNT_TEXT.test(text)) return "account";
+  if (START_TEXT.test(text)) return "start";
   return "submit";
 }
+
+/** Site-wide header and navigation (Workday's "Sign In" utility button), not the form's buttons. */
+const inChrome = (el: Element) => !!el.closest("header, nav, [role='banner'], [role='navigation'], [data-automation-id='utilityButtonBar'], [data-automation-id='header']");
 
 const ACCOUNT_EXISTS =
   /\b(already (exists|registered|in use|been registered|have an account with)|account (with this|for this) (email|e-mail)|email (address )?is already|an account already)\b/i;
@@ -264,10 +274,20 @@ export const accountExists = (doc: Document = document) => ACCOUNT_EXISTS.test((
 
 /** The site's link or button to switch from Create Account to Sign In. */
 export function findSignIn(root: Document = document): HTMLElement | null {
+  return findLink(root, SIGN_IN_LINK);
+}
+
+/** The site's link or button to switch from Sign In to Create Account. */
+export function findCreateAccount(root: Document = document): HTMLElement | null {
+  return findLink(root, CREATE_ACCOUNT_LINK);
+}
+
+function findLink(root: Document, pattern: RegExp): HTMLElement | null {
   const candidates = deepQueryAll(root, "a, button, [role='button'], [role='link']").filter(
-    (el): el is HTMLElement => el instanceof HTMLElement && isVisible(el) && SIGN_IN_LINK.test(actionText(el)),
+    (el): el is HTMLElement => el instanceof HTMLElement && isVisible(el) && !el.closest("copilot-assistant") && pattern.test(actionText(el)),
   );
-  return candidates[0] ?? null;
+  // The form's own link ("Already have an account? Sign In"), not the page header's.
+  return candidates.find((el) => !inChrome(el) && !el.closest("form")) ?? candidates.find((el) => !inChrome(el)) ?? candidates[0] ?? null;
 }
 
 /** The page's main button for this step (Continue, Create Account…), if there is one. */
@@ -279,13 +299,31 @@ export function findAction(root: Document = document): HTMLElement | null {
   const score = (el: HTMLElement, index: number) => {
     const parentText = (el.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim();
     const inSentence = parentText.length > actionText(el).length + 12;
-    return (el.matches("button[type=submit], input[type=submit]") ? 4 : 0) + (el.closest("form") ? 2 : 0) - (inSentence ? 5 : 0) + index / 1000;
+    return (
+      (el.matches("button[type=submit], input[type=submit]") ? 4 : 0) +
+      (el.closest("form") ? 2 : 0) -
+      (inSentence ? 5 : 0) -
+      (inChrome(el) ? 6 : 0) +
+      // Workday's real button is hidden behind a clickable overlay that carries its name.
+      (el.getAttribute("data-automation-id") === "click_filter" ? 3 : 0) +
+      (/ with (e-?mail|email address)$/i.test(actionText(el)) ? 3 : 0) +
+      index / 1000
+    );
   };
   return candidates.map((el, i) => ({ el, s: score(el, i) })).sort((a, b) => b.s - a.s)[0]?.el ?? null;
 }
 
 export function actionText(el: HTMLElement): string {
-  return ((el instanceof HTMLInputElement ? el.value : el.textContent) ?? "").replace(/\s+/g, " ").trim();
+  const shown = ((el instanceof HTMLInputElement ? el.value : el.textContent) ?? "").replace(/\s+/g, " ").trim();
+  if (shown) return shown;
+  // Workday's click overlay sits over the real (hidden) button, whose caption is the truth:
+  // the Sign In form's overlay is labelled just "Submit".
+  if (el.getAttribute("data-automation-id") === "click_filter") {
+    const real = el.parentElement?.querySelector("button");
+    const caption = (real?.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (caption) return caption;
+  }
+  return (el.getAttribute("aria-label") ?? "").trim();
 }
 
 const HEADINGS = "h1, h2, h3, h4, h5, legend, [role='heading']";
@@ -348,7 +386,12 @@ export function fieldError(el: Element): string {
 
 /** Page-level errors (Workday's "Errors Found" banner, form-wide alerts). */
 export function pageErrors(root: Document = document): string[] {
-  return deepQueryAll(root, "[data-automation-id='errorBanner'], [data-automation-id='errorHeading'], form [role='alert'], .alert-danger, .form-errors")
+  return deepQueryAll(
+    root,
+    "[data-automation-id='errorBanner'], [data-automation-id='errorHeading'], [data-automation-id='errorMessage'], form [role='alert'], main [role='alert'], [data-automation-id='applyFlowPage'] [role='alert'], .alert-danger, .form-errors",
+  )
+    // A field's own message is reported with that field.
+    .filter((node) => !node.closest("[data-automation-id^='formField-']"))
     .filter((node) => isVisible(node) && text(node) && !node.closest("copilot-assistant"))
     .map((node) => text(node).slice(0, 300))
     .slice(0, 10);

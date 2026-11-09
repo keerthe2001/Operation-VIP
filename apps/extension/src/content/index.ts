@@ -6,7 +6,7 @@
 import { fillFields } from "@/content/autofill/writer";
 import { expandSections } from "@/content/forms/sections";
 import { detectJob, forcedJob } from "@/content/detection/engine";
-import { accountExists, actionKind, actionText, findAction, findField, findSignIn, pageErrors, scanFields } from "@/content/forms/scanner";
+import { accountExists, actionKind, actionText, findAction, findCreateAccount, findField, findSignIn, pageErrors, scanFields } from "@/content/forms/scanner";
 import { toContentSchema } from "@/shared/messages";
 
 // Confirmation pages after applying.
@@ -120,14 +120,21 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
       return false;
     }
     button.scrollIntoView?.({ block: "center" });
-    button.click();
+    activate(button);
     sendResponse({ ok: true, data: actionText(button) });
+    schedule();
+    return false;
+  }
+  if (parsed.data.type === "CLICK_CREATE_ACCOUNT") {
+    const link = findCreateAccount();
+    if (link) activate(link);
+    sendResponse(link ? { ok: true } : { ok: false, error: "No Create Account link on this page." });
     schedule();
     return false;
   }
   if (parsed.data.type === "CLICK_SIGN_IN") {
     const link = findSignIn();
-    if (link) link.click();
+    if (link) activate(link);
     sendResponse(link ? { ok: true } : { ok: false, error: "No Sign In link on this page." });
     schedule();
     return false;
@@ -188,3 +195,12 @@ chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
 });
 
 report(true);
+
+/** Clicks like a person would: some sites (Workday's click overlay) listen for the pointer events. */
+function activate(el: HTMLElement) {
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+    const Event = type.startsWith("pointer") && typeof PointerEvent !== "undefined" ? PointerEvent : MouseEvent;
+    el.dispatchEvent(new Event(type, { bubbles: true, cancelable: true, composed: true, button: 0, buttons: type.endsWith("down") ? 1 : 0 }));
+  }
+  el.click();
+}

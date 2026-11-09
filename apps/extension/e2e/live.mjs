@@ -39,7 +39,8 @@ try {
   let [worker] = context.serviceWorkers();
   worker ??= await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).host;
-  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual", fillProgress: "off" } }));
+  // Manual mode: nothing on the site is pressed. The password is only typed, never sent.
+  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual", fillProgress: "off" }, accountPassword: "Str0ng!Pass#2026" }));
 
   // A signed-in test user with a processed resume.
   const email = `live${Date.now()}@example.com`;
@@ -98,8 +99,14 @@ try {
       await tab.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
       await tab.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => undefined);
       for (const text of clicks) {
-        if (NEVER.test(text) && !/^apply/i.test(text)) throw new Error(`refusing to click ${text}`);
-        const target = tab.getByRole("button", { name: text, exact: true }).or(tab.getByRole("link", { name: text, exact: true })).first();
+        // "#id" clicks a Workday control by its automation id (e.g. #createAccountLink, which only
+        // switches to the Create Account form). Anything that would send the form is refused.
+        const byId = text.startsWith("#");
+        if (!byId && NEVER.test(text) && !/^(apply( manually)?|sign in with email)$/i.test(text)) throw new Error(`refusing to click ${text}`);
+        if (byId && /submit|click_filter/i.test(text)) throw new Error(`refusing to click ${text}`);
+        const target = byId
+          ? tab.locator(`[data-automation-id="${text.slice(1)}"]`).first()
+          : tab.getByRole("button", { name: text, exact: true }).or(tab.getByRole("link", { name: text, exact: true })).first();
         await target.click({ timeout: 20000 });
         await tab.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => undefined);
         await sleep(2500);
@@ -132,7 +139,7 @@ try {
         error: f.error ?? "",
         req: f.required,
       }));
-      entry.action = state?.form?.action ?? null;
+      entry.action = state?.form?.action ? `${state.form.action} (${state.form.actionKind})` : null;
       entry.pageErrors = state?.form?.pageErrors ?? [];
       entry.activity = (state?.activity ?? []).map((a) => a.text);
       await tab.screenshot({ path: `${outDir}/${name}-after.png`, fullPage: true });
@@ -140,6 +147,7 @@ try {
       entry.error = String(error).slice(0, 400);
       await tab.screenshot({ path: `${outDir}/${name}-error.png` }).catch(() => undefined);
     }
+    await tab.close(); // later targets may share this URL
   }
 } finally {
   await writeFile(`${outDir}/report.json`, JSON.stringify(report, null, 2));

@@ -7,7 +7,7 @@ export const workday: PortalAdapter = {
   matches: (url) => /\.myworkdayjobs\.com$|\.myworkday\.com$/.test(url.hostname),
   extract(doc, url) {
     const title =
-      clean(text(doc.querySelector('[data-automation-id="jobPostingHeader"], [data-automation-id="jobTitle"]'))) ??
+      clean(text(doc.querySelector('[data-automation-id="jobPostingHeader"], [data-automation-id="jobTitleHeading"], [data-automation-id="jobTitle"]'))) ??
       splitTitle(doc.title).title;
     // acme.wd5.myworkdayjobs.com → "Acme"
     const company = fromSlug(url.hostname.split(".")[0]);
