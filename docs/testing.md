@@ -95,8 +95,24 @@ fields revealed by a style change; the docked panel has no visible scrollbars.
 Field recognition is also measured on a corpus of form samples modelled on Workday (My Information,
 My Experience with automation ids and error messages, Application Questions, Voluntary Disclosures), Greenhouse, Lever, iCIMS, SmartRecruiters, Taleo,
 SuccessFactors, Ashby, a Naukri-style form and an Indian careers page
-(`apps/extension/src/test/corpus`): 155 of 155 fields map as expected, field and page errors are read; no injection on unsupported sites;
+(`apps/extension/src/test/corpus`): all samples map as expected (including trimmed markup from live Workday, Greenhouse, Lever and Ashby forms), field and page errors are read; no injection on unsupported sites;
 sign-out.
+
+### Live career sites (manual)
+
+`apps/extension/e2e/live.mjs` loads the built extension against real job pages, fills them in
+Manual mode and prints what was recognized and filled. It never presses Submit, Continue, Sign In
+or Create Account (it only opens forms, e.g. `click:Apply,Apply Manually|<url>` or Workday's
+`#createAccountLink`), so nothing is sent to the site. The environment's network must allow the
+site's hosts (Workday also needs `wdN.myworkday.com`).
+
+```bash
+RESUME_PDF=resume.pdf node apps/extension/e2e/live.mjs out-dir <url> ["click:Apply,Apply Manually|<url>"] …
+```
+
+Last run: Greenhouse job-boards 14/14 filled, Lever 12/12, Ashby 11/11, Workday account pages
+recognized (email, both passwords, "I agree"; bot-trap field skipped). SmartRecruiters' apply page
+is behind bot protection that blocks headless browsers, so it is covered by fixtures only.
 
 ## Continuous integration
 

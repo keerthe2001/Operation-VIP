@@ -49,9 +49,9 @@ export function nearestCaption(el: Element): string {
     if (others.length > 0) break;
     for (const candidate of node.querySelectorAll(CAPTION)) {
       if (candidate.contains(el) || candidate.querySelector(CONTROLS)) continue;
-      // A <label for> that names some other control.
+      // A <label for> that names some other control (Ashby points some at ids that don't exist).
       const target = candidate.getAttribute("for");
-      if (target && target !== (el as HTMLElement).id) continue;
+      if (target && target !== (el as HTMLElement).id && el.ownerDocument.getElementById(target)) continue;
       if (!(candidate.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
       const value = text(candidate);
       if (value && value.length < 400) return value;

@@ -22,15 +22,15 @@ function dispatch(el: Element, ...types: string[]) {
 }
 
 function hasValue(el: HTMLElement, instruction: FillInstruction): boolean {
+  if (instruction.kind === "radio" && !(el instanceof HTMLInputElement)) {
+    return [...(el.parentElement?.children ?? [])].some((b) => b.getAttribute("aria-pressed") === "true");
+  }
   if (instruction.kind === "radio") {
     const name = (el as HTMLInputElement).name;
     return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`).some((r) => (r as HTMLInputElement).checked);
   }
   if (instruction.kind === "checkbox") return false;
-  if (instruction.kind === "checkboxes") {
-    const name = (el as HTMLInputElement).name;
-    return !!name && deepQueryAll(el.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(name)}"]`).some((b) => (b as HTMLInputElement).checked);
-  }
+  if (instruction.kind === "checkboxes") return groupBoxes(el as HTMLInputElement).some((b) => b.checked);
   if (instruction.kind === "combobox" && instruction.multi) return false;
   if (instruction.kind === "listbox") {
     const shown = (el.textContent ?? "").trim();
@@ -173,6 +173,14 @@ async function pickOption(owner: HTMLElement, value: string, attempts = 20): Pro
   return false;
 }
 
+/** The boxes of a "check all that apply" question: same name, or the same fieldset/group. */
+function groupBoxes(first: HTMLInputElement): HTMLInputElement[] {
+  const named = first.name ? (deepQueryAll(first.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(first.name)}"]`) as HTMLInputElement[]) : [];
+  if (named.length > 1) return named;
+  const root = first.closest("fieldset, [role='group']");
+  return root ? ([...root.querySelectorAll("input[type=checkbox]")] as HTMLInputElement[]) : [first];
+}
+
 const SUGGESTIONS = "[role='option'], .dropdown-results > *, .pac-item, [class*='suggestion'] li, li[class*='suggestion'], [class*='autocomplete'] li, [class*='typeahead'] li";
 
 /** Suggestions a place box shows near itself (or Google Places' list at the end of the page). */
@@ -244,6 +252,13 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
         break;
       }
       case "radio": {
+        // Toggle buttons standing in for radios (Ashby's Yes / No).
+        if (!(el instanceof HTMLInputElement)) {
+          const target = [...(el.parentElement?.children ?? [])].find((b) => b.getAttribute("data-copilot-field") === instruction.optionValue) as HTMLElement | undefined;
+          if (!target) return { id: instruction.id, status: "failed", message: "Option not found" };
+          if (target.getAttribute("aria-pressed") !== "true") press(target);
+          break;
+        }
         const name = (el as HTMLInputElement).name;
         const radios = name
           ? (deepQueryAll(el.getRootNode() as Document, `input[type=radio][name="${CSS.escape(name)}"]`) as HTMLInputElement[])
@@ -258,8 +273,7 @@ export async function fillField(instruction: FillInstruction): Promise<FillResul
         break;
       }
       case "checkboxes": {
-        const name = (el as HTMLInputElement).name;
-        const boxes = deepQueryAll(el.getRootNode() as Document, `input[type=checkbox][name="${CSS.escape(name)}"]`) as HTMLInputElement[];
+        const boxes = groupBoxes(el as HTMLInputElement);
         const wanted = new Set((instruction.optionValue ?? "").split("\n").filter(Boolean));
         const targets = boxes.filter((b) => wanted.has(b.value) || wanted.has(b.getAttribute("data-copilot-field") ?? ""));
         if (!targets.length) return { id: instruction.id, status: "failed", message: "Option not found" };

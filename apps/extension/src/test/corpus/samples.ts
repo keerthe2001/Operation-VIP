@@ -128,6 +128,23 @@ const wdAccount = (create: boolean) => `<div data-automation-id="signInContent">
 </form><div>${create ? 'Already have an account?<button data-automation-id="signInLink">Sign In</button>' : 'Don\'t have an account yet?<button data-automation-id="createAccountLink">Create Account</button>'}</div></div>
 <div><label for="bc">Enter website. This input is for robots only, do not enter if you're human.</label><input data-automation-id="beecatcher" id="bc" name="website" type="text"></div>`;
 
+/** Ashby: radios without value attributes, fieldsets captioned by a <label>, multi-select
+ * checkboxes that each have their own name, Yes/No toggle buttons, a location combobox. */
+const ash = {
+  text(id: string, label: string, type = "text") {
+    return `<div data-field-path="${id}"><label for="${id}">${label}</label><div><input placeholder="Type here..." name="${id}" id="${id}" type="${type}"></div></div>`;
+  },
+  radios(id: string, label: string, options: string[]) {
+    return `<div data-field-path="${id}"><fieldset><label for="${id}">${label}</label>${options.map((o, i) => `<div><span><input type="radio" id="${id}-r${i}" name="${id}"></span><label for="${id}-r${i}">${o}</label></div>`).join("")}</fieldset></div>`;
+  },
+  boxes(id: string, label: string, options: string[]) {
+    return `<div data-field-path="${id}"><fieldset><label for="${id}">${label}</label>${options.map((o, i) => `<div><span><input type="checkbox" id="${id}-c${i}" name="${o}"></span><label for="${id}-c${i}">${o}</label></div>`).join("")}</fieldset></div>`;
+  },
+  toggle(id: string, label: string) {
+    return `<div data-field-path="${id}"><label for="${id}">${label}</label><div><button aria-pressed="false" data-option="yes">Yes</button><button aria-pressed="false" data-option="no">No</button><input type="checkbox" tabindex="-1" name="${id}" style="display:none"></div></div>`;
+  },
+};
+
 export const SAMPLES: Sample[] = [
   {
     name: "Workday · My Information",
@@ -230,6 +247,20 @@ export const SAMPLES: Sample[] = [
       ["Resume/CV", "resume"], ["Full name", "full_name"], ["Email", "email"], ["Phone", "phone"], ["Current location", "location"], ["Current company", "current_company"],
       ["LinkedIn URL", "linkedin"], ["GitHub URL", "github"], ["Language skills", "languages"], ["Preferred name", "preferred_name"],
       ["Authorized to work", "work_authorization"], ["Previously employed", null], ["How did you hear", "referral_source"], ["What is your location", "country"], ["Gender", "gender"],
+    ],
+  },
+  {
+    name: "Ashby · application form",
+    html: `<form>${ash.text("_systemfield_name", "Full Name")}${ash.text("_systemfield_email", "Email", "email")}${ash.text("p1", "Phone", "tel")}
+      <div data-field-path="_systemfield_location"><label for="_systemfield_location">Location</label><div><input placeholder="Start typing..." aria-autocomplete="list" aria-haspopup="listbox" role="combobox" value=""><button></button></div></div>
+      <div data-field-path="_systemfield_resume"><label for="_systemfield_resume">Resume</label><div role="presentation"><input type="file" tabindex="-1" id="_systemfield_resume"><div><button><span>Upload File</span></button></div></div></div>
+      ${ash.text("li", "LinkedIn Profile")}${ash.radios("pr", "What pronouns would you like our team to use when addressing you?", ["He/Him", "She/Her", "They/Them", "Prefer not to say"])}
+      ${ash.boxes("src", "How did you hear about this opportunity? (select all that apply)", ["LinkedIn", "Glassdoor", "Company Blog", "Employee Referral"])}
+      ${ash.toggle("sp", "Will you now or in the future require Acme to sponsor an immigration case in order to employ you?")}
+      ${ash.radios("_systemfield_eeoc_gender", "Gender", ["Male", "Female", "Decline to self-identify"])}${ash.radios("_systemfield_eeoc_race", "Race", ["Hispanic or Latino", "White (Not Hispanic or Latino)", "Decline to self-identify"])}</form>`,
+    expect: [
+      ["Full Name", "full_name"], ["Email", "email"], ["Phone", "phone"], ["Location", "location"], ["Resume", "resume"], ["LinkedIn", "linkedin"],
+      ["Pronouns", "pronouns"], ["How did you hear", "referral_source"], ["Sponsorship (toggle)", "requires_sponsorship"], ["Gender", "gender"], ["Race", "ethnicity"],
     ],
   },
   {

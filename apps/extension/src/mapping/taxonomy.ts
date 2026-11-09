@@ -327,6 +327,7 @@ export const RULES: FieldRule[] = [
   {
     key: "requires_sponsorship", label: "Visa sponsorship",
     patterns: [/\b(require|need)s? (visa )?sponsorship\b/, /\bvisa sponsorship\b/, /\bsponsorship\b/],
+    sentence: [/\b(require|need)\b.*\bto sponsor\b/, /\bsponsor (a |an |your )?(visa|immigration|work permit|h-?1b)\b/],
     attrPatterns: [/\bsponsor/],
   },
   {

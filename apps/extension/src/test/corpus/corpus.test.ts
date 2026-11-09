@@ -72,3 +72,29 @@ describe("live-site details", () => {
     expect(scanFields()[0]).toMatchObject({ kind: "combobox", currentValue: "Decline To Self Identify" });
   });
 });
+
+describe("Ashby choices", () => {
+  it("tells value-less radios apart and fills the intended one", async () => {
+    const { fillField } = await import("@/content/autofill/writer");
+    const sample = SAMPLES.find((s) => s.name.startsWith("Ashby"))!;
+    document.body.innerHTML = sample.html;
+    const gender = scanFields().find((f) => f.label === "Gender")!;
+    const decline = gender.options.find((o) => o.label === "Decline to self-identify")!;
+    expect(new Set(gender.options.map((o) => o.value)).size).toBe(3); // not three times "on"
+    const result = await fillField({ id: gender.id, kind: "radio", value: decline.label, optionValue: decline.value, overwrite: true });
+    expect(result.status).toBe("filled");
+    expect(scanFields().find((f) => f.label === "Gender")!.currentValue).toBe("Decline to self-identify");
+  });
+
+  it("answers Yes/No toggle buttons", async () => {
+    const { fillField } = await import("@/content/autofill/writer");
+    document.body.innerHTML = SAMPLES.find((s) => s.name.startsWith("Ashby"))!.html;
+    document.querySelectorAll("button[aria-pressed]").forEach((b) => b.addEventListener("click", () => {
+      b.parentElement!.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    }));
+    const toggle = scanFields().find((f) => /sponsor/.test(f.label))!;
+    const no = toggle.options.find((o) => o.label === "No")!;
+    await fillField({ id: toggle.id, kind: "radio", value: "No", optionValue: no.value, overwrite: true });
+    expect(scanFields().find((f) => /sponsor/.test(f.label))!.currentValue).toBe("No");
+  });
+});

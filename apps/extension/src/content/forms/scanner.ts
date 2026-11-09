@@ -83,8 +83,10 @@ function describedText(el: Element): string {
 
 /** Question text for a radio group: fieldset legend, radiogroup label, or the text before the options. */
 function groupLabel(first: HTMLInputElement): string {
-  const legend = first.closest("fieldset")?.querySelector("legend");
-  if (legend && text(legend)) return text(legend);
+  const fieldset = first.closest("fieldset");
+  // Ashby captions its fieldsets with a <label> instead of a <legend>.
+  const legend = fieldset?.querySelector(":scope > legend, :scope > label, :scope > div > legend");
+  if (legend && !legend.querySelector("input") && text(legend)) return text(legend);
   const group = first.closest("[role='radiogroup'], [role='group']");
   if (group && (group.getAttribute("aria-labelledby") || group.getAttribute("aria-label"))) {
     const label = labelFor(group);
@@ -98,6 +100,67 @@ function groupLabel(first: HTMLInputElement): string {
     if (candidate && !candidate.querySelector("input") && text(candidate)) return text(candidate);
   }
   return first.name;
+}
+
+/** Yes/No answered with toggle buttons (Ashby: <button aria-pressed>Yes</button><button…>No</button>). */
+function toggleGroups(root: Document): FieldDescriptor[] {
+  const parents = new Set(deepQueryAll(root, "button[aria-pressed]").map((b) => b.parentElement).filter((p): p is HTMLElement => !!p));
+  const found: FieldDescriptor[] = [];
+  for (const parent of parents) {
+    const buttons = ([...parent.children] as HTMLElement[]).filter((b) => b.matches("button[aria-pressed]") && isVisible(b));
+    if (buttons.length < 2 || buttons.length > 6 || buttons.some((b) => text(b).length > 40) || parent.closest("copilot-assistant")) continue;
+    const first = buttons[0]!;
+    const caption = parent.parentElement?.querySelector(":scope > label, :scope > legend, :scope > fieldset > label");
+    const label = (caption && text(caption)) || nearestCaption(first) || labelFor(parent);
+    if (!label) continue;
+    const pressed = buttons.find((b) => b.getAttribute("aria-pressed") === "true");
+    found.push({
+      id: fieldId(first),
+      kind: "radio",
+      label: label.slice(0, 500),
+      name: "",
+      htmlId: "",
+      placeholder: "",
+      autocomplete: "",
+      helpText: "",
+      required: /[*✱]\s*$/.test(label),
+      options: buttons.map((b) => ({ value: fieldId(b), label: text(b).slice(0, 300) })),
+      currentValue: pressed ? text(pressed) : "",
+      accept: "",
+      maxLength: null,
+      section: sectionOf(first),
+    });
+  }
+  return found;
+}
+
+/** Puts a descriptor where its control sits on the page among the others. */
+function insertInPageOrder(descriptors: FieldDescriptor[], descriptor: FieldDescriptor) {
+  const el = findField(descriptor.id);
+  const index = el
+    ? descriptors.findIndex((d) => {
+        const other = findField(d.id);
+        return !!other && other.getRootNode() === el.getRootNode() && !!(el.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING);
+      })
+    : -1;
+  descriptors.splice(index === -1 ? descriptors.length : index, 0, descriptor);
+}
+
+/** Checkboxes that answer one question: same name (Lever), or several boxes in one fieldset
+ * or group with a caption (Ashby gives each box its own name). Null for a lone checkbox. */
+function checkboxGroupKey(el: HTMLInputElement, names: Map<string, number>): string | null {
+  if (el.name && names.get(el.name)! > 1) return `cb|${el.form?.id ?? ""}|${el.name}`;
+  const root = el.closest("fieldset, [role='group']");
+  if (!root || root.querySelectorAll("input[type=checkbox]").length < 2) return null;
+  return `cbg|${fieldId(root.querySelector("input[type=checkbox]")!)}`;
+}
+
+/** The value to report for each option of a group: its own value when the values tell the
+ * options apart, else Copilot's id for it (Ashby's radios all have the default value "on"). */
+function optionValues(inputs: HTMLInputElement[]): string[] {
+  const values = inputs.map((i) => i.getAttribute("value") ?? "");
+  const distinct = new Set(values).size === values.length && values.every((v) => v && v !== "on");
+  return inputs.map((input, i) => (distinct ? values[i]! : fieldId(input)).slice(0, 300));
 }
 
 /** What a searchable dropdown shows as chosen when its text box is empty (react-select and
@@ -160,8 +223,9 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     else currentValue = input.value ?? "";
 
     // "Check all that apply": boxes sharing a name are one question (handled below).
-    if (el instanceof HTMLInputElement && el.type === "checkbox" && el.name && checkboxNames.get(el.name)! > 1) {
-      const key = `cb|${el.form?.id ?? ""}|${el.name}`;
+    const boxGroup = el instanceof HTMLInputElement && el.type === "checkbox" ? checkboxGroupKey(el, checkboxNames) : null;
+    if (el instanceof HTMLInputElement && boxGroup) {
+      const key = boxGroup;
       if (!checkboxGroups.has(key)) radioSlots.set(key, descriptors.length + radioSlots.size);
       checkboxGroups.set(key, [...(checkboxGroups.get(key) ?? []), el]);
       continue;
@@ -218,7 +282,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       autocomplete: "",
       helpText: describedText(first),
       required: radios.some((r) => r.required) || /\*\s*$/.test(label),
-      options: radios.map((r) => ({ value: (r.value || fieldId(r)).slice(0, 300), label: (labelFor(r) || r.value).slice(0, 300) })),
+      options: optionValues(radios).map((value, i) => ({ value, label: (labelFor(radios[i]!) || radios[i]!.value).slice(0, 300) })),
       currentValue: checked ? labelFor(checked) || checked.value : "",
       accept: "",
       maxLength: null,
@@ -238,7 +302,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
       autocomplete: "",
       helpText: describedText(first),
       required: boxes.some((b) => b.required) || /[*✱]\s*$/.test(label) || !!first.closest(".required-field"),
-      options: boxes.map((b) => ({ value: (b.value || fieldId(b)).slice(0, 300), label: (labelFor(b) || b.value).slice(0, 300) })),
+      options: optionValues(boxes).map((value, i) => ({ value, label: (labelFor(boxes[i]!) || boxes[i]!.value).slice(0, 300) })),
       currentValue: boxes.filter((b) => b.checked).map((b) => labelFor(b) || b.value).join(", "),
       accept: "",
       maxLength: null,
@@ -246,6 +310,7 @@ export function scanFields(root: Document = document): FieldDescriptor[] {
     }]);
   }
   for (const [slot, descriptor] of groups.sort((a, b) => a[0] - b[0])) descriptors.splice(Math.min(slot, descriptors.length), 0, descriptor);
+  for (const descriptor of toggleGroups(root)) insertInPageOrder(descriptors, descriptor);
   return descriptors.slice(0, MAX_FIELDS);
 }
 

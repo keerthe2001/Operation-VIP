@@ -354,9 +354,14 @@ export function holdsValue(field: MappedField): boolean {
   const digits = (t: string) => t.replace(/\D/g, "");
   if (digits(current) && (digits(current) === digits(value) || digits(value).endsWith(digits(current)))) return true;
   // Choices: the chosen option shares a word with the intended answer ("India (+91)" vs "India").
-  if (["select", "radio", "listbox", "checkboxes"].includes(field.kind)) {
-    const words = new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1));
-    return current.toLowerCase().split(/[^a-z0-9]+/).some((w) => words.has(w));
+  // Radios, selects and checkbox groups were filled with one of their own option labels, so the
+  // checked option must be that label (checked above). Only dropdowns whose options load on
+  // open get a looser test: most of the answer's words in what they show.
+  if (field.kind === "listbox" || field.kind === "combobox") {
+    const words = new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+    const shown = new Set(current.toLowerCase().split(/[^a-z0-9]+/));
+    const shared = [...words].filter((w) => shown.has(w)).length;
+    return words.size > 0 && shared / words.size >= 0.5;
   }
   return false;
 }
