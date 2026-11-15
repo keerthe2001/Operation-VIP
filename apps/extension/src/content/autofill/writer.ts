@@ -3,7 +3,7 @@
  * (React, Vue, Angular) observe the change and update their own state.
  */
 import { isVisible } from "@/content/dom/visibility";
-import { deepQueryAll, findField } from "@/content/forms/scanner";
+import { deepQueryAll, findField, scanFields } from "@/content/forms/scanner";
 import type { FillInstruction, FillResult } from "@/shared/fields";
 
 function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -269,7 +269,9 @@ async function pickComboboxOption(input: HTMLInputElement, value: string): Promi
 }
 
 export async function fillField(instruction: FillInstruction): Promise<FillResult> {
-  const el = findField(instruction.id);
+  // The page may have re-rendered since the last scan: tagging it again finds the new element,
+  // which gets the same id.
+  const el = findField(instruction.id) ?? (scanFields(), findField(instruction.id));
   if (!el) return { id: instruction.id, status: "failed", message: "Field is no longer on the page" };
   if (!instruction.overwrite && hasValue(el, instruction)) {
     return { id: instruction.id, status: "skipped", message: "Already has a value" };

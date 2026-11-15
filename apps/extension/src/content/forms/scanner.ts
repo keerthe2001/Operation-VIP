@@ -6,7 +6,6 @@ export const FIELD_ATTR = "data-copilot-field";
 const SKIPPED_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "search"]);
 const MAX_FIELDS = 300;
 
-let counter = 0;
 
 /** Elements in the document and in every open shadow root. */
 export function deepQueryAll(root: Document | ShadowRoot | Element, selector: string): Element[] {
@@ -22,14 +21,41 @@ export function findField(id: string): HTMLElement | null {
   return (deepQueryAll(document, `[${FIELD_ATTR}="${CSS.escape(id)}"]`)[0] as HTMLElement | undefined) ?? null;
 }
 
+/**
+ * Copilot's id for a control. It comes from what the control is (id, name, label…), not from a
+ * running count, so when a React page re-renders and swaps an input for an identical new one,
+ * the new one gets the same id and a fill already on its way still finds it.
+ */
 function fieldId(el: Element): string {
-  let id = el.getAttribute(FIELD_ATTR);
-  if (!id) {
-    counter += 1;
-    id = `f${counter}`;
-    el.setAttribute(FIELD_ATTR, id);
-  }
+  const existing = el.getAttribute(FIELD_ATTR);
+  if (existing) return existing;
+  const base = `f${hash(signature(el))}`;
+  let id = base;
+  // Identical-looking controls (repeated blocks): the first free suffix, in page order.
+  for (let n = 2; isTaken(id, el); n += 1) id = `${base}-${n}`;
+  el.setAttribute(FIELD_ATTR, id);
   return id;
+}
+
+function signature(el: Element): string {
+  const attr = (name: string) => el.getAttribute(name) ?? "";
+  const own = [el.tagName, attr("type"), el.id, attr("name"), attr("data-automation-id"), attr("aria-label"), attr("placeholder"), attr("value").slice(0, 40)].join("|");
+  // Anonymous controls are told apart by what they're labelled.
+  return own.replace(/\|/g, "") === el.tagName ? `${own}|${labelFor(el).slice(0, 80)}` : own;
+}
+
+function isTaken(id: string, el: Element): boolean {
+  const other = deepQueryAll(el.ownerDocument, `[${FIELD_ATTR}="${CSS.escape(id)}"]`)[0];
+  return !!other && other !== el && other.isConnected;
+}
+
+function hash(text: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
 }
 
 const HONEYPOT_LABEL = /\b(for robots|robots only|bots only|if you('| a)re (a )?human|are human,? (do not|don'?t|leave)|leave (this|it) (field )?(blank|empty)|do not (fill|enter|complete) (this|in))\b/i;

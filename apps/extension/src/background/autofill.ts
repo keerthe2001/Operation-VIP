@@ -15,6 +15,8 @@ export interface FillSummary {
   filled: number;
   skipped: number;
   failed: number;
+  /** Fields the page replaced while they were being filled (a React re-render). */
+  stale?: number;
 }
 
 function toBase64(buffer: ArrayBuffer): string {
@@ -141,7 +143,10 @@ export class AutofillCoordinator {
     const adjusted = await this.adjust(tabId, mapFields(fields, frameId, context.profile, context.resumeName), context, url);
     const mapped = adjusted.map((next) => {
       const before = results.get(fieldKey(next));
-      return before?.result ? { ...next, result: before.result, resultMessage: before.resultMessage } : next;
+      // A field Copilot filled that is empty again was replaced or cleared by the page (a new
+      // step reusing the same inputs, a re-render): it needs filling again.
+      const emptied = before?.result === "filled" && !next.currentValue.trim() && next.kind !== "checkbox";
+      return before?.result && !emptied ? { ...next, result: before.result, resultMessage: before.resultMessage } : next;
     });
     const state: FormState = {
       url: frameId === 0 ? url : (previous?.url ?? url),
@@ -316,7 +321,9 @@ export class AutofillCoordinator {
     for (const result of results.values()) summary[result.status] += 1;
     // Fields we couldn't even attempt (e.g. resume file unavailable).
     summary.failed += chosen.length - results.size;
-    latest.lastFill = { at: Date.now(), ...summary };
+    const stale = [...results.values()].filter((r) => r.status === "failed" && /no longer on the page/i.test(r.message ?? "")).length;
+    if (stale) summary.stale = stale;
+    latest.lastFill = { at: Date.now(), filled: summary.filled, skipped: summary.skipped, failed: summary.failed };
     const items = this.progressItems({ ...latest, filling: order });
     latest.filling = undefined;
     await this.session.set(formEntry(tabId, latest));

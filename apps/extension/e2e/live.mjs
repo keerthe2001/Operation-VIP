@@ -39,8 +39,15 @@ try {
   let [worker] = context.serviceWorkers();
   worker ??= await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).host;
+  if (process.env.DEBUG) worker.on("console", (m) => m.text().startsWith("DEBUG") && console.log(m.text().slice(0, 1500)));
   // Manual mode: nothing on the site is pressed. The password is only typed, never sent.
-  await worker.evaluate(async () => chrome.storage.local.set({ settings: { applyMode: "manual", fillProgress: "off" }, accountPassword: "Str0ng!Pass#2026" }));
+  // AUTO=1 checks Auto mode: nothing is pressed by the test, Copilot works on its own (it never
+  // presses a final Submit). Use it only on single-page forms (not Workday, which would create an account).
+  const auto = process.env.AUTO === "1";
+  await worker.evaluate(
+    async (mode) => chrome.storage.local.set({ settings: { applyMode: mode, fillProgress: "off" }, accountPassword: "Str0ng!Pass#2026" }),
+    auto ? "auto" : "manual",
+  );
 
   // A signed-in test user with a processed resume.
   const email = `live${Date.now()}@example.com`;
@@ -117,7 +124,22 @@ try {
       entry.job = state?.tab?.job ?? null;
       entry.detected = state?.form?.fields?.length ?? 0;
       await tab.screenshot({ path: `${outDir}/${name}-before.png`, fullPage: false });
-      if (state?.form?.fields?.length) {
+      if (auto) {
+        // Wait for Copilot to fill by itself, until the number of filled fields stops changing.
+        let last = -1;
+        for (let i = 0, stable = 0; i < 120 && stable < 8; i++) {
+          await sleep(500);
+          state = await tabStateFor(tab.url());
+          const filled = (state?.form?.fields ?? []).filter((f) => f.result === "filled").length;
+          const failed = (state?.form?.fields ?? []).filter((f) => f.result === "failed");
+          const lf = JSON.stringify(state?.form?.lastFill ?? null);
+          if (lf !== entry.lastFillSeen) { entry.lastFillSeen = lf; (entry.lastFills ??= []).push(`${i / 2}s ${lf}`); }
+          if (failed.length && !entry.firstFailure) entry.firstFailure = { at: i, lastFill: state.form.lastFill, reasons: [...new Set(failed.map((f) => f.resultMessage))] };
+          stable = filled === last && filled > 0 ? stable + 1 : 0;
+          last = filled;
+        }
+        entry.fill = { auto: true, filledAlone: last };
+      } else if (state?.form?.fields?.length) {
         const keys = state.form.fields.filter((f) => f.status === "auto" || f.status === "ready").map((f) => `${f.frameId}:${f.id}`);
         const reply = await panel.evaluate(
           async ({ tabId, keys }) => chrome.runtime.sendMessage({ type: "FILL_FIELDS", tabId, fields: keys, overwrite: false }),
@@ -155,6 +177,8 @@ try {
     console.log(`\n=== ${entry.url}`);
     if (entry.error) console.log(`ERROR ${entry.error}`);
     console.log(`job: ${JSON.stringify(entry.job && { portal: entry.job.portal, title: entry.job.title, company: entry.job.company, app: entry.job.isApplicationPage, n: entry.job.fieldCount })}`);
+    if (entry.lastFills) console.log(`lastFill over time: ${entry.lastFills.join(" | ")}`);
+    if (entry.firstFailure) console.log(`first failure: ${JSON.stringify(entry.firstFailure)}`);
     console.log(`fill: ${JSON.stringify(entry.fill)} action: ${entry.action} errors: ${entry.pageErrors?.join(" | ")}`);
     for (const f of entry.fields ?? []) {
       console.log(`  ${f.req ? "*" : " "} [${f.kind}] ${f.label} {${f.section ?? ""}} → ${f.key ?? "-"} (${f.status}${f.result ? "/" + f.result : ""}) v="${f.value}" now="${f.now}"${f.error ? " ERR " + f.error : ""}`);

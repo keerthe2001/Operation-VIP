@@ -89,6 +89,21 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 async function fillAndVerify(tabId: number, keys: string[], overwrite: boolean) {
   const summary = await autofill.fill(tabId, keys, overwrite);
+  // A page that re-rendered while we filled (React swapping its inputs): let it settle, then
+  // fill again from the fresh scan instead of reporting the fields as failed.
+  if (summary.stale) {
+    await sleep(1500);
+    const fresh = await autofill.state(tabId);
+    const again = [...new Set([...readyKeys(fresh?.fields ?? []), ...keys.filter((k) => fresh?.fields.some((f) => `${f.frameId}:${f.id}` === k && f.result !== "filled"))])];
+    if (again.length) {
+      const second = await autofill.fill(tabId, again, overwrite);
+      summary.filled += second.filled;
+      summary.skipped = second.skipped;
+      summary.failed = second.failed;
+      summary.stale = second.stale;
+      keys = [...new Set([...keys, ...again])];
+    }
+  }
   await sleep(900);
   const retry = await autofill.unverified(tabId, keys);
   if (retry.length) {
@@ -166,6 +181,25 @@ async function runFlow(tabId: number) {
     return;
   }
 
+  // A sign-in that the site refused: no account yet, so create one (once). Never retry a
+  // password, which can lock the account.
+  const signingIn = state.actionKind === "account" && /^(sign in|log ?in)$/i.test(state.action ?? "");
+  if (signingIn && done.has(`signin-tried|${state.url}`)) {
+    const errors = [...(state.pageErrors ?? []), ...state.fields.map((f) => activeError(f)).filter(Boolean)];
+    if (!errors.length) return; // still signing in
+    if (!done.has(`create|${state.url}`) && !done.has(`signin|${state.url}`)) {
+      done.add(`create|${state.url}`);
+      await log(tabId, "No account with this email yet: creating one");
+      await chrome.tabs.sendMessage(tabId, { type: "CLICK_CREATE_ACCOUNT" }, { frameId: 0 }).catch(() => undefined);
+      return;
+    }
+    if (!done.has(`stuck|${state.url}`)) {
+      done.add(`stuck|${state.url}`);
+      await log(tabId, `Sign in didn't work: ${errors[0]!.slice(0, 100)}. Please sign in yourself`, "need");
+    }
+    return;
+  }
+
   // Open empty "Add" sections first, so experience and education get filled too.
   if (!done.has(`expand|${step}`)) {
     done.add(`expand|${step}`);
@@ -208,25 +242,6 @@ async function runFlow(tabId: number) {
 
   const kind = state.actionKind;
   if (!kind || !state.action) return;
-  // A sign-in that the site refused: no account yet, so create one (once). Never retry a
-  // password, which can lock the account.
-  const signingIn = kind === "account" && /^(sign in|log ?in)$/i.test(state.action);
-  if (signingIn && done.has(`signin-tried|${state.url}`)) {
-    const errors = [...(latest.pageErrors ?? []), ...latest.fields.map((f) => activeError(f)).filter(Boolean)];
-    if (!errors.length) return; // still signing in
-    if (!done.has(`create|${state.url}`) && !done.has(`signin|${state.url}`)) {
-      done.add(`create|${state.url}`);
-      await log(tabId, "No account with this email yet: creating one");
-      await chrome.tabs.sendMessage(tabId, { type: "CLICK_CREATE_ACCOUNT" }, { frameId: 0 }).catch(() => undefined);
-      return;
-    }
-    if (!done.has(`stuck|${state.url}`)) {
-      done.add(`stuck|${state.url}`);
-      await log(tabId, `Sign in didn't work: ${errors[0]!.slice(0, 100)}. Please sign in yourself`, "need");
-    }
-    return;
-  }
-  if (signingIn) done.add(`signin-tried|${state.url}`);
   if (clicks > 0) {
     // Still on the same step after pressing the button: the page refused. Read its errors,
     // put back what it rejected or cleared, then press again (three tries at most).
@@ -261,6 +276,7 @@ async function runFlow(tabId: number) {
     await log(tabId, "Everything is filled. Ready to submit", "need");
     return; // the final Submit always waits for the user's OK
   }
+  if (signingIn) done.add(`signin-tried|${state.url}`);
   done.add(`click#${clicks + 1}|${step}`);
   await log(tabId, kind === "account" ? `${state.action}…` : clicks ? `${state.action} (try ${clicks + 1})` : `${state.action} → next page`);
   await chrome.tabs.sendMessage(tabId, { type: "CLICK_ACTION", kinds: [kind] }, { frameId: 0 }).catch(() => undefined);

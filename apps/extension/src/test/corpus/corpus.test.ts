@@ -132,3 +132,26 @@ describe("home-made forms", () => {
     expect(actionKind("Apply", false)).toBe("start");
   });
 });
+
+describe("pages that re-render (React)", () => {
+  it("keeps a field's id when the page swaps the input for an identical new one", async () => {
+    const { fillField } = await import("@/content/autofill/writer");
+    document.body.innerHTML = `<form><div class="field"><label for="first_name">First Name</label><input id="first_name" type="text"></div>
+      <div class="field"><label>Why us?</label><textarea></textarea></div></form>`;
+    const [first, why] = scanFields();
+    // Hydration replaces both controls with fresh, identical elements.
+    for (const el of document.querySelectorAll("input, textarea")) el.replaceWith(el.cloneNode(false) as Element);
+    for (const el of document.querySelectorAll("[data-copilot-field]")) el.removeAttribute("data-copilot-field");
+    // The fill arrives before Copilot has rescanned the page.
+    const result = await fillField({ id: first!.id, kind: "text", value: "Priya", optionValue: null, overwrite: false });
+    expect(result.status).toBe("filled");
+    expect((document.getElementById("first_name") as HTMLInputElement).value).toBe("Priya");
+    expect(scanFields().map((f) => f.id)).toEqual([first!.id, why!.id]);
+  });
+
+  it("still tells identical-looking controls apart", () => {
+    document.body.innerHTML = `<div><label>Company</label><input></div><div><label>Company</label><input></div>`;
+    const ids = scanFields().map((f) => f.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+});
