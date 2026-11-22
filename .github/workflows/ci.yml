@@ -76,3 +76,51 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+
+  huntexams-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: huntexams/api
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: huntexams
+          POSTGRES_PASSWORD: huntexams
+          POSTGRES_DB: huntexams_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U huntexams" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      HX_SECRET_KEY: ci-secret-key-not-used-in-production-000000
+      HX_TEST_DATABASE_URL: postgresql+asyncpg://huntexams:huntexams@localhost:5432/huntexams_test
+      HX_DATABASE_URL: postgresql+asyncpg://huntexams:huntexams@localhost:5432/huntexams_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - name: Curriculum content is valid
+        run: uv run python -m app.seed --check
+      - run: uv run pytest -q
+      - name: Migrations match models
+        run: uv run alembic upgrade head && uv run alembic check
+
+  huntexams-content-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cd huntexams/api && uv sync --frozen
+      - name: Every lesson example, exercise and lab step runs in real Python (Pyodide)
+        run: cd apps/huntexams && node scripts/check-content.mjs ../../huntexams/api/content

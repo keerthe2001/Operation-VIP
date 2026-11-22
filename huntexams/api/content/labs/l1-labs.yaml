@@ -1,0 +1,142 @@
+- slug: lab-tokenizer
+  title: Build a tiny tokenizer
+  topic: tokens-and-tokenization
+  body:
+    intro: >-
+      You'll build a tokenizer step by step: first split on spaces, then break long words into
+      pieces, then count tokens. The replay shows every token being added to the list.
+    minutes: 15
+    steps:
+      - id: split
+        say: "Store a sentence and split it into words: **words = \"I love learning tokenisation\".split()**"
+        starter: ""
+        show: 'words = "I love learning tokenisation".split()'
+        check: {expr: "words == ['I', 'love', 'learning', 'tokenisation']", fail: "words should be the list of 4 words. Use .split()"}
+        explain: "Splitting on spaces is the crudest tokenizer. Real ones are smarter, so let's improve it."
+      - id: empty
+        say: "Make an empty list to collect tokens: **tokens = []**"
+        append: "\n"
+        show: "tokens = []"
+        check: {expr: "tokens == []", fail: "tokens should be an empty list: tokens = []"}
+      - id: loop
+        say: "Loop over the words and add each one to tokens. The second line starts with 4 spaces."
+        append: "\n"
+        show: |
+          for w in words:
+              tokens.append(w)
+        check: {expr: "tokens == words", fail: "tokens should end up with the same 4 words."}
+        explain: "Watch the replay: tokens grows by one item each round."
+      - id: chunk
+        replace: true
+        say: "Now break long words. Replace the loop so words longer than 6 letters are cut into 4-letter pieces first."
+        show: |
+          words = "I love learning tokenisation".split()
+          tokens = []
+          for w in words:
+              while len(w) > 6:
+                  tokens.append(w[:4])
+                  w = w[4:]
+              tokens.append(w)
+        check: {expr: "tokens == ['I', 'love', 'lear', 'ning', 'toke', 'nisa', 'tion']", fail: "Expected I, love, lear, ning, toke, nisa, tion. Press Show me to see the full loop."}
+        hint: "w[:4] is the first 4 letters, w[4:] is the rest. Keep cutting while the word is long."
+        explain: "Rare long words now cost several tokens, just like with real tokenizers."
+      - id: count
+        say: "Print how many tokens there are: **print(len(tokens), \"tokens\")**"
+        append: "\n"
+        show: 'print(len(tokens), "tokens")'
+        check: {stdout: "7 tokens", fail: "It should print 7 tokens"}
+        explain: "Four words became seven tokens. That's why token counts, not word counts, decide cost and limits."
+
+- slug: lab-sampling
+  title: Make the model choose
+  topic: next-token-prediction
+  body:
+    intro: >-
+      You'll turn raw scores into probabilities, then choose the next word greedily and by
+      sampling. Every number is shown in the replay as it's calculated.
+    minutes: 15
+    steps:
+      - id: scores
+        say: "Here are raw scores (logits) for three words. Store them: **scores = {\"mat\": 3.0, \"floor\": 1.7, \"sofa\": 1.2}**"
+        starter: "import math\n"
+        show: 'scores = {"mat": 3.0, "floor": 1.7, "sofa": 1.2}'
+        check: {expr: "scores == {'mat': 3.0, 'floor': 1.7, 'sofa': 1.2}", fail: "Copy the dictionary exactly."}
+      - id: exp
+        say: "Exponentiate each score: **exps = {w: math.exp(s) for w, s in scores.items()}**"
+        append: "\n"
+        show: "exps = {w: math.exp(s) for w, s in scores.items()}"
+        check: {expr: "abs(exps['mat'] - 20.0855) < 0.01", fail: "exps['mat'] should be about 20.09"}
+        explain: "exp makes big scores much bigger. mat jumped to about 20."
+      - id: probs
+        say: "Divide by the total so they add up to 1."
+        append: "\n"
+        show: |
+          total = sum(exps.values())
+          probs = {w: round(e / total, 3) for w, e in exps.items()}
+          print(probs)
+        check: {expr: "abs(sum(probs.values()) - 1) < 0.01 and probs['mat'] > 0.65", fail: "probs should add up to 1, with mat around 0.7."}
+        explain: "That's softmax. mat ≈ 0.70, floor ≈ 0.19, sofa ≈ 0.11."
+      - id: greedy
+        say: "Greedy choice: pick the word with the highest probability."
+        append: "\n"
+        show: |
+          choice = max(probs, key=probs.get)
+          print("greedy:", choice)
+        check: {stdout: "greedy: mat", fail: "It should print greedy: mat"}
+      - id: sample
+        say: "Sampling: roll a weighted dice 10 times. Run it twice and compare."
+        append: "\n"
+        show: |
+          import random
+          rolls = random.choices(list(probs), weights=list(probs.values()), k=10)
+          print("sampled:", rolls)
+        check: {expr: "len(rolls) == 10 and set(rolls) <= {'mat', 'floor', 'sofa'}", fail: "rolls should be a list of 10 words."}
+        explain: "Mostly mat, sometimes floor or sofa. This randomness is why chatbots don't repeat themselves word for word."
+
+- slug: lab-json
+  title: Parse a model's JSON safely
+  topic: structured-outputs
+  body:
+    intro: >-
+      Models sometimes return broken or incomplete JSON. You'll write a parser that never crashes
+      and explains exactly what was wrong. The model replies here are fixed examples, not a live model.
+    minutes: 15
+    steps:
+      - id: parse
+        say: "Parse a good reply. Type: **data = json.loads(reply)**"
+        starter: "import json\nreply = '{\"name\": \"Asha\", \"intent\": \"refund\"}'\n"
+        show: "data = json.loads(reply)"
+        check: {expr: "data == {'name': 'Asha', 'intent': 'refund'}", fail: "data should be the parsed dictionary."}
+        explain: "json.loads turned text into a dictionary. Look at data in the Variables panel."
+      - id: read
+        say: "Read the intent field into a variable: **intent = data[\"intent\"]**"
+        append: "\n"
+        show: 'intent = data["intent"]'
+        check: {expr: "intent == 'refund'", fail: "intent should be 'refund'."}
+      - id: bad
+        kind: read
+        say: "Now a broken reply. Add **bad = \"Sure! Here you go\"** and **json.loads(bad)**, then Run. It will crash, and that's the point. Read the red error, then press Continue."
+        append: "\n"
+        show: |
+          bad = "Sure! Here you go"
+          json.loads(bad)
+        hint: "This step is about seeing the error, not avoiding it."
+        explain: "Models don't always return JSON. Your code must handle this."
+      - id: safe
+        replace: true
+        say: "Replace the crashing line with a safe function. Press Show me to type it in."
+        show: |
+          import json
+          reply = '{"name": "Asha", "intent": "refund"}'
+          bad = "Sure! Here you go"
+
+          def safe_parse(text):
+              try:
+                  return json.loads(text), None
+              except json.JSONDecodeError as e:
+                  return None, f"not JSON: {e.msg}"
+
+          print(safe_parse(reply))
+          print(safe_parse(bad))
+        check: {expr: "safe_parse(bad)[0] is None and safe_parse(reply)[0]['intent'] == 'refund'", fail: "safe_parse should return (None, error) for bad text and the data for good text."}
+        explain: "No crash: bad input becomes a clear error message you can act on, like retrying."

@@ -1,0 +1,797 @@
+number: 5
+slug: ai-agents-tool-calling
+title: AI Agents & Tool Calling
+summary: Build agents that plan, call tools, keep state and memory, recover from errors and ask a human when needed.
+hours: 18
+topics:
+
+- slug: intro-to-agents
+  title: What is an AI agent?
+  summary: An LLM in a loop that can decide, use tools, and remember, until a goal is done.
+  minutes: 8
+  body:
+    objectives:
+      - Explain how an agent differs from a chatbot
+      - Name the four parts of an agent
+      - Predict what breaks without tools or memory
+    intro: >-
+      A chatbot answers once. An agent works toward a goal: it decides what to do, uses tools to
+      look things up or take actions, remembers results, and keeps going until it can answer.
+    intro_eng: >-
+      An agent is an LLM-driven control loop: observe state, choose an action (tool call or final
+      answer), execute, update state, repeat, with limits on steps, cost and permissions.
+    scenes:
+      - engine: flow
+        title: How does an AI agent work?
+        track: [Goal, Think, Tool, Memory, Answer]
+        actors:
+          - {id: you, label: You, icon: person, x: 14, y: 62}
+          - {id: agent, label: Agent, icon: brain, x: 47, y: 62}
+          - {id: tools, label: Tools, icon: wrench, x: 83, y: 36}
+          - {id: mem, label: Memory, icon: db, x: 83, y: 80}
+        switches:
+          - {id: tool, label: Tools, label_on: "ON · the agent can look things up", label_off: "OFF · it can only guess", track: 2, actor: tools}
+          - {id: mem, label: Memory, label_on: "ON · it remembers results", label_off: "OFF · it forgets everything", track: 3, actor: mem}
+        steps:
+          - {at: 0, from: you, to: agent, packet: "Umbrella today?", tone: ask, caption: "You ask: 'Should I take an umbrella in Chennai today?'"}
+          - {at: 1, think: agent, notes: {agent: "need: today's weather"}, caption: "The agent thinks first: it can't know today's weather from memory, so it needs to check."}
+          - {at: 2, when: tool, from: agent, to: tools, packet: "get_weather(Chennai)", tone: ask, caption: "It picks a tool and calls it with the right input."}
+          - {at: 2, when: tool, from: tools, to: agent, packet: "rain 80%", tone: good, notes: {tools: "returned: rain 80%"}, caption: "The tool sends back a real fact: 80% chance of rain."}
+          - {at: 2, when: "!tool", active: [agent], tone: bad, notes: {tools: "switched off"}, caption: "No tools. The agent has no way to check, so it can only guess."}
+          - {at: 3, when: mem, from: agent, to: mem, packet: "save: rain 80%", tone: ask, notes: {mem: "Chennai · rain 80%"}, caption: "It saves what it learned, so a follow-up question doesn't need another lookup."}
+          - {at: 3, when: "!mem", active: [agent], tone: bad, notes: {mem: empty}, caption: "Memory is off. Ask 'what about tomorrow?' and it starts from zero."}
+          - {at: 4, when: tool, from: agent, to: you, packet: "Yes, take one ☂", tone: good, caption: "Answer: 'Yes, there's an 80% chance of rain.' Based on a fact, not a guess."}
+          - {at: 4, when: "!tool", from: agent, to: you, packet: "Maybe? Not sure", tone: bad, caption: "Without tools the answer is a guess. Agents need tools to act on the real world."}
+    points:
+      - {title: A goal, not a single reply, text: "The agent keeps working until the goal is met.", step: 0}
+      - {title: It decides what to do, text: "The LLM chooses the next action.", step: 1}
+      - {title: Tools act on the world, text: "Look things up, calculate, send, book.", step: 2}
+      - {title: Memory carries results, text: "So later steps can use earlier findings.", step: 3}
+    words:
+      - [Agent, An LLM in a loop that can use tools toward a goal.]
+      - [Tool, A function the agent may call.]
+    checks:
+      - id: vs-chatbot
+        type: mcq
+        prompt: "What makes an agent different from a plain chatbot?"
+        options: ["It's friendlier", "It can take steps, use tools and keep going toward a goal", "It uses a bigger model"]
+        answer: 1
+        explain: "The loop and the tools are what make it an agent."
+      - id: no-tools
+        type: predict
+        prompt: "Tools are switched off. You ask the agent for today's gold price."
+        options: ["It looks it up", "It guesses, or says it can't know", "It refuses all questions"]
+        answer: 1
+        explain: "Without tools it has no way to get live facts."
+      - id: parts
+        type: multi
+        prompt: "Which are core parts of an agent? Pick all that apply."
+        options: ["An LLM that decides", "Tools", "Memory or state", "A logo"]
+        answer: [0, 1, 2]
+        explain: "Decide, act, remember."
+
+- slug: agent-architecture
+  title: LLM-powered agent architecture
+  summary: The model, the tool registry, state, memory and guardrails, and how they connect.
+  minutes: 8
+  body:
+    objectives:
+      - Draw the main components of an agent
+      - Say which component is responsible for what
+    intro: >-
+      An agent app has a few clear parts: the LLM that decides, a registry of tools it may use,
+      the state of the current task, longer-term memory, and guardrails that limit what it can do.
+    intro_eng: >-
+      Components: policy (LLM + system prompt), tool registry (schemas + executors), working
+      state (messages, scratch, plan), memory store, and an orchestrator enforcing step/cost
+      limits, permissions and approvals.
+    scenes:
+      - engine: graph
+        title: The parts of an agent app
+        track: [Orchestrator, LLM, Tools, State, Guardrails]
+        nodes:
+          orc: {x: 215, y: 120, label: orchestrator}
+          llm: {x: 80, y: 60, label: LLM}
+          tools: {x: 350, y: 60, label: tool registry}
+          st: {x: 80, y: 190, label: state + memory}
+          g: {x: 350, y: 190, label: guardrails}
+        edges: [[orc, llm], [orc, tools], [orc, st], [orc, g]]
+        steps:
+          - {at: 0, node: orc, state: {role: "runs the loop"}, caption: "The orchestrator is your code. It runs the loop and enforces limits."}
+          - {at: 1, node: llm, edge: orc-llm, state: {role: "decides the next action"}, caption: "The LLM decides: call a tool, or give the final answer."}
+          - {at: 2, node: tools, edge: orc-tools, state: {role: "runs real functions"}, caption: "The tool registry maps names to real functions, with schemas."}
+          - {at: 3, node: st, edge: orc-st, state: {role: "remembers the task"}, caption: "State holds the conversation, tool results and plan."}
+          - {at: 4, node: g, edge: orc-g, state: {role: "limits and approvals"}, tone: good, caption: "Guardrails cap steps and cost, and require approval for risky actions."}
+    points:
+      - {title: Your code is in charge, text: "The orchestrator runs the loop; the LLM only proposes.", step: 0}
+      - {title: Tools are registered, text: "Only listed tools can be called.", step: 2}
+      - {title: Guardrails limit damage, text: "Step limits, budgets, approvals.", step: 4}
+    words:
+      - [Orchestrator, The code that runs the agent loop.]
+      - [Guardrail, A rule that limits what the agent can do.]
+    checks:
+      - id: who-decides
+        type: mcq
+        prompt: "Who actually executes a tool?"
+        options: ["The LLM", "The orchestrator (your code)", "The user"]
+        answer: 1
+        explain: "The model proposes; your code executes."
+      - id: arch-order
+        type: order
+        prompt: "Order one cycle through the architecture."
+        items: ["Orchestrator sends state to the LLM", "LLM proposes an action", "Orchestrator checks guardrails", "Tool runs and state is updated"]
+        explain: "Propose, check, execute, update."
+
+- slug: agent-execution-loop
+  title: The agent execution loop
+  summary: Decide, act, observe, repeat, with a step limit.
+  minutes: 9
+  body:
+    objectives:
+      - Write the loop in plain Python
+      - Explain why a step limit is essential
+    intro: >-
+      Every agent is a loop: ask the LLM what to do next, do it, add the result to the
+      conversation, repeat. The loop stops when the LLM gives a final answer or when it hits a
+      step limit, so it can never run forever.
+    intro_eng: >-
+      while steps < max_steps: action = llm(state); if action.final: return; result = run(action);
+      state.append(result). Bound steps, tokens and wall time; log every iteration.
+    scenes:
+      - engine: graph
+        title: Chennai weather in Fahrenheit
+        track: [Ask, Decide 1, Act, Decide 2, Act, Answer]
+        nodes:
+          user: {x: 50, y: 120, label: user}
+          llm: {x: 200, y: 60, label: LLM decides}
+          tool: {x: 350, y: 120, label: tool runs}
+          st: {x: 200, y: 190, label: state}
+        edges: [[user, llm], [llm, tool], [tool, st], [st, llm]]
+        steps:
+          - {at: 0, node: user, state: {goal: "Chennai weather in °F", steps: 0}, caption: "The user asks for Chennai's weather in Fahrenheit."}
+          - {at: 1, node: llm, edge: user-llm, state: {goal: "Chennai weather in °F", steps: 1, next: get_weather}, caption: "LLM call 1: it needs live data, so it chooses get_weather."}
+          - {at: 2, node: tool, edge: llm-tool, state: {steps: 1, weather: "31°C, humid"}, caption: "The tool runs and returns 31°C. The result goes into state."}
+          - {at: 3, node: llm, edge: st-llm, state: {steps: 2, weather: "31°C, humid", next: convert}, caption: "LLM call 2: the result is in °C, so it chooses convert."}
+          - {at: 4, node: tool, edge: llm-tool, state: {steps: 2, weather: "31°C, humid", temp_f: 87.8}, caption: "convert returns 87.8."}
+          - {at: 5, node: user, state: {steps: 3, done: true, answer: "About 88°F and humid"}, tone: good, caption: "LLM call 3: everything needed is in state, so it writes the final answer."}
+    points:
+      - {title: Decide, text: "Ask the LLM for the next action.", step: 1}
+      - {title: Act, text: "Run the chosen tool.", step: 2}
+      - {title: Observe, text: "Add the result to state.", step: 3}
+      - {title: Stop, text: "On a final answer, or at the step limit.", step: 5}
+    words:
+      - [Iteration, One trip around the loop.]
+      - [Step limit, The most iterations allowed.]
+    code:
+      file: loop.py
+      source: |
+        def fake_llm(state):
+            # A stand-in for a real model: it follows a fixed plan.
+            if "weather" not in state:
+                return {"tool": "get_weather", "args": {"city": "Chennai"}}
+            if "temp_f" not in state:
+                return {"tool": "convert", "args": {"c": state["weather"]}}
+            return {"final": f"About {round(state['temp_f'])}°F"}
+
+        tools = {
+            "get_weather": lambda city: 31,
+            "convert": lambda c: c * 9 / 5 + 32,
+        }
+
+        state, steps = {}, 0
+        while steps < 5:
+            steps += 1
+            action = fake_llm(state)
+            if "final" in action:
+                print(action["final"], "after", steps, "LLM calls")
+                break
+            result = tools[action["tool"]](**action["args"])
+            state["weather" if action["tool"] == "get_weather" else "temp_f"] = result
+      notes:
+        1: ["A pretend LLM that decides the next action. No real model is called.", "Deterministic stand-in policy for teaching."]
+        3: ["No weather yet? Ask for the weather tool.", "Action 1."]
+        5: ["Weather but not °F yet? Ask to convert.", "Action 2."]
+        7: ["Everything known: give the final answer.", "Terminal action."]
+        9: ["The tools the agent may use.", "Tool registry."]
+        14: ["Start with empty state.", "Initial state."]
+        15: ["Never loop more than 5 times.", "Step limit guardrail."]
+        17: ["Ask the 'LLM' what to do.", "Decide."]
+        18: ["A final answer ends the loop.", "Termination."]
+        21: ["Otherwise run the tool…", "Act."]
+        22: ["…and remember the result.", "Observe/update state."]
+    exercise:
+      prompt: "The loop has no step limit and fake_llm never finishes. Add a limit of 3 steps and set stopped = True if the limit is hit."
+      starter: |
+        def fake_llm(state):
+            return {"tool": "think", "args": {}}
+
+        tools = {"think": lambda: "hmm"}
+        steps, stopped = 0, False
+        # change the loop so it stops after 3 steps
+        while steps < 1000:
+            steps += 1
+            action = fake_llm({})
+            tools[action["tool"]](**action["args"])
+      tests: |
+        assert steps == 3, f"The loop should stop after 3 steps, it ran {steps}"
+        assert stopped is True, "Set stopped = True when the limit is reached"
+      solution: |
+        def fake_llm(state):
+            return {"tool": "think", "args": {}}
+
+        tools = {"think": lambda: "hmm"}
+        steps, stopped = 0, False
+        MAX_STEPS = 3
+        while True:
+            if steps >= MAX_STEPS:
+                stopped = True
+                break
+            steps += 1
+            action = fake_llm({})
+            tools[action["tool"]](**action["args"])
+    checks:
+      - id: llm-calls
+        type: predict
+        prompt: "The user asks for Chennai's weather in °F. The weather tool only returns °C. How many LLM calls will the agent make?"
+        options: ["1", "2", "3"]
+        answer: 2
+        explain: "One to choose get_weather, one to choose convert, one to write the answer."
+      - id: why-limit
+        type: mcq
+        prompt: "Why must an agent loop have a step limit?"
+        options: ["To save screen space", "So a confused agent can't loop forever and burn money", "Models require it"]
+        answer: 1
+        explain: "Limits turn runaway loops into a clean failure."
+      - id: loop-order
+        type: order
+        prompt: "Order one loop iteration."
+        items: ["Ask the LLM for the next action", "If it's a final answer, stop", "Run the tool", "Add the result to state"]
+        explain: "Decide, check for done, act, observe."
+    lab: lab-agent-loop
+
+- slug: tool-calling
+  title: Tool calling in practice
+  summary: Validate the model's tool call before running it, and return results in a standard shape.
+  minutes: 8
+  body:
+    objectives:
+      - Validate tool names and arguments
+      - Return results and errors in a consistent format
+    intro: >-
+      The model's tool call is a suggestion written as JSON. Before running it, check the tool
+      exists and the arguments are the right type. Then return the result, or a clear error the
+      model can react to.
+    intro_eng: >-
+      Validate against the declared JSON schema; never eval model output; return structured tool
+      results (ok/error with message) so the model can self-correct on the next turn.
+    scenes:
+      - engine: flow
+        title: A bad tool call, caught
+        track: [Call, Validate, Error, Retry, Result]
+        actors:
+          - {id: llm, label: LLM, icon: brain, x: 14, y: 60}
+          - {id: val, label: Validator, icon: shield, x: 50, y: 60}
+          - {id: tool, label: Tool, icon: wrench, x: 86, y: 60}
+        steps:
+          - {at: 0, from: llm, to: val, packet: "get_weather(city=42)", tone: ask, caption: "The model calls get_weather with city = 42, a number instead of text."}
+          - {at: 1, think: val, notes: {val: "city must be text"}, caption: "The validator checks the arguments against the tool's schema."}
+          - {at: 2, from: val, to: llm, packet: "error: city must be a string", tone: bad, caption: "Instead of crashing, it sends a clear error back to the model."}
+          - {at: 3, from: llm, to: val, packet: "get_weather(city='Chennai')", tone: ask, caption: "The model reads the error and fixes its call."}
+          - {at: 4, from: tool, to: llm, packet: "31°C, humid", tone: good, caption: "Valid call, real result."}
+    points:
+      - {title: Check the tool exists, text: "Unknown names get a clear error.", step: 1}
+      - {title: Check argument types, text: "Against the tool's schema.", step: 1}
+      - {title: Errors are messages, text: "Send errors back so the model can fix its call.", step: 2}
+      - {title: Never eval model output, text: "Treat it as data, always."}
+    words:
+      - [Validation, Checking inputs before using them.]
+    code:
+      file: validate.py
+      source: |
+        SCHEMAS = {"get_weather": {"city": str}}
+        TOOLS = {"get_weather": lambda city: f"{city}: 31°C"}
+
+        def run_call(call):
+            name, args = call.get("tool"), call.get("args", {})
+            if name not in TOOLS:
+                return {"ok": False, "error": f"unknown tool {name!r}"}
+            for field, kind in SCHEMAS[name].items():
+                if not isinstance(args.get(field), kind):
+                    return {"ok": False, "error": f"{field} must be {kind.__name__}"}
+            return {"ok": True, "result": TOOLS[name](**args)}
+
+        print(run_call({"tool": "get_wether", "args": {"city": "Pune"}}))
+        print(run_call({"tool": "get_weather", "args": {"city": 42}}))
+        print(run_call({"tool": "get_weather", "args": {"city": "Pune"}}))
+      notes:
+        1: ["What each tool expects.", "Minimal schema."]
+        4: ["Safely run a tool call from the model.", "Validation wrapper."]
+        6: ["Unknown tool? Explain instead of crashing.", "Name check."]
+        8: ["Check every argument's type.", "Schema validation."]
+        11: ["All good: run it.", "Execute."]
+        13: ["Misspelt tool.", "Error path."]
+        14: ["Wrong type.", "Error path."]
+        15: ["Valid.", "Success."]
+    checks:
+      - id: unknown
+        type: mcq
+        prompt: "The model calls a tool that doesn't exist. Best response?"
+        options: ["Crash", "Return a clear error so the model can choose a real tool", "Pick a random tool"]
+        answer: 1
+        explain: "Errors are information for the next step."
+      - id: tc-debug
+        type: debug
+        prompt: "This executes whatever the model writes. Tap the dangerous line."
+        code: |
+          reply = model_output()
+          call = json.loads(reply)
+          result = eval(call["expression"])
+          return result
+        answer: 3
+        explain: "eval runs arbitrary code from model output. Only call registered functions with validated arguments."
+
+- slug: tool-design
+  title: Designing good tools
+  summary: Clear names, descriptions and narrow inputs make agents pick the right tool.
+  minutes: 7
+  body:
+    objectives:
+      - Write a tool description the model can use
+      - Keep tools small and specific
+    intro: >-
+      The model chooses tools by reading their names and descriptions. Vague tools get misused.
+      Good tools do one thing, have clear names, and describe when to use them and when not to.
+    intro_eng: >-
+      Tool descriptions are prompt engineering. Prefer narrow, idempotent tools with explicit
+      parameter descriptions and enums; return compact, structured results.
+    scenes:
+      - engine: flow
+        title: Vague tool versus clear tool
+        track: [Ask, Choose, Result]
+        actors:
+          - {id: user, label: User, icon: person, x: 12, y: 60}
+          - {id: llm, label: Agent, icon: brain, x: 45, y: 60}
+          - {id: t1, label: do_stuff, icon: wrench, x: 84, y: 30}
+          - {id: t2, label: get_order_status, icon: box, x: 84, y: 86}
+        switches:
+          - {id: clear, label: Clear tool descriptions, label_on: "ON · get_order_status(order_id)", label_off: "OFF · do_stuff(input)", track: 1}
+        steps:
+          - {at: 0, from: user, to: llm, packet: "Where is order 1182?", tone: ask, caption: "A customer asks about an order."}
+          - {at: 1, when: clear, from: llm, to: t2, packet: "get_order_status(1182)", tone: ask, caption: "The description says 'Look up delivery status by order ID'. Easy choice."}
+          - {at: 2, when: clear, from: t2, to: user, packet: "Out for delivery", tone: good, caption: "Right tool, right answer."}
+          - {at: 1, when: "!clear", from: llm, to: t1, packet: "do_stuff('order?')", tone: bad, caption: "'do_stuff' tells the model nothing. It guesses."}
+          - {at: 2, when: "!clear", from: t1, to: user, packet: "error", tone: bad, caption: "Vague tools get misused."}
+    points:
+      - {title: Name it for its job, text: "get_order_status beats do_stuff.", step: 1}
+      - {title: Describe when to use it, text: "And when not to.", step: 1}
+      - {title: Narrow inputs, text: "order_id, not a free-text 'input'.", step: 1}
+      - {title: Small results, text: "Return just what's needed, to save tokens."}
+    words:
+      - [Tool description, The text the model reads to decide whether to use a tool.]
+    checks:
+      - id: better-name
+        type: mcq
+        prompt: "Which tool definition will an agent use most reliably?"
+        options: ["helper(x)", "search_policy(question): finds HR policy text; don't use for payroll", "tool1(data)"]
+        answer: 1
+        explain: "A clear name, purpose and boundary."
+      - id: return-size
+        type: predict
+        prompt: "Your tool returns a 50-page JSON dump every call. What suffers?"
+        options: ["Nothing", "Tokens, cost and the model's focus", "The tool's speed only"]
+        answer: 1
+        explain: "Tool results go into the context window."
+
+- slug: agent-state
+  title: State management
+  summary: Keep the task's facts in a structured state object, not just in chat text.
+  minutes: 7
+  body:
+    objectives:
+      - Design a state object for a task
+      - Update it after each step
+    intro: >-
+      State is everything the agent knows about the current task: the goal, results so far, the
+      plan and what's left. Keeping it as structured data makes the agent easier to debug and
+      resume.
+    intro_eng: >-
+      Typed state (dict/dataclass/Pydantic) with explicit reducers per field beats free-form
+      message history alone; it enables checkpointing, inspection and deterministic tests.
+    scenes:
+      - engine: code
+        title: State grows, one step at a time
+        track: [Start, Tool 1, Tool 2, Done]
+        source: |
+          state = {"goal": "weather in F"}
+          state["weather_c"] = 31
+          state["weather_f"] = 87.8
+          state["done"] = True
+        steps:
+          - {at: 0, line: 1, vars: {state: "{'goal': 'weather in F'}"}, changed: [state], out: "", caption: "State starts with just the goal."}
+          - {at: 1, line: 2, vars: {state: "{'goal': ..., 'weather_c': 31}"}, changed: [state], out: "", caption: "The first tool's result is stored as a named field."}
+          - {at: 2, line: 3, vars: {state: "{..., 'weather_c': 31, 'weather_f': 87.8}"}, changed: [state], out: "", caption: "The second tool adds another."}
+          - {at: 3, line: 4, vars: {state: "{..., 'weather_f': 87.8, 'done': True}"}, changed: [state], out: "", tone: good, caption: "Done is recorded explicitly. Anyone can inspect exactly where the task stands."}
+    points:
+      - {title: State is the task's facts, text: "Goal, results, plan, status.", step: 0}
+      - {title: Named fields, text: "Easier to read and test than raw chat text.", step: 1}
+      - {title: Inspect anytime, text: "Debugging becomes reading a dictionary.", step: 3}
+    words:
+      - [State, The data that describes where a task stands.]
+    checks:
+      - id: why-state
+        type: mcq
+        prompt: "Why keep agent state as named fields instead of only chat messages?"
+        options: ["It's prettier", "Easier to inspect, test and resume", "Models need it"]
+        answer: 1
+        explain: "Structured state is debuggable."
+      - id: fill-state
+        type: fill
+        prompt: "Record the converted temperature in state."
+        code: |
+          temp_f = convert(state["weather_c"])
+          state[____] = temp_f
+        options: ["\"weather_f\"", "\"goal\"", "\"done\""]
+        answer: "\"weather_f\""
+        explain: "Store each result under a clear name."
+
+- slug: agent-memory
+  title: Short-term and long-term memory
+  summary: Short-term is this conversation; long-term is a store that survives restarts.
+  minutes: 8
+  body:
+    objectives:
+      - Separate short-term and long-term memory
+      - Decide what's worth remembering
+    intro: >-
+      Short-term memory is the current conversation and task state. Long-term memory is a store
+      (often a vector DB) the agent can search later: preferences, past results, facts about the
+      user. Remember little, but the right things.
+    intro_eng: >-
+      Short-term: context window + state. Long-term: episodic/semantic memory stores queried by
+      retrieval, with write policies (what to save), TTLs and user-controlled deletion.
+    scenes:
+      - engine: flow
+        title: Monday's preference, remembered on Friday
+        track: [Monday, Save, Restart, Friday, Recall]
+        actors:
+          - {id: user, label: User, icon: person, x: 12, y: 60}
+          - {id: agent, label: Agent, icon: brain, x: 46, y: 60}
+          - {id: stm, label: Short-term, icon: chat, x: 84, y: 28}
+          - {id: ltm, label: Long-term, icon: db, x: 84, y: 88}
+        switches:
+          - {id: ltm, label: Long-term memory, label_on: "ON · important facts are saved", label_off: "OFF · only this chat", track: 4, actor: ltm}
+        steps:
+          - {at: 0, from: user, to: agent, packet: "I'm vegetarian", tone: ask, notes: {stm: "vegetarian"}, caption: "On Monday the user mentions they're vegetarian."}
+          - {at: 1, when: ltm, from: agent, to: ltm, packet: "save: diet = vegetarian", tone: ask, notes: {ltm: "diet: vegetarian"}, caption: "The agent decides this is worth keeping and saves it."}
+          - {at: 2, active: [stm], notes: {stm: "(cleared)"}, caption: "The session ends. Short-term memory is gone."}
+          - {at: 3, from: user, to: agent, packet: "Suggest dinner", tone: ask, caption: "Friday, a new chat."}
+          - {at: 4, when: ltm, from: ltm, to: agent, packet: "diet: vegetarian", tone: good, caption: "It searches long-term memory and suggests paneer tikka, not chicken."}
+          - {at: 4, when: "!ltm", active: [agent], tone: bad, caption: "Without long-term memory it suggests butter chicken."}
+    points:
+      - {title: Short-term, text: "This conversation and task state. Lost when it ends.", step: 2}
+      - {title: Long-term, text: "A store searched in future sessions.", step: 4}
+      - {title: Save selectively, text: "Preferences and decisions, not every message.", step: 1}
+      - {title: Let users see and delete it, text: "Memory about people is personal data."}
+    words:
+      - [Short-term memory, What the agent knows in this session.]
+      - [Long-term memory, What it can recall in future sessions.]
+    checks:
+      - id: which
+        type: mcq
+        prompt: "Where should 'user prefers replies in Tamil' be kept?"
+        options: ["Short-term only", "Long-term memory", "Nowhere"]
+        answer: 1
+        explain: "A lasting preference belongs in long-term memory."
+      - id: privacy
+        type: multi
+        prompt: "Good practices for long-term memory? Pick all that apply."
+        options: ["Save only useful facts", "Let users view and delete memories", "Save every message forever", "Never store passwords"]
+        answer: [0, 1, 3]
+        explain: "Selective, transparent and safe."
+
+- slug: agent-planning
+  title: Planning and task decomposition
+  summary: Break a big goal into small steps, then work through them.
+  minutes: 8
+  body:
+    objectives:
+      - Decompose a goal into steps
+      - Re-plan when a step fails
+    intro: >-
+      'Plan my trip to Jaipur under ₹15,000' is too big for one step. A planning agent first
+      writes a short list of sub-tasks (transport, stay, budget check), then does them one by one,
+      adjusting the plan if something fails.
+    intro_eng: >-
+      Plan-and-execute: an LLM produces a task list; an executor runs tasks (possibly with tools);
+      a re-planner revises on failure or new information. Keep plans short and checkable.
+    scenes:
+      - engine: graph
+        title: A trip under ₹15,000
+        track: [Goal, Plan, Train, Hotel, Check]
+        nodes:
+          goal: {x: 60, y: 120, label: goal}
+          t1: {x: 210, y: 50, label: find train}
+          t2: {x: 210, y: 120, label: find hotel}
+          t3: {x: 210, y: 190, label: check budget}
+          done: {x: 360, y: 120, label: itinerary}
+        edges: [[goal, t1], [goal, t2], [goal, t3], [t3, done]]
+        steps:
+          - {at: 0, node: goal, state: {goal: "Jaipur trip, budget ₹15,000"}, caption: "A big goal."}
+          - {at: 1, node: goal, state: {plan: "1 train, 2 hotel, 3 budget"}, caption: "The agent writes a 3-step plan first."}
+          - {at: 2, node: t1, edge: goal-t1, state: {train: "₹3,400 return"}, caption: "Step 1: train found."}
+          - {at: 3, node: t2, edge: goal-t2, state: {train: "₹3,400", hotel: "₹9,800 for 3 nights"}, caption: "Step 2: hotel found."}
+          - {at: 4, node: t3, edge: goal-t3, state: {total: "₹13,200", within_budget: true}, tone: good, caption: "Step 3: total ₹13,200, under budget. If it were over, the agent would re-plan the hotel."}
+    points:
+      - {title: Plan first, text: "A short list of sub-tasks.", step: 1}
+      - {title: Execute one at a time, text: "Each step is small enough to get right.", step: 2}
+      - {title: Re-plan on failure, text: "Over budget? Change the plan, don't push on.", step: 4}
+    words:
+      - [Decomposition, Splitting a big task into smaller ones.]
+    checks:
+      - id: replan
+        type: predict
+        prompt: "The hotel step makes the total ₹18,000, over budget. What should a good agent do?"
+        options: ["Report success anyway", "Re-plan: look for a cheaper hotel", "Stop with no explanation"]
+        answer: 1
+        explain: "Plans adapt to results."
+      - id: plan-order
+        type: order
+        prompt: "Order plan-and-execute."
+        items: ["Write a short plan", "Do the first task", "Check the result", "Revise the plan if needed"]
+        explain: "Plan, act, check, adapt."
+
+- slug: reasoning-and-execution
+  title: Reasoning and execution (ReAct)
+  summary: Alternate short reasoning with actions and observations.
+  minutes: 7
+  body:
+    objectives:
+      - Describe the Thought → Action → Observation cycle
+      - Know when explicit reasoning helps
+    intro: >-
+      ReAct agents alternate: a short thought about what to do, an action (a tool call), and an
+      observation (the result). Writing the thought helps the model choose well and helps you
+      debug why it chose that.
+    intro_eng: >-
+      ReAct interleaves reasoning traces with tool use. With native tool-calling models, the
+      reasoning can be internal; log the decisions and observations regardless.
+    scenes:
+      - engine: tokens
+        title: Thought, action, observation
+        track: [Thought, Action, Observation, Answer]
+        roles:
+          th: {label: thought, color: l5}
+          ac: {label: action, color: l2}
+          ob: {label: observation, color: l3}
+        steps:
+          - {at: 0, cells: [{role: th, w: "I|need|the|current|gold|price"}], caption: "Thought: what's needed and why."}
+          - {at: 1, cells: [{role: th, w: "I|need|the|current|gold|price"}, {role: ac, w: "price_lookup(gold)"}], caption: "Action: a tool call."}
+          - {at: 2, cells: [{role: th, w: "I|need|the|current|gold|price"}, {role: ac, w: "price_lookup(gold)"}, {role: ob, w: "₹7,210/g"}], caption: "Observation: the tool's result."}
+          - {at: 3, cells: [{role: th, w: "I|need|the|current|gold|price"}, {role: ac, w: "price_lookup(gold)"}, {role: ob, w: "₹7,210/g"}, {role: th, w: "Answer:|₹7,210|per|gram"}], tone: good, caption: "Enough information, so a final answer."}
+    points:
+      - {title: Think briefly, text: "One line on what's needed.", step: 0}
+      - {title: Act, text: "Call a tool.", step: 1}
+      - {title: Observe, text: "Read the result before the next thought.", step: 2}
+    words:
+      - [ReAct, "Reason + act: alternating thoughts and tool calls."]
+    checks:
+      - id: react-order
+        type: order
+        prompt: "Order one ReAct cycle."
+        items: ["Thought", "Action", "Observation"]
+        explain: "Think, act, observe."
+      - id: why-thought
+        type: mcq
+        prompt: "Why log the agent's reasoning steps?"
+        options: ["To make answers longer", "To understand and debug its choices", "Required by law"]
+        answer: 1
+        explain: "Visible decisions are debuggable decisions."
+
+- slug: errors-and-retries
+  title: Error handling and retries
+  summary: Retry what's temporary, report what's permanent, and always stop eventually.
+  minutes: 8
+  body:
+    objectives:
+      - Separate temporary from permanent errors
+      - Implement retry with backoff
+    intro: >-
+      Tools fail. A timeout might work next time; 'city not found' won't. Retry temporary errors
+      a few times with growing waits, and send permanent errors back to the model or the user.
+    intro_eng: >-
+      Classify errors (transient: timeouts, 429, 5xx; permanent: validation, 4xx). Use bounded
+      exponential backoff with jitter; make tools idempotent so retries are safe.
+    scenes:
+      - engine: meter
+        title: Retrying a flaky tool
+        track: [Try 1, Wait, Try 2, Wait, Try 3]
+        gauges:
+          - {label: Attempts, max: 3, format: num, color: l2}
+          - {label: Waited, max: 4000, format: ms, color: l1}
+        steps:
+          - {at: 0, values: [1, 0], log: "get_weather → timeout", tone: bad, caption: "First try times out. That's often temporary."}
+          - {at: 1, values: [1, 500], log: "wait 0.5 s", caption: "Wait a little before retrying."}
+          - {at: 2, values: [2, 500], log: "get_weather → timeout", tone: bad, caption: "Second try also fails."}
+          - {at: 3, values: [2, 1500], log: "wait 1 s more (backoff)", caption: "Wait longer each time: that's backoff."}
+          - {at: 4, values: [3, 1500], log: "get_weather → 31°C", tone: good, caption: "Third try works. After 3 failures it would stop and report the error instead."}
+    points:
+      - {title: Temporary errors, text: "Timeouts, rate limits: retry.", step: 0}
+      - {title: Permanent errors, text: "Bad input: don't retry, report.", step: 0}
+      - {title: Back off, text: "Wait longer between tries.", step: 3}
+      - {title: Cap retries, text: "Then fail clearly.", step: 4}
+    words:
+      - [Transient error, A failure that may succeed if tried again.]
+      - [Backoff, Waiting longer after each retry.]
+    code:
+      file: retry.py
+      source: |
+        attempts = []
+
+        def flaky_tool():
+            attempts.append(1)
+            if len(attempts) < 3:
+                raise TimeoutError("slow server")
+            return "31°C"
+
+        def with_retries(fn, tries=3):
+            wait = 0.5
+            for n in range(1, tries + 1):
+                try:
+                    return fn()
+                except TimeoutError as e:
+                    print(f"try {n} failed: {e}; waiting {wait}s")
+                    wait *= 2
+            return "gave up after retries"
+
+        print(with_retries(flaky_tool))
+      notes:
+        3: ["A tool that fails twice, then works.", "Simulated transient failure."]
+        9: ["Run fn, retrying on timeouts.", "Retry wrapper."]
+        10: ["Start with a short wait.", "Initial backoff."]
+        12: ["Try it.", "Attempt."]
+        14: ["Timed out? Note it.", "Catch only transient errors."]
+        16: ["Double the wait next time.", "Exponential backoff (sleep omitted in the lesson)."]
+        17: ["After all tries, give up clearly.", "Bounded retries."]
+    checks:
+      - id: classify
+        type: multi
+        prompt: "Which errors are worth retrying? Pick all that apply."
+        options: ["Timeout", "Rate limit (429)", "Invalid city name", "Server busy (503)"]
+        answer: [0, 1, 3]
+        explain: "Bad input won't fix itself."
+      - id: forever
+        type: predict
+        prompt: "A tool fails permanently and you retry forever. What happens?"
+        options: ["It eventually works", "The agent hangs and burns money", "Nothing"]
+        answer: 1
+        explain: "Always cap retries."
+
+- slug: human-in-the-loop
+  title: Human-in-the-loop
+  summary: Pause for human approval before risky actions.
+  minutes: 7
+  body:
+    objectives:
+      - Identify actions that need approval
+      - Design an approval step
+    intro: >-
+      Some actions shouldn't happen without a person saying yes: paying money, sending emails to
+      customers, deleting data. The agent pauses, shows what it plans to do, and waits for approval.
+    intro_eng: >-
+      Gate side-effecting tools behind an interrupt: persist state, surface the proposed action
+      with context, resume on approve/edit/reject, and audit the decision.
+    scenes:
+      - engine: graph
+        title: A refund that waits for approval
+        track: [Request, Propose, Pause, Approve, Act]
+        nodes:
+          req: {x: 50, y: 120, label: refund request}
+          agent: {x: 170, y: 120, label: agent}
+          gate: {x: 290, y: 120, label: approval gate}
+          pay: {x: 390, y: 60, label: issue refund}
+          human: {x: 290, y: 200, label: support lead}
+        edges: [[req, agent], [agent, gate], [gate, pay], [human, gate]]
+        steps:
+          - {at: 0, node: req, state: {order: 1182, amount: "₹2,499"}, caption: "A customer asks for a refund."}
+          - {at: 1, node: agent, edge: req-agent, state: {proposal: "refund ₹2,499 to UPI"}, caption: "The agent checks the order and proposes a refund."}
+          - {at: 2, node: gate, edge: agent-gate, state: {status: "waiting for approval"}, caption: "Money moves, so it pauses at the approval gate."}
+          - {at: 3, node: human, edge: human-gate, state: {status: approved, by: "support lead"}, caption: "A person reviews and approves."}
+          - {at: 4, node: pay, edge: gate-pay, state: {status: "refund issued", audit: logged}, tone: good, caption: "Only now does the refund happen, and the decision is logged."}
+    points:
+      - {title: Gate risky actions, text: "Money, messages to customers, deletions.", step: 2}
+      - {title: Show the plan, text: "The human sees exactly what will happen.", step: 1}
+      - {title: Log decisions, text: "Who approved what, and when.", step: 4}
+    words:
+      - [Approval gate, A pause until a person says yes.]
+    checks:
+      - id: needs-approval
+        type: multi
+        prompt: "Which actions should need human approval? Pick all that apply."
+        options: ["Issuing a refund", "Looking up the weather", "Emailing all customers", "Deleting a user's account"]
+        answer: [0, 2, 3]
+        explain: "Anything costly or hard to undo."
+      - id: hitl-order
+        type: order
+        prompt: "Order an approval flow."
+        items: ["Agent proposes an action", "Workflow pauses", "Human approves or edits", "Action runs and is logged"]
+        explain: "Propose, pause, decide, act."
+
+- slug: agent-from-scratch
+  title: Building an agent from scratch
+  summary: Put the loop, tools, state, retries and limits together in plain Python.
+  minutes: 12
+  body:
+    objectives:
+      - Assemble a complete agent without a framework
+      - Explain every line of it
+    intro: >-
+      Before using frameworks, build one agent yourself: a decision function, a tool registry, a
+      loop with a step limit, state, validation and an approval gate. Then frameworks will feel
+      like shortcuts, not magic. That's the Level 5 mission.
+    intro_eng: >-
+      A framework-free agent clarifies the control flow frameworks abstract: policy call, action
+      parsing/validation, tool execution, state reduction, termination and guardrails.
+    scenes:
+      - engine: graph
+        title: The whole agent on one screen
+        track: [Decide, Validate, Approve, Act, Update]
+        nodes:
+          d: {x: 70, y: 60, label: decide()}
+          v: {x: 215, y: 60, label: validate()}
+          a: {x: 360, y: 60, label: "approve?"}
+          t: {x: 360, y: 190, label: run tool}
+          s: {x: 140, y: 190, label: update state}
+        edges: [[d, v], [v, a], [a, t], [t, s], [s, d]]
+        steps:
+          - {at: 0, node: d, state: {step: 1, of: 6}, caption: "decide() asks the LLM, or your stand-in, for the next action."}
+          - {at: 1, node: v, edge: d-v, state: {step: 1, valid: true}, caption: "validate() checks the tool name and arguments."}
+          - {at: 2, node: a, edge: v-a, state: {step: 1, risky: false}, caption: "Risky tools pause for approval; safe ones continue."}
+          - {at: 3, node: t, edge: a-t, state: {step: 1, result: "31°C"}, caption: "The tool runs, with retries for temporary errors."}
+          - {at: 4, node: s, edge: t-s, state: {step: 2, weather: "31°C"}, tone: good, caption: "State updates and the loop continues, never past the step limit."}
+    points:
+      - {title: Decide, text: "One function that returns the next action.", step: 0}
+      - {title: Validate, text: "Never trust raw model output.", step: 1}
+      - {title: Approve risky actions, text: "Gate side effects.", step: 2}
+      - {title: Act and update, text: "Run, retry, record.", step: 4}
+    words:
+      - [Framework, A library that provides these pieces ready-made.]
+    checks:
+      - id: complete
+        type: multi
+        prompt: "What must a safe from-scratch agent have? Pick all that apply."
+        options: ["A step limit", "Tool validation", "Approval for risky actions", "A dark theme"]
+        answer: [0, 1, 2]
+        explain: "The UI theme isn't a safety feature."
+      - id: scratch-order
+        type: order
+        prompt: "Order the agent's cycle."
+        items: ["decide()", "validate()", "approve if risky", "run tool", "update state"]
+        explain: "Decide, check, gate, act, record."
+
+project:
+  slug: agent-from-scratch-mission
+  title: Tool-using agent from scratch
+  body:
+    problem: >-
+      A college library wants an assistant that can check book availability, reserve a book and
+      answer questions about fines. Build it without an agent framework.
+    requirements:
+      - "At least 3 tools (e.g. search_catalogue, reserve_book, get_fine) with schemas and validation"
+      - "An agent loop with a step limit, retries for transient errors and structured state"
+      - "A human approval step before reserve_book runs"
+      - "Works with a real LLM API or a clearly labelled stand-in decision function"
+      - "A README with 3 example runs showing each step of the loop"
+    milestones:
+      - Write the three tools with validation
+      - Build the loop with a step limit
+      - Add retries and structured state
+      - Add the approval gate
+      - Record example runs in the README
+    rubric:
+      - {name: Loop and limits, points: 25, pass: "Loop terminates on answer or step limit, every time"}
+      - {name: Tool validation, points: 20, pass: "Bad tool names and arguments produce clear errors, not crashes"}
+      - {name: Approval gate, points: 20, pass: "Reservations never happen without approval"}
+      - {name: State and retries, points: 15, pass: "State is inspectable; transient errors are retried and capped"}
+      - {name: README runs, points: 20, pass: "3 runs show decide → act → observe clearly"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."

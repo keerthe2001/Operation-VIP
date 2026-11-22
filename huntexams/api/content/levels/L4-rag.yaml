@@ -1,0 +1,1238 @@
+number: 4
+slug: complete-rag
+title: Complete RAG Development
+summary: Build retrieval-augmented generation end to end, from documents to grounded answers, and measure it.
+hours: 28
+topics:
+
+- slug: rag-architecture
+  title: RAG architecture and workflow
+  summary: Retrieve the right pieces of your documents, then let the model answer from them.
+  minutes: 9
+  body:
+    objectives:
+      - Explain the 5 steps of RAG
+      - Say why RAG reduces made-up answers
+      - Separate the offline and online halves
+    intro: >-
+      Imagine an open-book exam. Instead of answering from memory, you first find the right page,
+      then write your answer from it. RAG does the same for an AI: find relevant text in your
+      documents, put it in the prompt, then generate.
+    intro_eng: >-
+      Retrieval-augmented generation grounds outputs in external documents: embed the query,
+      retrieve the top-k chunks from an index, inject them as context, then generate. Ingestion
+      (offline) and query-time retrieval (online) are separate pipelines.
+    scenes:
+      - engine: flow
+        title: How does RAG answer a question?
+        track: [Ask, Embed, Search, Context, Answer]
+        actors:
+          - {id: q, label: Question, icon: chat, x: 15, y: 34}
+          - {id: emb, label: Embedder, icon: grid, x: 50, y: 34}
+          - {id: db, label: Vector DB, icon: db, x: 85, y: 34}
+          - {id: llm, label: LLM, icon: cpu, x: 50, y: 80}
+          - {id: ans, label: Answer, icon: doc, x: 85, y: 80}
+        switches:
+          - {id: ret, label: Retrieval, label_on: "ON · finds the right pages first", label_off: "OFF · the LLM answers from memory", track: 2, actor: db}
+        steps:
+          - {at: 0, from: q, to: emb, packet: "How many casual leaves?", tone: ask, caption: "An employee asks: 'How many casual leaves do I get?'"}
+          - {at: 1, when: ret, from: emb, to: db, packet: "[0.12, −0.80, 0.33 …]", tone: ask, notes: {emb: "question → numbers"}, caption: "The question becomes a list of numbers that captures its meaning."}
+          - {at: 2, when: ret, active: [db], notes: {db: "HR policy · 214 chunks"}, caption: "The vector DB compares it with every chunk of the HR policy and finds the 3 closest."}
+          - {at: 3, when: ret, from: db, to: llm, packet: "3 chunks · section 4", tone: good, notes: {llm: "question + 3 chunks"}, caption: "Those chunks are pasted into the prompt as context."}
+          - {at: 4, when: ret, from: llm, to: ans, packet: "12 days a year (section 4)", tone: good, caption: "The LLM answers from the context and cites the section, so you can check it."}
+          - {at: 2, when: "!ret", active: [llm], tone: bad, notes: {db: "not used", emb: "skipped"}, caption: "Retrieval is off. The LLM never sees your company's policy."}
+          - {at: 4, when: "!ret", from: llm, to: ans, packet: "Usually 10–15 days", tone: bad, caption: "It answers confidently from general memory, and it's wrong for your company. That's a hallucination."}
+      - engine: graph
+        title: Two lanes, offline and online
+        track: [Load, Chunk, Embed, Store, Query]
+        nodes:
+          docs: {x: 50, y: 60, label: documents}
+          chunk: {x: 150, y: 60, label: chunks}
+          emb: {x: 250, y: 60, label: embeddings}
+          db: {x: 360, y: 120, label: vector DB}
+          q: {x: 150, y: 190, label: question}
+          ans: {x: 280, y: 190, label: answer}
+        edges: [[docs, chunk], [chunk, emb], [emb, db], [q, db], [db, ans]]
+        steps:
+          - {at: 0, node: docs, state: {lane: offline, docs: "PDFs, pages"}, caption: "Offline lane: runs ahead of time, whenever documents change."}
+          - {at: 1, node: chunk, edge: docs-chunk, state: {lane: offline, chunks: 214}, caption: "Documents are split into chunks."}
+          - {at: 2, node: emb, edge: chunk-emb, state: {lane: offline, chunks: 214, vectors: 214}, caption: "Each chunk is embedded."}
+          - {at: 3, node: db, edge: emb-db, state: {lane: offline, stored: 214}, caption: "Vectors and text are stored in the vector DB."}
+          - {at: 4, node: ans, edge: db-ans, state: {lane: online, question: "casual leave?", answer: "12 days"}, tone: good, caption: "Online lane: each question searches the store and answers in seconds."}
+    points:
+      - {title: A question comes in, text: "Plain text, as the user typed it.", step: 0}
+      - {title: It becomes numbers, text: "An embedding model turns meaning into a vector.", step: 1}
+      - {title: The closest chunks are found, text: "The vector DB finds pieces of your documents with similar vectors.", step: 2}
+      - {title: They become context, text: "Those pieces are pasted into the prompt.", step: 3}
+      - {title: The LLM answers from them, text: "And can point to where the answer came from.", step: 4}
+    words:
+      - [RAG, "Retrieval-augmented generation: find facts, then answer."]
+      - [Chunk, A small piece of a document.]
+      - [Grounding, Making the answer rely on provided sources.]
+    code:
+      file: rag.py
+      source: |
+        def answer(question, db, llm):
+            q_vec = embed(question)
+            chunks = db.search(q_vec, k=3)
+            context = "\n".join(c.text for c in chunks)
+            prompt = f"Answer using only this:\n{context}\n\nQ: {question}"
+            return llm.generate(prompt)
+      notes:
+        1: ["A function that answers a question using your documents.", "Dependencies injected for testability."]
+        2: ["Turn the question into numbers.", "Embed with the same model used at ingestion."]
+        3: ["Ask the database for the 3 closest chunks.", "Top-k retrieval; k trades recall against context size."]
+        4: ["Glue the chunks into one block of text.", "Context assembly; add source IDs and a token budget in production."]
+        5: ["Instruct: answer only from these chunks.", "Grounding instruction; reduces but doesn't eliminate hallucination."]
+        6: ["Send it all to the model.", "Single generation call."]
+    checks:
+      - id: no-retrieval
+        type: predict
+        prompt: "Retrieval is switched off. The AI is asked about your company's leave policy. What usually happens?"
+        options: ["It says \"I don't know\"", "It answers confidently, and may be wrong", "It searches the internet"]
+        answer: 1
+        explain: "Without retrieval it fills the gap from general training data and sounds just as sure."
+      - id: rag-order
+        type: order
+        prompt: "Order the online RAG steps."
+        items: ["Embed the question", "Search the vector DB", "Build the prompt with the chunks", "Generate the answer"]
+        explain: "Embed, search, build context, generate."
+      - id: lanes
+        type: mcq
+        prompt: "When does chunking and embedding your documents happen?"
+        options: ["Every time a user asks", "Ahead of time, whenever documents change", "Never"]
+        answer: 1
+        explain: "That's the offline ingestion lane."
+
+- slug: document-ingestion
+  title: Document ingestion
+  summary: Load PDFs, web pages and docs into clean text with useful metadata.
+  minutes: 8
+  body:
+    objectives:
+      - List common sources and their quirks
+      - Keep source metadata for citations
+      - Plan re-ingestion when documents change
+    intro: >-
+      Before anything can be searched it has to become text. PDFs, web pages, Word files and
+      spreadsheets each need a different loader. Keep where each piece came from (file, page,
+      URL) so answers can cite it later.
+    intro_eng: >-
+      Ingestion = load, extract, normalise and attach metadata (source, page, section, updated_at,
+      access scope). Track document versions/hashes so changed files are re-embedded and deleted
+      ones removed.
+    scenes:
+      - engine: flow
+        title: Many formats, one clean stream
+        track: [PDF, Web page, Sheet, Clean text]
+        actors:
+          - {id: pdf, label: PDF, icon: doc, x: 12, y: 24}
+          - {id: web, label: Web page, icon: globe, x: 12, y: 60}
+          - {id: xls, label: Sheet, icon: grid, x: 12, y: 92}
+          - {id: load, label: Loader, icon: wrench, x: 50, y: 60}
+          - {id: out, label: Text + metadata, icon: list, x: 86, y: 60}
+        steps:
+          - {at: 0, from: pdf, to: load, packet: "policy.pdf (12 pages)", tone: ask, caption: "PDFs: extract text page by page, and keep page numbers."}
+          - {at: 1, from: web, to: load, packet: "faq.html", tone: ask, caption: "Web pages: strip menus, ads and footers; keep the URL."}
+          - {at: 2, from: xls, to: load, packet: "holidays.xlsx", tone: ask, caption: "Spreadsheets: turn rows into readable sentences."}
+          - {at: 3, from: load, to: out, packet: "{text, source, page}", tone: good, caption: "Everything becomes clean text with metadata, ready to chunk."}
+    points:
+      - {title: Every format needs a loader, text: "PDF, HTML, DOCX and spreadsheets all extract differently.", step: 0}
+      - {title: Keep the source, text: "File name, page and URL let answers cite their evidence.", step: 3}
+      - {title: Documents change, text: "Re-ingest updated files and remove deleted ones, or answers go stale.", eng: "Use content hashes to skip unchanged files and to detect updates."}
+    words:
+      - [Loader, Code that reads a file format into text.]
+      - [Citation, Pointing to the source of a claim.]
+    checks:
+      - id: keep-meta
+        type: mcq
+        prompt: "Why store the page number with each chunk?"
+        options: ["It makes search faster", "So answers can cite where they came from", "It's required by PDFs"]
+        answer: 1
+        explain: "Citations let users verify the answer."
+      - id: stale
+        type: predict
+        prompt: "HR updates the leave policy, but nobody re-ingests it. What do users get?"
+        options: ["The new policy", "Answers from the old policy", "An error"]
+        answer: 1
+        explain: "The vector DB still holds the old text."
+      - id: sources
+        type: multi
+        prompt: "Which are good metadata to keep? Pick all that apply."
+        options: ["Source file name", "Page number", "Last updated date", "The reader's password"]
+        answer: [0, 1, 2]
+        explain: "Useful for citations, filtering and freshness."
+
+- slug: preprocessing
+  title: Document preprocessing
+  summary: Clean extracted text so chunks carry meaning, not noise.
+  minutes: 7
+  body:
+    objectives:
+      - Spot common noise in extracted text
+      - Write simple cleaning rules
+    intro: >-
+      Extracted text is messy: repeated headers on every page, page numbers, broken hyphenation,
+      extra spaces. Noise wastes tokens and confuses retrieval. A few cleaning rules fix most of it.
+    intro_eng: >-
+      Typical steps: remove boilerplate (headers/footers), fix de-hyphenation and whitespace,
+      normalise Unicode, drop empty lines, and preserve structure markers (headings, lists, tables).
+    scenes:
+      - engine: tokens
+        title: Cleaning one extracted page
+        track: [Raw, Mark noise, Clean]
+        roles:
+          keep: {label: content, color: l3}
+          junk: {label: noise, color: l1}
+        steps:
+          - {at: 0, cells: [{role: keep, w: "ACME HR POLICY v3 | Page 4 of 12 | Casual leave is 12 days a year. Leave can- not be carried forward."}], whole: true, caption: "Raw text from page 4 of a PDF."}
+          - {at: 1, cells: [{role: junk, w: "ACME|HR|POLICY|v3|Page|4|of|12"}, {role: keep, w: "Casual|leave|is|12|days|a|year.|Leave|can-|not|be|carried|forward."}], caption: "The header and page number repeat on every page: noise."}
+          - {at: 2, cells: [{role: keep, w: "Casual|leave|is|12|days|a|year.|Leave|cannot|be|carried|forward."}], tone: good, caption: "Clean: header gone, 'can- not' rejoined as 'cannot'. Fewer tokens, clearer meaning."}
+    points:
+      - {title: Remove repeated boilerplate, text: "Headers, footers and page numbers on every page.", step: 1}
+      - {title: Fix broken words and spacing, text: "Rejoin hyphenated words, collapse spaces.", step: 2}
+      - {title: Keep structure, text: "Headings and lists help chunking later; don't flatten them away."}
+    words:
+      - [Boilerplate, Text repeated on every page that adds no meaning.]
+    code:
+      file: clean.py
+      source: |
+        import re
+
+        def clean(text):
+            text = re.sub(r"Page \d+ of \d+", "", text)
+            text = text.replace("can- not", "cannot")
+            text = re.sub(r"\s+", " ", text)
+            return text.strip()
+
+        raw = "Page 4 of 12   Casual leave is 12 days.  Leave can- not be carried forward."
+        print(clean(raw))
+      notes:
+        1: ["Python's pattern-matching tool.", "re module for regex."]
+        4: ["Delete 'Page X of Y' anywhere.", "Regex substitution."]
+        5: ["Fix a broken word.", "A real pipeline would rejoin any 'word- word' split."]
+        6: ["Turn runs of spaces into one space.", "Whitespace normalisation."]
+        7: ["Trim the ends.", "strip()."]
+    exercise:
+      prompt: "Extend clean() so it also removes the header 'ACME HR POLICY v3'."
+      starter: |
+        import re
+
+        def clean(text):
+            text = re.sub(r"Page \d+ of \d+", "", text)
+            text = re.sub(r"\s+", " ", text)
+            return text.strip()
+      tests: |
+        out = clean("ACME HR POLICY v3 Page 4 of 12 Casual leave is 12 days.")
+        assert "ACME" not in out, "Remove the header text"
+        assert out == "Casual leave is 12 days.", f"Got: {out!r}"
+      solution: |
+        import re
+
+        def clean(text):
+            text = text.replace("ACME HR POLICY v3", "")
+            text = re.sub(r"Page \d+ of \d+", "", text)
+            text = re.sub(r"\s+", " ", text)
+            return text.strip()
+    checks:
+      - id: noise-cost
+        type: mcq
+        prompt: "Why remove headers repeated on every page?"
+        options: ["They waste tokens and can make unrelated chunks look similar", "They break the PDF", "They're copyrighted"]
+        answer: 0
+        explain: "The same header in every chunk adds noise to every embedding."
+      - id: keep-headings
+        type: predict
+        prompt: "You strip all line breaks and headings. What gets harder later?"
+        options: ["Nothing", "Splitting the text along its natural sections", "Running Python"]
+        answer: 1
+        explain: "Structure helps structure-aware chunking."
+
+- slug: chunking-strategies
+  title: Chunking strategies
+  summary: Fixed, recursive, sentence, semantic, structure-aware, token-based and overlapping chunks.
+  minutes: 11
+  body:
+    objectives:
+      - Name the seven common chunking strategies
+      - Pick a strategy for a document type
+      - Explain the risk of cutting mid-sentence
+    intro: >-
+      Chunking decides what a "piece" of your document is. Cut too small and pieces lose
+      context; too big and retrieval gets fuzzy. Different documents need different cuts: FAQs
+      split by question, manuals by heading, chat logs by message.
+    intro_eng: >-
+      Fixed-size (chars/tokens), recursive (try paragraph → sentence → word separators),
+      sentence-based, semantic (split where embedding similarity drops), structure-aware
+      (headings/sections/tables), token-based, and any of these with overlap.
+    scenes:
+      - engine: slicer
+        title: Fixed-size versus sentence-based
+        track: [Chunk 1, Chunk 2, Chunk 3, Chunk 4, Done]
+        text: "Casual leave is 12 days a year. It cannot be carried forward. Sick leave needs a doctor's note after two days. Earned leave builds up at 1.5 days a month."
+        mode: chars
+        size: 48
+        overlap: 0
+        steps:
+          - {at: 0, chunk: 0, caption: "Fixed-size chunking cuts every 48 characters, wherever that lands."}
+          - {at: 1, chunk: 1, tone: bad, caption: "Look at the edge: 'It cannot be carried forward' is cut in half."}
+          - {at: 2, chunk: 2, caption: "Each chunk is the same size, but meaning is split across boundaries."}
+          - {at: 3, chunk: 3, caption: "The last chunk is whatever's left."}
+          - {at: 4, chunk: all, tone: bad, caption: "Fast and predictable, but facts get cut. Sentence-based or recursive chunking avoids this."}
+      - engine: slicer
+        title: Sentence-based keeps facts whole
+        track: [Chunk 1, Chunk 2, Chunk 3, Done]
+        text: "Casual leave is 12 days a year. It cannot be carried forward. Sick leave needs a doctor's note after two days. Earned leave builds up at 1.5 days a month."
+        mode: sentences
+        size: 70
+        overlap: 0
+        steps:
+          - {at: 0, chunk: 0, caption: "Sentence-based chunking packs whole sentences until the size limit."}
+          - {at: 1, chunk: 1, caption: "The next chunk starts at a sentence boundary."}
+          - {at: 2, chunk: 2, caption: "Sizes vary, but no fact is cut in half."}
+          - {at: 3, chunk: all, tone: good, caption: "Every chunk is a complete thought."}
+    points:
+      - {title: Fixed-size, text: "Simple and fast; cuts mid-sentence.", step: 0}
+      - {title: Sentence-based and recursive, text: "Respect natural boundaries.", eng: "Recursive splitting tries large separators first (\\n\\n, \\n, '. ', ' ') and only falls back to smaller ones when a piece is too long."}
+      - {title: Semantic, text: "Starts a new chunk where the topic changes.", eng: "Compare adjacent sentence embeddings; split where similarity drops below a threshold."}
+      - {title: Structure-aware, text: "Uses headings, lists and tables; best for manuals and policies."}
+      - {title: Token-based, text: "Counts tokens instead of characters so chunks fit model limits exactly."}
+      - {title: Overlap, text: "Repeats a little text between chunks so edges aren't lost. Next topic."}
+    words:
+      - [Chunking, Splitting documents into retrievable pieces.]
+      - [Boundary, Where one chunk ends and the next begins.]
+    code:
+      file: chunkers.py
+      source: |
+        import re
+
+        def fixed(text, size):
+            return [text[i:i + size] for i in range(0, len(text), size)]
+
+        def by_sentence(text, size):
+            sentences = re.split(r"(?<=[.!?])\s+", text)
+            chunks, cur = [], ""
+            for s in sentences:
+                if cur and len(cur) + len(s) + 1 > size:
+                    chunks.append(cur)
+                    cur = s
+                else:
+                    cur = (cur + " " + s).strip()
+            if cur:
+                chunks.append(cur)
+            return chunks
+
+        doc = "Leave is 12 days. It cannot be carried forward. Sick leave needs a note."
+        print(fixed(doc, 30))
+        print(by_sentence(doc, 50))
+      notes:
+        3: ["Cut every size characters.", "Fixed-size slicing."]
+        4: ["A list of slices.", "List comprehension over step offsets."]
+        6: ["Pack whole sentences up to size.", "Greedy sentence packing."]
+        7: ["Split after . ! or ?", "Regex sentence split (good enough for a lesson)."]
+        9: ["Go through the sentences.", "Iterate."]
+        10: ["If adding this one would be too big…", "Size check."]
+        11: ["…close the current chunk…", "Emit."]
+        12: ["…and start a new one.", "Reset."]
+        14: ["Otherwise add it to the current chunk.", "Append with a space."]
+        15: ["Don't forget the last chunk.", "Flush."]
+    checks:
+      - id: pick-faq
+        type: mcq
+        prompt: "A FAQ page with 40 short question-answer pairs. Best chunking?"
+        options: ["Fixed 2,000 characters", "One chunk per question and answer (structure-aware)", "One chunk per word"]
+        answer: 1
+        explain: "Each Q&A is a natural unit."
+      - id: fixed-risk
+        type: predict
+        prompt: "What's the main risk of fixed-size chunking?"
+        options: ["It's slow", "Facts get cut across chunk edges", "It can't handle PDFs"]
+        answer: 1
+        explain: "The boundary lands wherever the count says, often mid-sentence."
+      - id: match
+        type: multi
+        prompt: "Which strategies respect natural boundaries? Pick all that apply."
+        options: ["Sentence-based", "Recursive", "Structure-aware", "Fixed-size"]
+        answer: [0, 1, 2]
+        explain: "Fixed-size ignores meaning."
+
+- slug: chunk-size-overlap
+  title: Chunk size and overlap
+  summary: Tune size and overlap with evidence, not guesses.
+  minutes: 9
+  body:
+    objectives:
+      - Predict how size and overlap change chunk count
+      - Explain why overlap helps at edges
+      - Tune both with a small test set
+    intro: >-
+      Overlap repeats the end of one chunk at the start of the next, so a sentence cut at a
+      boundary still appears whole somewhere. Size and overlap together decide how many chunks
+      you store and how much context each one carries.
+    intro_eng: >-
+      Step = size − overlap, so chunk count ≈ len / step. Typical starting points are 200–800
+      tokens with 10–20% overlap; tune against retrieval recall on real questions.
+    scenes:
+      - engine: slicer
+        title: What does chunk overlap do?
+        track: [Chunk 1, Chunk 2, Chunk 3, Chunk 4, Done]
+        text: "Casual leave: 12 days a year. It cannot be carried forward. Sick leave needs a doctor's note after two days. Earned leave builds up at 1.5 days a month."
+        mode: chars
+        size: 64
+        overlap_on: 20
+        overlap_off: 0
+        switches:
+          - {id: ov, label: "Overlap of 20 characters", label_on: "ON · chunks share their edges", label_off: "OFF · hard cuts between chunks", track: 1}
+        steps:
+          - {at: 0, chunk: 0, caption: "A 64-character window takes the first chunk."}
+          - {at: 1, when: ov, chunk: 1, caption: "The window slides forward 44 characters, so 20 characters repeat (striped)."}
+          - {at: 1, when: "!ov", chunk: 1, tone: bad, caption: "Without overlap the window jumps a full 64. Half a sentence here, half in the next chunk."}
+          - {at: 2, chunk: 2, caption: "Each chunk shares its edge with the one before it when overlap is on."}
+          - {at: 3, when: ov, chunk: 3, caption: "Overlap means more chunks for the same text."}
+          - {at: 4, when: ov, chunk: all, tone: good, caption: "4 chunks that share their edges. Ready to embed."}
+          - {at: 4, when: "!ov", chunk: all, tone: bad, caption: "3 chunks, with sentences split at the edges. Retrieval may find only half a fact."}
+    points:
+      - {title: Step is size minus overlap, text: "That's how far the window moves each time.", step: 1}
+      - {title: Overlap adds chunks, text: "More overlap means more, slightly redundant chunks.", step: 3}
+      - {title: Overlap protects edges, text: "A fact cut at one edge is whole in the neighbour.", step: 4}
+      - {title: Tune with a test set, text: "Try 2–3 settings and measure which finds the right chunk most often."}
+    words:
+      - [Overlap, Text repeated between neighbouring chunks.]
+      - [Step, How far the chunk window moves each time.]
+    code:
+      file: overlap.py
+      source: |
+        def chunk(text, size, overlap):
+            out, start = [], 0
+            while start < len(text):
+                out.append(text[start:start + size])
+                start += size - overlap
+            return out
+
+        doc = "abcdefghijklmnopqrstuvwxyz"
+        print(chunk(doc, 10, 0))
+        print(chunk(doc, 10, 3))
+      notes:
+        1: ["Cut text into chunks of size, sharing overlap characters.", "Sliding window."]
+        3: ["Keep going until the end.", "Loop over the text."]
+        4: ["Take one chunk.", "Slice."]
+        5: ["Move forward by size minus overlap.", "Step = size − overlap."]
+        9: ["No overlap: 3 chunks.", "Disjoint."]
+        10: ["Overlap 3: 4 chunks, each starting with the last 3 letters of the previous.", "Overlapping windows."]
+    checks:
+      - id: more-chunks
+        type: predict
+        prompt: "Raise overlap from 0 to 60 characters. What happens to the number of chunks?"
+        options: ["It goes up", "It goes down", "It stays the same"]
+        answer: 0
+        explain: "Each step is shorter (size − overlap), so it takes more steps to cover the text."
+      - id: overlap-bug
+        type: debug
+        prompt: "This chunker should repeat overlap characters between chunks, but it never does. Tap the buggy line."
+        code: |
+          def chunk(text, size, overlap):
+              out, start = [], 0
+              while start < len(text):
+                  out.append(text[start:start + size])
+                  start += size
+              return out
+        answer: 5
+        explain: "It should be start += size - overlap. Moving a full size skips the overlap."
+        hint: "Look at how far start moves each time."
+      - id: tune
+        type: mcq
+        prompt: "How should you pick chunk size?"
+        options: ["Copy a blog post's number", "Test a few sizes on real questions and measure", "Always 1,000"]
+        answer: 1
+        explain: "Measure on your own data."
+    lab: lab-chunking
+
+- slug: embedding-generation
+  title: Embedding generation at scale
+  summary: Embed thousands of chunks efficiently with batching, retries and caching.
+  minutes: 7
+  body:
+    objectives:
+      - Batch embedding requests
+      - Avoid re-embedding unchanged chunks
+      - Handle failures with retries
+    intro: >-
+      Embedding a few chunks is one call. Embedding 100,000 means batching requests, retrying the
+      ones that fail, and skipping chunks you've already embedded, or you'll waste hours and money.
+    intro_eng: >-
+      Batch to the provider's limits, respect rate limits with exponential backoff, key a cache by
+      (model, content hash), and store the model name with each vector so re-embeds are traceable.
+    scenes:
+      - engine: meter
+        title: One at a time versus batched
+        track: [One by one, Batched, Cached]
+        gauges:
+          - {label: Time for 10k chunks, max: 3000, format: num, color: l1}
+          - {label: API calls, max: 10000, format: num, color: l2}
+        steps:
+          - {at: 0, values: [2800, 10000], log: "10,000 calls, one chunk each (seconds)", tone: bad, caption: "One request per chunk: 10,000 round trips."}
+          - {at: 1, values: [140, 100], log: "100 calls of 100 chunks", caption: "Batches of 100: the same work in a fraction of the time."}
+          - {at: 2, values: [14, 10], log: "Only the 1,000 changed chunks re-embedded", tone: good, caption: "With a cache keyed by content hash, unchanged chunks are skipped entirely."}
+    points:
+      - {title: Batch requests, text: "Send many chunks per call.", step: 1}
+      - {title: Cache by content, text: "If the text and model haven't changed, reuse the vector.", step: 2}
+      - {title: Retry politely, text: "Back off and retry on rate-limit errors instead of failing the whole job."}
+    words:
+      - [Batch, Many items sent in one request.]
+      - [Backoff, Waiting longer after each failed retry.]
+    code:
+      file: batches.py
+      source: |
+        import hashlib
+
+        def batches(items, size):
+            for i in range(0, len(items), size):
+                yield items[i:i + size]
+
+        cache = {}
+        chunks = [f"chunk {n}" for n in range(7)]
+        for group in batches(chunks, 3):
+            todo = [c for c in group if hashlib.sha256(c.encode()).hexdigest() not in cache]
+            for c in todo:
+                cache[hashlib.sha256(c.encode()).hexdigest()] = [0.0]  # stand-in for a real embedding
+            print(len(group), "in batch,", len(todo), "embedded")
+      notes:
+        3: ["Split a list into groups of size.", "Generator for batching."]
+        7: ["Remember what we've already embedded.", "Cache keyed by content hash."]
+        9: ["Process one batch at a time.", "Iterate batches."]
+        10: ["Skip chunks whose content we've seen.", "Hash lookup."]
+        12: ["Pretend to embed (no real model here).", "Placeholder vector."]
+    checks:
+      - id: why-batch
+        type: mcq
+        prompt: "Why batch embedding calls?"
+        options: ["Better embeddings", "Far fewer round trips, so much faster", "It's required"]
+        answer: 1
+        explain: "Network round trips dominate when you send one chunk at a time."
+      - id: cache-key
+        type: predict
+        prompt: "You switch to a new embedding model. Should you reuse cached vectors?"
+        options: ["Yes, the text didn't change", "No, re-embed: vectors from different models don't match"]
+        answer: 1
+        explain: "The cache key must include the model."
+
+- slug: vector-storage
+  title: Storing vectors with their text
+  summary: Store each chunk's vector, text and metadata together, with stable IDs.
+  minutes: 6
+  body:
+    objectives:
+      - Design a chunk record
+      - Use stable IDs for updates and deletes
+    intro: >-
+      Each stored chunk needs a stable ID, its vector, its text and metadata. Stable IDs (like
+      file + chunk number) let you update or delete exactly the right rows when a document changes.
+    intro_eng: >-
+      Deterministic IDs (e.g. hash(source, chunk_index)) enable idempotent upserts. Store the
+      embedding model and version alongside vectors.
+    scenes:
+      - engine: graph
+        title: Updating one document
+        track: [Old rows, Change, Delete, Insert]
+        nodes:
+          f: {x: 60, y: 120, label: leave.pdf}
+          c1: {x: 220, y: 60, label: "leave.pdf#0"}
+          c2: {x: 220, y: 120, label: "leave.pdf#1"}
+          c3: {x: 220, y: 180, label: "leave.pdf#2"}
+          n: {x: 370, y: 120, label: new version}
+        edges: [[f, c1], [f, c2], [f, c3], [f, n]]
+        steps:
+          - {at: 0, node: f, state: {rows: 3, version: 1}, caption: "leave.pdf is stored as 3 chunks with IDs leave.pdf#0, #1, #2."}
+          - {at: 1, node: n, edge: f-n, state: {rows: 3, version: 2}, caption: "HR uploads a new version."}
+          - {at: 2, node: c2, dim: [c1, c2, c3], state: {rows: 0, version: 2}, caption: "Because IDs are stable, all old chunks for this file are found and deleted."}
+          - {at: 3, node: c1, state: {rows: 3, version: 2}, tone: good, caption: "New chunks are inserted. No stale duplicates remain."}
+    points:
+      - {title: Stable IDs, text: "Build IDs from the source and chunk number.", step: 0}
+      - {title: Replace, don't duplicate, text: "On update, delete old chunks for that source first.", step: 2}
+      - {title: Store the model name, text: "So you know which vectors to re-embed when you change models."}
+    words:
+      - [Stable ID, An ID that stays the same for the same piece of content.]
+    checks:
+      - id: dupes
+        type: predict
+        prompt: "You re-ingest an updated PDF without deleting its old chunks. What happens in search?"
+        options: ["Only new text is found", "Old and new versions both show up", "Nothing"]
+        answer: 1
+        explain: "Stale duplicates compete with the current text."
+      - id: id-choice
+        type: mcq
+        prompt: "Best chunk ID?"
+        options: ["A random number each time", "source + chunk number", "The chunk's first word"]
+        answer: 1
+        explain: "Stable and unique."
+
+- slug: dense-retrieval
+  title: Dense retrieval
+  summary: Retrieval by embedding similarity, great for meaning, weaker for exact terms.
+  minutes: 7
+  body:
+    objectives:
+      - Explain dense retrieval's strengths and weaknesses
+      - Recognise queries it struggles with
+    intro: >-
+      Dense retrieval is search by embedding similarity. It's excellent when people describe things
+      in their own words. It's weaker for exact strings: product codes, error numbers, rare names.
+    intro_eng: >-
+      Dense retrievers generalise across paraphrase but compress rare tokens; out-of-domain jargon
+      and identifiers often need sparse (lexical) signals.
+    scenes:
+      - engine: bars
+        title: Dense retrieval on two kinds of question
+        track: [Paraphrase, Exact code]
+        format: num
+        max: 1
+        steps:
+          - {at: 0, text: "query: how do I get my money back", bars: [["Refund policy", 0.89], ["Shipping times", 0.31], ["Error E-4402 fix", 0.22]], pick: 0, tone: good, caption: "Different words, right answer. Dense retrieval shines."}
+          - {at: 1, text: "query: E-4402", bars: [["Error E-4417 fix", 0.74], ["Error E-4402 fix", 0.72], ["Refund policy", 0.18]], pick: 0, tone: bad, caption: "Exact codes look alike as vectors. The wrong error page wins."}
+    points:
+      - {title: Great at paraphrase, text: "Finds meaning in different words.", step: 0}
+      - {title: Weak on exact strings, text: "Codes, IDs and rare names blur together.", step: 1}
+      - {title: Fix with hybrid search, text: "Add keyword search for exact terms (two topics ahead)."}
+    words:
+      - [Dense, Uses embedding vectors (every number filled in).]
+    checks:
+      - id: weak
+        type: mcq
+        prompt: "Which query is dense retrieval most likely to get wrong?"
+        options: ["how do I reset my password", "error code PX-0091", "tips for better sleep"]
+        answer: 1
+        explain: "Exact identifiers need lexical matching."
+      - id: strength
+        type: predict
+        prompt: "User types 'my parcel never came'. The doc is titled 'Lost delivery claims'. Dense retrieval…"
+        options: ["Probably finds it", "Can't find it: no shared words"]
+        answer: 0
+        explain: "Meaning matches even without shared words."
+
+- slug: sparse-retrieval-bm25
+  title: Sparse retrieval (BM25)
+  summary: Keyword scoring that rewards rare matching words and works well for exact terms.
+  minutes: 9
+  body:
+    objectives:
+      - Explain term frequency and inverse document frequency
+      - Compute a simple keyword score
+      - Know where BM25 beats embeddings
+    intro: >-
+      BM25 is classic keyword search, tuned well. A document scores higher when it contains the
+      query's words, especially rare words. 'E-4402' is rare, so a document that contains it
+      exactly scores very high.
+    intro_eng: >-
+      BM25 combines term frequency with saturation (k1), inverse document frequency, and length
+      normalisation (b). It's a strong baseline and complementary to dense retrieval.
+    scenes:
+      - engine: bars
+        title: Keyword scores for "error E-4402 printer"
+        track: [Common words, Rare word, Ranked]
+        format: num
+        max: 8
+        steps:
+          - {at: 0, text: "query: error E-4402 printer", bars: [["Error E-4417 fix", 1.2], ["Error E-4402 fix", 1.2], ["Printer setup guide", 1.0]], caption: "'error' and 'printer' are common, so matching them adds only a little."}
+          - {at: 1, text: "query: error E-4402 printer", bars: [["Error E-4417 fix", 1.2], ["Error E-4402 fix", 7.4], ["Printer setup guide", 1.0]], caption: "'E-4402' is rare across the collection, so the document containing it gets a big boost."}
+          - {at: 2, text: "query: error E-4402 printer", bars: [["Error E-4402 fix", 7.4], ["Error E-4417 fix", 1.2], ["Printer setup guide", 1.0]], pick: 0, tone: good, caption: "The exact match wins clearly. That's BM25's strength."}
+    points:
+      - {title: Matches words, text: "No understanding of meaning, just words.", step: 0}
+      - {title: Rare words count more, text: "That's inverse document frequency.", step: 1}
+      - {title: Great for exact terms, text: "Codes, names, jargon.", step: 2}
+    words:
+      - [BM25, A keyword relevance score used in search engines.]
+      - [IDF, "Inverse document frequency: how rare a word is."]
+    code:
+      file: keyword_score.py
+      source: |
+        import math
+
+        docs = ["error E-4417 fix", "error E-4402 fix", "printer setup guide"]
+
+        def idf(word):
+            n = sum(1 for d in docs if word in d.lower().split())
+            return math.log((len(docs) + 1) / (n + 1)) + 1
+
+        def score(query, doc):
+            words = doc.lower().split()
+            return round(sum(idf(w) for w in query.lower().split() if w in words), 2)
+
+        for d in docs:
+            print(d, "→", score("error E-4402 printer", d))
+      notes:
+        5: ["How rare is a word across all documents?", "Smoothed IDF."]
+        6: ["Count documents containing it.", "Document frequency."]
+        7: ["Rare words get a bigger number.", "log((N+1)/(df+1)) + 1."]
+        9: ["Score a document for a query.", "Simplified BM25 (no TF saturation or length norm)."]
+        11: ["Add up IDF for every query word the document contains.", "Lexical match sum."]
+        14: ["The doc with the rare code wins.", "Ranking."]
+    checks:
+      - id: rare
+        type: predict
+        prompt: "Which query word adds most to a BM25 score?"
+        options: ["the", "printer", "E-4402"]
+        answer: 2
+        explain: "The rarest word carries the most weight."
+      - id: when-bm25
+        type: mcq
+        prompt: "Where does BM25 beat dense retrieval?"
+        options: ["Paraphrased questions", "Exact codes and names", "Questions in another language"]
+        answer: 1
+        explain: "Exact lexical matches are BM25's home ground."
+
+- slug: hybrid-search
+  title: Hybrid search
+  summary: Combine dense and keyword scores to get the best of both.
+  minutes: 8
+  body:
+    objectives:
+      - Explain why hybrid beats either alone
+      - Merge rankings with reciprocal rank fusion
+    intro: >-
+      Dense retrieval understands meaning; BM25 nails exact words. Hybrid search runs both and
+      merges the results, so 'my parcel never came' and 'error E-4402' both work.
+    intro_eng: >-
+      Fuse with weighted score normalisation or reciprocal rank fusion: RRF(d) = Σ 1/(k + rank_i(d)),
+      robust because it ignores incomparable raw scores.
+    scenes:
+      - engine: bars
+        title: Two rankings become one
+        track: [Dense, Keyword, Fused]
+        format: num
+        max: 0.04
+        steps:
+          - {at: 0, text: "query: printer error E-4402", bars: [["E-4417 fix", 0.0164], ["Printer guide", 0.0161], ["E-4402 fix", 0.0159]], caption: "Dense ranks the similar-looking E-4417 page first."}
+          - {at: 1, text: "query: printer error E-4402", bars: [["E-4402 fix", 0.0164], ["E-4417 fix", 0.0161], ["Printer guide", 0.0159]], caption: "Keyword search puts the exact E-4402 page first."}
+          - {at: 2, text: "query: printer error E-4402", bars: [["E-4417 fix", 0.0325], ["E-4402 fix", 0.0323], ["Printer guide", 0.0320]], caption: "Fusion adds 1/(60 + rank) from each list. With equal weight it is a near tie; giving keyword search a bit more weight puts the exact E-4402 page first."}
+    points:
+      - {title: Run both searches, text: "Dense for meaning, keyword for exact words.", step: 0}
+      - {title: Merge by rank, text: "Reciprocal rank fusion adds 1/(60 + rank) from each list.", step: 2}
+      - {title: Tune the balance, text: "Weight keyword higher if your users search by codes and names."}
+    words:
+      - [Hybrid search, Combining keyword and vector search.]
+      - [RRF, "Reciprocal rank fusion: a way to merge rankings."]
+    code:
+      file: rrf.py
+      source: |
+        dense = ["E-4417 fix", "Printer guide", "E-4402 fix"]
+        keyword = ["E-4402 fix", "E-4417 fix", "Printer guide"]
+
+        def rrf(*rankings, k=60):
+            scores = {}
+            for ranking in rankings:
+                for rank, doc in enumerate(ranking, start=1):
+                    scores[doc] = scores.get(doc, 0) + 1 / (k + rank)
+            return sorted(scores, key=scores.get, reverse=True)
+
+        print(rrf(dense, keyword))
+        print(rrf(dense, keyword, keyword))
+      notes:
+        1: ["Results from vector search, best first.", "Dense ranking."]
+        2: ["Results from keyword search.", "Sparse ranking."]
+        4: ["Merge any number of rankings.", "Reciprocal rank fusion."]
+        7: ["Each list gives 1 / (60 + position).", "Higher rank, bigger contribution."]
+        11: ["Equal weight: E-4417 just edges it.", "Fused."]
+        12: ["Count keyword twice (more weight): E-4402 wins.", "Weighted fusion via repetition."]
+    checks:
+      - id: why-hybrid
+        type: mcq
+        prompt: "Why use hybrid search?"
+        options: ["It's cheaper", "It handles both paraphrases and exact terms", "It needs no embeddings"]
+        answer: 1
+        explain: "Each method covers the other's weak spot."
+      - id: rrf-fill
+        type: fill
+        prompt: "Complete reciprocal rank fusion."
+        code: |
+          scores[doc] = scores.get(doc, 0) + 1 / (k ____ rank)
+        options: ["+", "*", "-"]
+        answer: "+"
+        explain: "Each list contributes 1/(k + rank)."
+
+- slug: metadata-retrieval
+  title: Metadata-based retrieval
+  summary: Use filters and boosts from metadata to keep results correct and fresh.
+  minutes: 6
+  body:
+    objectives:
+      - Combine filters with retrieval
+      - Boost recent documents
+    intro: >-
+      Metadata makes retrieval smarter: only this department, only this language, prefer recent
+      documents. Filters remove; boosts reorder.
+    intro_eng: >-
+      Apply mandatory filters (tenant, access, language) as pre-filters; apply soft preferences
+      (recency, authority) as score boosts after retrieval.
+    scenes:
+      - engine: bars
+        title: Boosting fresher documents
+        track: [Similarity only, With recency boost]
+        format: num
+        max: 1
+        steps:
+          - {at: 0, text: "query: work from home rules", bars: [["WFH policy 2021", 0.84], ["WFH policy 2025", 0.82], ["Office map", 0.30]], pick: 0, tone: bad, caption: "Pure similarity prefers the outdated 2021 policy."}
+          - {at: 1, text: "query: work from home rules", bars: [["WFH policy 2025", 0.90], ["WFH policy 2021", 0.76], ["Office map", 0.27]], pick: 0, tone: good, caption: "A small recency boost lifts the current policy to the top."}
+    points:
+      - {title: Filters remove, text: "Hard rules: tenant, permissions, language.", step: 0}
+      - {title: Boosts reorder, text: "Soft preferences: newer, more official.", step: 1}
+      - {title: Keep metadata clean, text: "Wrong dates or missing tags break both."}
+    words:
+      - [Boost, A score bonus for preferred results.]
+    checks:
+      - id: filter-or-boost
+        type: mcq
+        prompt: "'Prefer newer documents, but old ones are OK if nothing else matches.' Filter or boost?"
+        options: ["Filter", "Boost"]
+        answer: 1
+        explain: "It's a preference, not a rule."
+      - id: perm
+        type: mcq
+        prompt: "'Users must never see other teams' documents.' Filter or boost?"
+        options: ["Filter", "Boost"]
+        answer: 0
+        explain: "Permissions are hard rules."
+
+- slug: reranking
+  title: Reranking
+  summary: Re-score the top results with a slower, smarter model to put the best first.
+  minutes: 8
+  body:
+    objectives:
+      - Explain retrieve-then-rerank
+      - Know the cost trade-off
+    intro: >-
+      Fast retrieval finds 20–50 candidates. A reranker then reads the question and each
+      candidate together and scores how well it actually answers. It's slower, so it only
+      sees the shortlist.
+    intro_eng: >-
+      Cross-encoder rerankers jointly encode (query, passage) for higher precision than
+      bi-encoder similarity, at much higher cost per pair, hence two-stage retrieval.
+    scenes:
+      - engine: bars
+        title: Top 4 before and after reranking
+        track: [Retrieved, Reranked]
+        format: num
+        max: 1
+        steps:
+          - {at: 0, text: "query: can I carry casual leave forward?", bars: [["Casual leave is 12 days", 0.83], ["Leave types overview", 0.80], ["Casual leave can't be carried forward", 0.79], ["Holiday calendar", 0.61]], caption: "Vector search: the chunk that actually answers is only third."}
+          - {at: 1, text: "query: can I carry casual leave forward?", bars: [["Casual leave can't be carried forward", 0.97], ["Casual leave is 12 days", 0.42], ["Leave types overview", 0.31], ["Holiday calendar", 0.04]], pick: 0, tone: good, caption: "The reranker reads question and chunk together and puts the real answer first."}
+    points:
+      - {title: Two stages, text: "Fast search for a shortlist, smart reranker for order.", step: 0}
+      - {title: Reads question and text together, text: "That's why it's more accurate.", step: 1}
+      - {title: Costs time, text: "Rerank 20–50, not 10,000."}
+    words:
+      - [Reranker, A model that re-scores a shortlist for relevance.]
+    checks:
+      - id: why-rerank
+        type: mcq
+        prompt: "Why not rerank every document in the database?"
+        options: ["Rerankers are too slow and expensive per document", "They only work on short text", "They can't read numbers"]
+        answer: 0
+        explain: "They read every pair in full, so they only see a shortlist."
+      - id: rr-order
+        type: order
+        prompt: "Order a two-stage retrieval."
+        items: ["Embed the question", "Retrieve top 30 by similarity", "Rerank the 30", "Keep the top 4 as context"]
+        explain: "Fast retrieve, then rerank, then keep the best."
+
+- slug: context-construction
+  title: Context construction
+  summary: Order, label and trim retrieved chunks into a prompt the model can use well.
+  minutes: 7
+  body:
+    objectives:
+      - Format chunks with source labels
+      - Stay within a token budget
+      - Order chunks deliberately
+    intro: >-
+      Retrieved chunks have to be packed into the prompt. Label each with its source, put the
+      best first, remove duplicates, and stop before the token budget runs out.
+    intro_eng: >-
+      Deduplicate, order by relevance (or document order for narrative coherence), label with
+      citation IDs, and truncate to a budget that leaves room for instructions and the answer.
+    scenes:
+      - engine: tokens
+        title: Packing context with labels
+        track: [Chunks, Label, Budget, Final]
+        capacity: 24
+        roles:
+          rule: {label: instructions, color: l5}
+          c1: {label: "[1] section 4", color: l3}
+          c2: {label: "[2] section 7", color: l4}
+          dup: {label: duplicate, color: l1}
+        steps:
+          - {at: 0, cells: [{role: rule, w: "Answer|from|sources|.|Cite|[n]"}], caption: "Start with instructions."}
+          - {at: 1, cells: [{role: rule, w: "Answer|from|sources|.|Cite|[n]"}, {role: c1, w: "[1]|Casual|leave|is|12|days"}], caption: "Add the best chunk with a label the model can cite."}
+          - {at: 2, cells: [{role: rule, w: "Answer|from|sources|.|Cite|[n]"}, {role: c1, w: "[1]|Casual|leave|is|12|days"}, {role: c2, w: "[2]|No|carry|forward"}], extra: [{role: dup, w: "[3]|Casual|leave|is|12|days"}], extra_label: "duplicate, dropped", extra_tone: gone, caption: "A duplicate chunk is dropped instead of wasting space."}
+          - {at: 3, cells: [{role: rule, w: "Answer|from|sources|.|Cite|[n]"}, {role: c1, w: "[1]|Casual|leave|is|12|days"}, {role: c2, w: "[2]|No|carry|forward"}], tone: good, caption: "Labelled, deduplicated and within budget, with room left for the answer."}
+    points:
+      - {title: Label sources, text: "Number each chunk so the answer can cite [1], [2].", step: 1}
+      - {title: Remove duplicates, text: "Overlap often retrieves near-identical chunks.", step: 2}
+      - {title: Leave room, text: "Keep space for the question and the answer.", step: 3}
+    words:
+      - [Citation marker, "A label like [1] that points to a source."]
+    code:
+      file: context.py
+      source: |
+        def build_context(chunks, budget):
+            seen, parts, used = set(), [], 0
+            for i, (text, source) in enumerate(chunks, start=1):
+                if text in seen:
+                    continue
+                cost = len(text.split())
+                if used + cost > budget:
+                    break
+                seen.add(text)
+                parts.append(f"[{i}] ({source}) {text}")
+                used += cost
+            return "\n".join(parts)
+
+        chunks = [("Casual leave is 12 days", "s4"), ("No carry forward", "s4"), ("Casual leave is 12 days", "s4")]
+        print(build_context(chunks, 20))
+      notes:
+        1: ["Build the context block from ranked chunks.", "Dedup + label + budget."]
+        3: ["Number chunks from 1.", "enumerate with start=1."]
+        4: ["Skip exact duplicates.", "Set membership."]
+        6: ["Estimate its cost in words.", "Token proxy."]
+        7: ["Stop when the budget is used up.", "Budget check."]
+        10: ["Label it with a number and source.", "Citation formatting."]
+    checks:
+      - id: why-label
+        type: mcq
+        prompt: "Why number chunks like [1], [2] in the context?"
+        options: ["It looks tidy", "So the answer can cite exactly which source it used", "Models require it"]
+        answer: 1
+        explain: "Citations make answers verifiable."
+      - id: budget
+        type: predict
+        prompt: "You fill the whole window with chunks. What goes wrong?"
+        options: ["Nothing", "No room for the answer, and it may get cut off", "Search gets slower"]
+        answer: 1
+        explain: "The answer shares the same window."
+
+- slug: response-generation
+  title: Response generation
+  summary: Prompt the model to answer only from context, cite sources and admit when it doesn't know.
+  minutes: 7
+  body:
+    objectives:
+      - Write a grounded answer prompt
+      - Handle 'not in the documents' gracefully
+    intro: >-
+      The final prompt tells the model three things: answer only from the provided sources, cite
+      them, and say "I couldn't find that in the documents" when the answer isn't there.
+    intro_eng: >-
+      Grounded generation prompt: explicit source-only instruction, citation format, abstention
+      rule, and output schema. Validate citations reference provided chunk IDs.
+    scenes:
+      - engine: flow
+        title: Answering, and knowing when not to
+        track: [Context, Found, Not found]
+        actors:
+          - {id: ctx, label: Context, icon: doc, x: 14, y: 60}
+          - {id: llm, label: LLM, icon: cpu, x: 50, y: 60}
+          - {id: user, label: User, icon: person, x: 86, y: 60}
+        switches:
+          - {id: found, label: Answer is in the documents, label_on: "ON · the policy covers it", label_off: "OFF · not covered", track: 1}
+        steps:
+          - {at: 0, from: ctx, to: llm, packet: "[1] Casual leave is 12 days", tone: ask, caption: "The model gets labelled sources and strict instructions."}
+          - {at: 1, when: found, from: llm, to: user, packet: "12 days a year [1]", tone: good, caption: "It answers and cites [1]."}
+          - {at: 2, when: "!found", from: llm, to: user, packet: "Not in the documents", tone: good, caption: "The documents don't say, so it says so instead of guessing. That's the right behaviour."}
+    points:
+      - {title: Sources only, text: "Tell the model not to use outside knowledge.", step: 0}
+      - {title: Cite, text: "Ask for [n] after each claim.", step: 1}
+      - {title: Abstain, text: "'I couldn't find that' beats a confident guess.", step: 2}
+    words:
+      - [Abstain, Decline to answer when evidence is missing.]
+    checks:
+      - id: abstain
+        type: mcq
+        prompt: "The answer isn't in the retrieved chunks. Best behaviour?"
+        options: ["Guess from general knowledge", "Say it couldn't find it in the documents", "Return the first chunk"]
+        answer: 1
+        explain: "Honest abstention protects users from wrong answers."
+      - id: verify-cite
+        type: predict
+        prompt: "The model cites [5], but only [1]–[3] were provided. What should your code do?"
+        options: ["Show it anyway", "Flag or retry: the citation is invalid"]
+        answer: 1
+        explain: "Validate citations against the chunks you actually sent."
+
+- slug: rag-evaluation
+  title: RAG evaluation
+  summary: Measure retrieval and answers separately, on a fixed test set.
+  minutes: 8
+  body:
+    objectives:
+      - Build a small RAG test set
+      - Separate retrieval errors from generation errors
+    intro: >-
+      When a RAG answer is wrong, either retrieval missed the right chunk or the model misused
+      it. Test them separately: did the right chunk come back? Was the answer correct and faithful
+      to it?
+    intro_eng: >-
+      Evaluate retrieval (hit rate/recall@k, MRR) and generation (correctness, faithfulness,
+      answer relevance) on a versioned question set with reference answers and source chunks.
+    scenes:
+      - engine: meter
+        title: Where do the failures come from?
+        track: [Test set, Retrieval, Answers, Diagnosis]
+        gauges:
+          - {label: Right chunk found, max: 100, format: pct, color: l4}
+          - {label: Answer correct, max: 100, format: pct, color: l3}
+          - {label: Wrong but faithful, max: 100, format: pct, color: l1}
+        steps:
+          - {at: 0, values: [0, 0, 0], log: "50 questions with known answers and source chunks", caption: "A test set: questions, correct answers, and which chunk contains each."}
+          - {at: 1, values: [72, 0, 0], log: "Right chunk in top 4 for 36 of 50", caption: "Retrieval finds the right chunk 72% of the time."}
+          - {at: 2, values: [72, 68, 0], log: "34 of 50 answers correct", caption: "Answers are correct 68% of the time."}
+          - {at: 3, values: [72, 68, 24], log: "Most failures: the right chunk wasn't retrieved", tone: good, caption: "Most wrong answers came from missed retrieval, so fix retrieval first."}
+    points:
+      - {title: Build a test set, text: "Questions, right answers, and the source chunk for each.", step: 0}
+      - {title: Score retrieval, text: "Was the right chunk in the top k?", step: 1}
+      - {title: Score answers, text: "Correct? Supported by the chunks?", step: 2}
+      - {title: Fix the bigger leak first, text: "Usually retrieval.", step: 3}
+    words:
+      - [Hit rate, How often the right chunk is retrieved.]
+      - [Faithfulness, Whether the answer is supported by the context.]
+    checks:
+      - id: diagnose
+        type: predict
+        prompt: "The right chunk is retrieved 95% of the time, but answers are right only 60%. Where's the problem?"
+        options: ["Retrieval", "Generation (prompt or model)", "The test set"]
+        answer: 1
+        explain: "Retrieval is fine; the model isn't using the context well."
+      - id: test-set
+        type: multi
+        prompt: "What should each test item contain? Pick all that apply."
+        options: ["The question", "The correct answer", "Which chunk holds the answer", "The user's email"]
+        answer: [0, 1, 2]
+        explain: "Enough to score both retrieval and generation."
+
+- slug: ragas-metrics
+  title: RAGAS and evaluation metrics
+  summary: Faithfulness, answer relevancy, context precision and recall, scored automatically.
+  minutes: 8
+  body:
+    objectives:
+      - Define four common RAG metrics
+      - Read an evaluation report
+    intro: >-
+      RAGAS is a popular library that scores RAG systems automatically. Its main metrics ask:
+      is the answer supported by the context (faithfulness)? Does it address the question
+      (answer relevancy)? Is the retrieved context relevant (precision) and complete (recall)?
+    intro_eng: >-
+      Many RAGAS metrics use an LLM as a judge, so scores are noisy estimates: fix the judge model,
+      run on enough samples, and track deltas between versions rather than absolute values.
+    scenes:
+      - engine: meter
+        title: An evaluation report
+        track: [Faithfulness, Relevancy, Precision, Recall]
+        gauges:
+          - {label: Faithfulness, max: 1, format: num, color: l3}
+          - {label: Answer relevancy, max: 1, format: num, color: l4}
+          - {label: Context precision, max: 1, format: num, color: l2}
+          - {label: Context recall, max: 1, format: num, color: l1}
+        steps:
+          - {at: 0, values: [0.91, 0, 0, 0], log: "Are answers supported by the context?", caption: "Faithfulness 0.91: answers mostly stick to the sources."}
+          - {at: 1, values: [0.91, 0.88, 0, 0], log: "Do answers address the question?", caption: "Answer relevancy 0.88: answers are on topic."}
+          - {at: 2, values: [0.91, 0.88, 0.62, 0], log: "Is retrieved context relevant?", tone: bad, caption: "Context precision 0.62: lots of irrelevant chunks get retrieved."}
+          - {at: 3, values: [0.91, 0.88, 0.62, 0.79], log: "Is needed context retrieved?", caption: "Context recall 0.79. Fix precision first: try reranking."}
+    points:
+      - {title: Faithfulness, text: "Every claim in the answer is supported by the context.", step: 0}
+      - {title: Answer relevancy, text: "The answer actually addresses the question.", step: 1}
+      - {title: Context precision, text: "Retrieved chunks are relevant.", step: 2}
+      - {title: Context recall, text: "Everything needed was retrieved.", step: 3}
+    words:
+      - [RAGAS, A library for automatic RAG evaluation.]
+      - [LLM judge, Using a model to grade another model's output.]
+    checks:
+      - id: metric-match
+        type: mcq
+        prompt: "The answer includes a claim that isn't in any retrieved chunk. Which metric drops?"
+        options: ["Context recall", "Faithfulness", "Answer relevancy"]
+        answer: 1
+        explain: "Unsupported claims lower faithfulness."
+      - id: low-precision
+        type: predict
+        prompt: "Context precision is low. Which fix helps most?"
+        options: ["Higher temperature", "Reranking or better filters", "Longer answers"]
+        answer: 1
+        explain: "Precision is about retrieving fewer irrelevant chunks."
+
+- slug: rag-optimisation
+  title: Retrieval and generation optimisation
+  summary: Change one thing at a time and keep what the metrics prove.
+  minutes: 7
+  body:
+    objectives:
+      - List the main tuning knobs
+      - Run a one-change-at-a-time experiment
+    intro: >-
+      RAG has many knobs: chunk size, overlap, embedding model, k, hybrid weights, reranking,
+      prompt wording. Change one, re-run the test set, keep it only if the numbers improve.
+    intro_eng: >-
+      Maintain an experiment log keyed by config hash; optimise retrieval metrics before
+      generation; watch latency and cost alongside quality.
+    scenes:
+      - engine: meter
+        title: Three experiments
+        track: [Baseline, Smaller chunks, Add reranker, Keep]
+        gauges:
+          - {label: Answer correct, max: 100, format: pct, color: l3}
+          - {label: Wait time, max: 3000, format: ms, color: l1}
+        steps:
+          - {at: 0, values: [68, 1200], log: "Baseline: 800-char chunks, k=4", caption: "Start with a baseline on the fixed test set."}
+          - {at: 1, values: [74, 1150], log: "Change 1: 400-char chunks", caption: "Smaller chunks: +6 points. Keep."}
+          - {at: 2, values: [83, 1650], log: "Change 2: add reranker", caption: "Reranker: +9 points, +500 ms. Worth it for this app."}
+          - {at: 3, values: [83, 1650], log: "Both changes kept, logged with numbers", tone: good, caption: "Every kept change has evidence behind it."}
+    points:
+      - {title: One change at a time, text: "Otherwise you can't tell what helped.", step: 1}
+      - {title: Retrieval first, text: "Answers can't use chunks that weren't found."}
+      - {title: Watch cost and speed, text: "A better score that doubles latency may not be worth it.", step: 2}
+    words:
+      - [Baseline, The starting score you compare against.]
+    checks:
+      - id: knob
+        type: multi
+        prompt: "Which are RAG tuning knobs? Pick all that apply."
+        options: ["Chunk size", "Top-k", "Reranking", "Screen brightness"]
+        answer: [0, 1, 2]
+        explain: "Everything in the pipeline except the user's screen."
+      - id: method
+        type: mcq
+        prompt: "You changed chunk size and the reranker together; the score rose. Next step?"
+        options: ["Ship it", "Test each change on its own to know what helped", "Change three more things"]
+        answer: 1
+        explain: "Isolate changes to learn."
+
+- slug: rag-tracing
+  title: Tracing and profiling RAG
+  summary: Record each step of every request so you can see what was retrieved and where time went.
+  minutes: 7
+  body:
+    objectives:
+      - Explain spans and traces
+      - Find the slow step in a request
+    intro: >-
+      A trace records each step of one request: embed, search, rerank, generate, with timings and
+      what each step saw. When a user reports a bad answer, the trace shows exactly which chunks
+      were retrieved and which step was slow.
+    intro_eng: >-
+      Each step is a span with start/end, inputs/outputs and attributes; spans nest into a trace.
+      OpenTelemetry-style tooling or LLM observability platforms collect and visualise them.
+    scenes:
+      - engine: graph
+        title: One slow request, step by step
+        track: [Request, Embed, Search, Rerank, Generate]
+        nodes:
+          r: {x: 50, y: 120, label: request}
+          e: {x: 140, y: 60, label: "embed 40ms"}
+          s: {x: 240, y: 60, label: "search 90ms"}
+          k: {x: 330, y: 120, label: "rerank 1900ms"}
+          g: {x: 240, y: 190, label: "generate 800ms"}
+        edges: [[r, e], [e, s], [s, k], [k, g]]
+        steps:
+          - {at: 0, node: r, state: {trace_id: "a91f", total_ms: 2830}, caption: "A user says the bot is slow. Open this request's trace."}
+          - {at: 1, node: e, edge: r-e, state: {embed_ms: 40}, caption: "Embedding: 40 ms. Fine."}
+          - {at: 2, node: s, edge: e-s, state: {embed_ms: 40, search_ms: 90, chunks: 50}, caption: "Search: 90 ms, but it returned 50 chunks."}
+          - {at: 3, node: k, edge: s-k, state: {embed_ms: 40, search_ms: 90, rerank_ms: 1900}, tone: bad, caption: "Reranking 50 chunks took 1.9 s. Here's the problem."}
+          - {at: 4, node: g, edge: k-g, state: {fix: "rerank top 20, not 50"}, tone: good, caption: "Fix: retrieve 20 instead of 50. The trace made it obvious."}
+    points:
+      - {title: A trace is one request's story, text: "Every step with timing and data.", step: 0}
+      - {title: Spans are steps, text: "Embed, search, rerank, generate.", step: 1}
+      - {title: Find the slow or wrong step, text: "No guessing.", step: 3}
+    words:
+      - [Trace, The record of one request through the system.]
+      - [Span, One timed step inside a trace.]
+    checks:
+      - id: debug-answer
+        type: mcq
+        prompt: "A user reports a wrong answer. What does the trace show you first?"
+        options: ["Which chunks were retrieved for that request", "The user's password", "Server CPU model"]
+        answer: 0
+        explain: "Seeing the retrieved chunks tells you whether retrieval or generation failed."
+      - id: trace-order
+        type: order
+        prompt: "Order the spans of a RAG request."
+        items: ["embed question", "vector search", "rerank", "generate answer"]
+        explain: "Same order as the pipeline."
+
+- slug: build-rag-app
+  title: Building a complete RAG application
+  summary: Put every piece together into an app you can run, test and explain.
+  minutes: 12
+  body:
+    objectives:
+      - Assemble ingestion, retrieval and generation
+      - Add evaluation and tracing hooks
+      - Plan the mission
+    intro: >-
+      A complete RAG app has two programs: an ingester that turns documents into stored chunks,
+      and an answerer that retrieves, builds context and generates with citations. Add a test
+      set and tracing from day one. That's your Level 4 mission.
+    intro_eng: >-
+      Minimal production shape: ingest CLI/job (load → clean → chunk → embed → upsert), query
+      service (retrieve → rerank → construct → generate → validate citations), eval script, traces.
+    scenes:
+      - engine: graph
+        title: Your Level 4 mission, piece by piece
+        track: [Ingest, Store, Retrieve, Answer, Evaluate]
+        nodes:
+          ing: {x: 60, y: 70, label: ingest.py}
+          db: {x: 200, y: 70, label: vector store}
+          ret: {x: 200, y: 180, label: retrieve()}
+          gen: {x: 340, y: 180, label: answer()}
+          ev: {x: 340, y: 70, label: eval.py}
+        edges: [[ing, db], [db, ret], [ret, gen], [gen, ev]]
+        steps:
+          - {at: 0, node: ing, state: {done: "load, clean, chunk"}, caption: "ingest.py loads, cleans and chunks your documents."}
+          - {at: 1, node: db, edge: ing-db, state: {done: "embed, store"}, caption: "Chunks are embedded and stored with metadata."}
+          - {at: 2, node: ret, edge: db-ret, state: {done: "top-k + filter"}, caption: "retrieve() finds the best chunks for a question."}
+          - {at: 3, node: gen, edge: ret-gen, state: {done: "grounded answer + citations"}, caption: "answer() builds context and generates a cited answer, or abstains."}
+          - {at: 4, node: ev, edge: gen-ev, state: {done: "test set + scores"}, tone: good, caption: "eval.py scores it on your test set. Ship with numbers."}
+    points:
+      - {title: Two programs, text: "Ingest offline, answer online.", step: 0}
+      - {title: Cite or abstain, text: "Every answer points to sources or says it can't find them.", step: 3}
+      - {title: Measure from day one, text: "A 15–20 question test set is enough to start.", step: 4}
+    words:
+      - [Pipeline, Steps that run in order, each feeding the next.]
+    checks:
+      - id: pieces
+        type: order
+        prompt: "Order building the app."
+        items: ["Ingest and chunk documents", "Embed and store", "Retrieve for a question", "Generate a cited answer", "Evaluate on a test set"]
+        explain: "Data in, retrieve, answer, measure."
+      - id: must
+        type: multi
+        prompt: "What must a good RAG answer include or do? Pick all that apply."
+        options: ["Cite its sources", "Say when it can't find the answer", "Use as many chunks as possible", "Stay grounded in the context"]
+        answer: [0, 1, 3]
+        explain: "More chunks isn't better; grounded, cited and honest is."
+
+project:
+  slug: ask-the-handbook
+  title: "Ask-the-handbook: a RAG app over your college rules"
+  body:
+    problem: >-
+      Students keep asking the same questions about attendance, exams and leave. Build an app that
+      answers from the official handbook PDF and shows which page it used.
+    requirements:
+      - "Ingest a real handbook or policy PDF (at least 15 pages) with page-level metadata"
+      - "Chunk with a strategy you justify, and store embeddings in a vector store"
+      - "Answer questions with citations to page numbers; abstain when the handbook doesn't say"
+      - "A test set of at least 20 questions with expected answers and pages, plus a scoring script"
+      - "A README explaining your chunk size, overlap and k with before/after numbers"
+    milestones:
+      - Load the PDF and split it into chunks
+      - Embed chunks and store them in a vector DB
+      - Answer a question using the top chunks
+      - Show the page number for every answer
+      - Write the test set, scoring script and README
+    rubric:
+      - {name: Answers from the document, points: 30, pass: "At least 16 of 20 test questions answered correctly"}
+      - {name: Shows its source, points: 20, pass: "Every answer cites a page"}
+      - {name: Says when it doesn't know, points: 20, pass: "Out-of-scope questions get 'not in the handbook'"}
+      - {name: Chunking choice explained, points: 15, pass: "README justifies size and overlap with numbers"}
+      - {name: Runs from the README, points: 15, pass: "A reviewer can run it in under 5 minutes"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."

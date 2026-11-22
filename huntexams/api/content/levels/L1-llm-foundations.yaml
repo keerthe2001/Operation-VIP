@@ -1,0 +1,760 @@
+number: 1
+slug: llm-foundations
+title: LLM Foundations
+summary: What a large language model is, how it reads text as tokens, and how it writes one token at a time.
+hours: 10
+topics:
+
+- slug: intro-to-llms
+  title: What is a large language model?
+  summary: A model that has read a huge amount of text and predicts what text comes next.
+  minutes: 7
+  body:
+    objectives:
+      - Explain what an LLM does in one sentence
+      - Say what "trained" means here
+      - Name two things LLMs are good at and one they're bad at
+    intro: >-
+      A large language model (LLM) is a program that has read a huge amount of text and learned
+      patterns in it. Give it some text and it predicts what should come next. Chat assistants,
+      code helpers and AI agents are all built on that one skill.
+    intro_eng: >-
+      An LLM is a transformer network trained with next-token prediction on a large corpus,
+      then usually tuned with instruction data and human feedback. At inference it maps a token
+      sequence to a probability distribution over the next token.
+    scenes:
+      - engine: flow
+        title: From your question to an answer
+        track: [Ask, Read, Predict, Answer]
+        actors:
+          - {id: you, label: You, icon: person, x: 12, y: 62}
+          - {id: model, label: LLM, icon: brain, x: 50, y: 62}
+          - {id: data, label: Training text, icon: doc, x: 50, y: 18}
+          - {id: out, label: Answer, icon: chat, x: 87, y: 62}
+        steps:
+          - {at: 0, from: you, to: model, packet: "Explain RAG simply", tone: ask, caption: "You type a question. To the model, it's just text to continue."}
+          - {at: 1, active: [data, model], notes: {data: "books, web, code", model: "learned patterns"}, caption: "Months before, the model read billions of sentences and adjusted itself to predict the next word well."}
+          - {at: 2, think: model, notes: {model: "next word: RAG…"}, caption: "Now it predicts the most fitting next word, adds it, and predicts again, word after word."}
+          - {at: 3, from: model, to: out, packet: "RAG finds facts first…", tone: good, caption: "The words stream out as an answer. It sounds sure, but it's a prediction, not a lookup."}
+    points:
+      - {title: It predicts the next piece of text, text: "Everything an LLM does comes from guessing what comes next, very well.", step: 2}
+      - {title: Training is reading at huge scale, text: "It learned patterns from books, websites and code before you ever used it.", eng: "Pre-training minimises next-token cross-entropy over trillions of tokens.", step: 1}
+      - {title: It doesn't look things up, text: "Without tools it answers from memory of patterns, so it can be confidently wrong.", step: 3}
+      - {title: Agents add tools and memory, text: "The rest of this route teaches you to give LLMs facts (RAG) and actions (tools).", step: 0}
+    words:
+      - [LLM, "Large language model: a model trained to predict text."]
+      - [Training, The long reading phase where the model learns patterns.]
+      - [Inference, "Using the trained model to produce an answer."]
+      - [Hallucination, A confident answer that is false.]
+    code:
+      file: tiny_model.py
+      source: |
+        # A toy "language model": it only knows which word followed which.
+        seen = {
+            "good": ["morning", "morning", "night"],
+            "morning": ["tea", "walk"],
+        }
+
+        def predict_next(word):
+            options = seen.get(word, [])
+            if not options:
+                return "?"
+            return max(set(options), key=options.count)
+
+        print(predict_next("good"))
+        print(predict_next("hello"))
+      notes:
+        1: ["A comment: Python ignores lines starting with #.", "Comment."]
+        2: ["What our toy model 'read': after good came morning twice and night once.", "A bigram table stored as dict of lists."]
+        7: ["A function that guesses the next word.", "Prediction function over the table."]
+        8: ["Look up what followed this word before.", "dict.get with default for unseen words."]
+        9: ["Never seen this word? It has no idea.", "Out-of-vocabulary handling."]
+        11: ["Pick the word that followed most often.", "argmax over counts, i.e. greedy decoding."]
+        13: ["good → morning, because that happened most.", "Most frequent continuation."]
+        14: ["hello was never seen, so it returns ?", "Real LLMs never return '?': they always produce something, which is why they can hallucinate."]
+    checks:
+      - id: core-skill
+        type: mcq
+        prompt: "What is the one core skill an LLM is trained for?"
+        options: ["Searching the internet", "Predicting the next piece of text", "Running code"]
+        answer: 1
+        explain: "Everything else is built on next-token prediction."
+      - id: unknown-fact
+        type: predict
+        prompt: "You ask a plain LLM (no tools) about yesterday's cricket score. What usually happens?"
+        options: ["It says it can't know", "It may invent a plausible score", "It checks a website"]
+        answer: 1
+        explain: "Without tools it predicts likely text. A made-up score is likely text. That's why agents need tools."
+      - id: good-bad
+        type: multi
+        prompt: "Which tasks is a plain LLM good at? Pick all that apply."
+        options: ["Rewriting an email politely", "Explaining a concept simply", "Knowing today's train timings", "Summarising a paragraph you give it"]
+        answer: [0, 1, 3]
+        explain: "It's great with text you give it. Live facts need a tool or retrieval."
+
+- slug: how-llms-work
+  title: How an LLM works inside
+  summary: Text becomes tokens, tokens become numbers, layers mix them, and out comes a guess.
+  minutes: 9
+  body:
+    objectives:
+      - Describe the path from text to prediction
+      - Explain attention in plain words
+      - Know why bigger context costs more
+    intro: >-
+      Inside, the model turns your words into numbers, passes them through many layers that let
+      each word look at the others (that's "attention"), and ends with a score for every possible
+      next word.
+    intro_eng: >-
+      Tokens are embedded, combined with positional information, and passed through stacked
+      transformer blocks (multi-head self-attention plus MLP). The final hidden state is projected
+      to vocabulary logits.
+    scenes:
+      - engine: graph
+        title: The journey of a sentence through the model
+        track: [Tokens, Numbers, Attention, Layers, Scores]
+        nodes:
+          tok: {x: 50, y: 120, label: tokens}
+          emb: {x: 140, y: 120, label: embeddings}
+          att: {x: 230, y: 60, label: attention}
+          mlp: {x: 230, y: 180, label: layers ×N}
+          out: {x: 360, y: 120, label: next-word scores}
+        edges: [[tok, emb], [emb, att], [att, mlp], [mlp, att], [mlp, out]]
+        steps:
+          - {at: 0, node: tok, state: {text: "the cat sat"}, caption: "Your text is split into tokens: the, cat, sat."}
+          - {at: 1, node: emb, edge: tok-emb, state: {text: "the cat sat", vectors: "3 lists of numbers"}, caption: "Each token becomes a list of numbers that carries its meaning."}
+          - {at: 2, node: att, edge: emb-att, state: {text: "the cat sat", vectors: "3 lists of numbers", attention: "sat looks at cat"}, caption: "Attention lets each word look at the others. 'sat' pays attention to 'cat' to know who sat."}
+          - {at: 3, node: mlp, edge: att-mlp, state: {text: "the cat sat", vectors: "updated", attention: "sat looks at cat", layers: "repeated ×N"}, caption: "This mixing repeats through many layers. Each layer refines the meaning."}
+          - {at: 4, node: out, edge: mlp-out, state: {text: "the cat sat", top_guess: "on (71%)"}, caption: "Finally, every word in the vocabulary gets a score. 'on' scores highest.", tone: good}
+    points:
+      - {title: Text becomes tokens, text: "Pieces of words, covered in the next topic.", step: 0}
+      - {title: Tokens become numbers, text: "Models only do maths, so every token becomes a list of numbers (an embedding).", step: 1}
+      - {title: Attention connects words, text: "Each word can look at every other word to understand context.", eng: "Self-attention computes softmax(QKᵀ/√d)V across all positions, which is O(n²) in sequence length.", step: 2}
+      - {title: Many layers, one guess, text: "After all the layers, the model scores every possible next token.", step: 4}
+    words:
+      - [Embedding, A list of numbers that represents meaning.]
+      - [Attention, "How each token decides which other tokens matter to it."]
+      - [Layer, One round of mixing and refining.]
+      - [Logits, Raw scores for every possible next token.]
+    checks:
+      - id: order-pipe
+        type: order
+        prompt: "Put the model's steps in order."
+        items: ["Split text into tokens", "Turn tokens into numbers", "Attention and layers mix them", "Score every possible next token"]
+        explain: "Tokens → embeddings → attention layers → scores."
+      - id: attention
+        type: mcq
+        prompt: "In 'The trophy didn't fit in the bag because it was too big', what helps the model know 'it' means the trophy?"
+        options: ["Tokenization", "Attention", "Temperature"]
+        answer: 1
+        explain: "Attention lets 'it' look at the other words and link to 'trophy'."
+      - id: long-cost
+        type: predict
+        prompt: "You double the length of a prompt. What happens to the attention work?"
+        options: ["About the same", "Roughly doubles", "Grows faster than double"]
+        answer: 2
+        explain: "Every token looks at every other token, so work grows with the square of the length."
+
+- slug: tokens-and-tokenization
+  title: Tokens and tokenization
+  summary: Models read text as tokens, small pieces of words, each with an ID.
+  minutes: 9
+  body:
+    objectives:
+      - Explain what a token is
+      - Estimate token counts for English text
+      - Know why rare words cost more tokens
+    intro: >-
+      Models don't read letters or whole words. They read tokens: chunks of text the tokenizer
+      learned from data. Common words are often one token; rare or long words are split into
+      several. You pay for, and are limited by, tokens.
+    intro_eng: >-
+      Most LLMs use byte-pair encoding (BPE) or similar subword tokenizers. Frequent byte sequences
+      are merged into single vocabulary entries; the model only ever sees integer token IDs.
+    scenes:
+      - engine: tokens
+        title: How a model reads your sentence
+        track: [Text, Split, IDs, Rare word]
+        roles:
+          w: {label: token, color: l4}
+          r: {label: rare word piece, color: l1}
+        steps:
+          - {at: 0, cells: [{role: w, w: "I love learning AI"}], whole: true, caption: "You see a sentence. The model can't read it like this."}
+          - {at: 1, cells: [{role: w, w: "I| love| learning| AI"}], caption: "The tokenizer splits it into tokens. Common words are one token each. Notice the space is part of the token."}
+          - {at: 2, cells: [{role: w, w: "I#40| love#3021| learning#6975| AI#15592"}], caption: "Each token has an ID number. The model only ever sees these numbers.", note: "4 tokens"}
+          - {at: 3, cells: [{role: w, w: "I| love| learning| AI|,"}, {role: r, w: " tok|en|isation"}], caption: "A rarer word like 'tokenisation' gets split into pieces. Rare words cost more tokens.", note: "8 tokens", tone: bad}
+    points:
+      - {title: Tokens are pieces of text, text: "Usually whole common words, or parts of rarer words.", step: 1}
+      - {title: Each token is a number, text: "The model sees IDs like 3021, not the letters.", step: 2}
+      - {title: Rare words cost more, text: "Names, code and non-English text often split into many tokens.", step: 3}
+      - {title: Rule of thumb, text: "In English, 100 tokens ≈ 75 words. Limits and prices are counted in tokens.", eng: "~4 characters per token for English on GPT-style BPE; much higher token counts for many Indic scripts."}
+    words:
+      - [Token, A small piece of text the model reads.]
+      - [Tokenizer, The tool that splits text into tokens.]
+      - [Token ID, The number that stands for a token.]
+      - [BPE, "Byte-pair encoding: a common way to build tokenizers."]
+    code:
+      file: tokens.py
+      source: |
+        # A very simple tokenizer: split on spaces, and break long words into 4-letter pieces.
+        def tokenize(text):
+            tokens = []
+            for word in text.split():
+                while len(word) > 6:
+                    tokens.append(word[:4])
+                    word = word[4:]
+                tokens.append(word)
+            return tokens
+
+        pieces = tokenize("I love learning tokenisation")
+        print(pieces)
+        print(len(pieces), "tokens")
+      notes:
+        2: ["A function that splits text into tokens.", "Toy subword tokenizer; real BPE learns merges from data."]
+        3: ["Start with an empty list of tokens.", "Accumulator list."]
+        4: ["Go through the text word by word.", "Whitespace pre-tokenisation."]
+        5: ["While the word is long (more than 6 letters)…", "Greedy chunking of long words."]
+        6: ["…cut off the first 4 letters as a token…", "Emit a fixed 4-char piece."]
+        7: ["…and keep the rest.", "Remainder continues the loop."]
+        8: ["Add what's left as the last piece.", "Append remainder."]
+        9: ["Give back all the tokens.", "Return the list."]
+        11: ["Try it on a sentence with a long rare word.", "Call."]
+        12: ["See the pieces.", "Print the list."]
+        13: ["Count them.", "len of the list is the token count."]
+    exercise:
+      prompt: "Write count_tokens(text) that uses tokenize() and returns how many tokens there are."
+      starter: |
+        def tokenize(text):
+            tokens = []
+            for word in text.split():
+                while len(word) > 6:
+                    tokens.append(word[:4])
+                    word = word[4:]
+                tokens.append(word)
+            return tokens
+
+        def count_tokens(text):
+            # use tokenize() here
+            pass
+      tests: |
+        assert count_tokens("agents use tools") == 3, "count_tokens('agents use tools') should be 3"
+        assert count_tokens("internationalisation") > 1, "Long words should count as several tokens"
+      solution: |
+        def tokenize(text):
+            tokens = []
+            for word in text.split():
+                while len(word) > 6:
+                    tokens.append(word[:4])
+                    word = word[4:]
+                tokens.append(word)
+            return tokens
+
+        def count_tokens(text):
+            return len(tokenize(text))
+    checks:
+      - id: cost
+        type: predict
+        prompt: "Which costs more tokens?"
+        options: ["\"cat\" typed 10 times", "\"internationalisation\" once", "Same"]
+        answer: 0
+        explain: "Each 'cat' is its own token: 10 tokens. The long word is a few pieces, but fewer than 10."
+      - id: what-model-sees
+        type: mcq
+        prompt: "What does the model actually receive?"
+        options: ["Letters", "Whole sentences", "A list of token IDs (numbers)"]
+        answer: 2
+        explain: "Text → tokens → IDs. The model only sees numbers."
+      - id: words-estimate
+        type: mcq
+        prompt: "Roughly how many words are 1,000 tokens of English?"
+        options: ["About 250", "About 750", "About 4,000"]
+        answer: 1
+        explain: "About 3 words per 4 tokens in English."
+    lab: lab-tokenizer
+
+- slug: context-windows
+  title: Context windows and limits
+  summary: A model can only read a fixed number of tokens at once. Old text falls out.
+  minutes: 8
+  body:
+    objectives:
+      - Explain what a context window is
+      - Predict what happens when a chat gets too long
+      - Name two ways apps handle the limit
+    intro: >-
+      The context window is how much text a model can read at once, counted in tokens. Your
+      instructions, the conversation, documents and the model's own reply all share it. When it's
+      full, something has to go.
+    intro_eng: >-
+      The context window is the maximum sequence length (prompt + completion). Applications must
+      truncate, summarise or retrieve selectively to stay within it, and attention cost grows
+      with length.
+    scenes:
+      - engine: tokens
+        title: Why does a chatbot forget?
+        track: [System, You, Reply, You again, Overflow]
+        capacity: 24
+        roles:
+          sys: {label: system, color: l5}
+          you: {label: you, color: l4}
+          bot: {label: bot, color: l3}
+        switches:
+          - {id: pin, label: Pin the system prompt, label_on: "ON · the rules always stay", label_off: "OFF · oldest tokens drop first", track: 4}
+        steps:
+          - {at: 0, cells: [{role: sys, w: "You|are|a|tutor"}], caption: "The app starts with a system prompt: the rules for the bot. 4 of 24 slots used."}
+          - {at: 1, cells: [{role: sys, w: "You|are|a|tutor"}, {role: you, w: "My|name|is|Priya|.|Explain|RAG"}], caption: "You tell it your name and ask a question. Every word takes a slot."}
+          - {at: 2, cells: [{role: sys, w: "You|are|a|tutor"}, {role: you, w: "My|name|is|Priya|.|Explain|RAG"}, {role: bot, w: "RAG|finds|facts|first|,|then|answers|."}], caption: "The reply goes into the same window. Replies use space too."}
+          - {at: 3, cells: [{role: sys, w: "You|are|a|tutor"}, {role: you, w: "My|name|is|Priya|.|Explain|RAG"}, {role: bot, w: "RAG|finds|facts|first|,|then|answers|."}, {role: you, w: "What|is|my|name"}], extra: [{role: you, w: "again|?|Keep|it|short"}], extra_label: "doesn't fit", extra_tone: bad, tone: bad, caption: "Your next message needs 9 slots, but only 5 are free. Something must go."}
+          - {at: 4, when: pin, cells: [{role: sys, w: "You|are|a|tutor"}, {role: you, w: "."}, {role: you, w: "Explain|RAG"}, {role: bot, w: "RAG|finds|facts|first|,|then|answers|."}, {role: you, w: "What|is|my|name|again|?|Keep|it|short"}], extra: [{role: you, w: "My|name|is|Priya"}], extra_label: dropped, extra_tone: gone, tone: bad, caption: "The rules are pinned, so the oldest chat goes instead: 'My name is Priya'. Now it can't tell you your name."}
+          - {at: 4, when: "!pin", cells: [{role: you, w: "My|name|is|Priya|.|Explain|RAG"}, {role: bot, w: "RAG|finds|facts|first|,|then|answers|."}, {role: you, w: "What|is|my|name|again|?|Keep|it|short"}], extra: [{role: sys, w: "You|are|a|tutor"}], extra_label: dropped, extra_tone: gone, tone: bad, caption: "The oldest tokens are dropped. That was the system prompt, so the bot forgets its rules."}
+    points:
+      - {title: Everything shares one window, text: "Rules, chat history, documents and the reply all count.", step: 2}
+      - {title: When it's full, something drops, text: "Simple apps drop the oldest text first.", step: 4}
+      - {title: Good apps choose what to keep, text: "Pin the rules, summarise old chat, and fetch only relevant documents (that's RAG).", eng: "Common strategies: sliding window, rolling summaries, retrieval, and prompt caching for fixed prefixes."}
+      - {title: Bigger windows cost more, text: "More tokens means more time and money per request.", step: 3}
+    words:
+      - [Context window, "The maximum tokens a model reads at once."]
+      - [System prompt, The rules an app gives the model before the chat.]
+      - [Truncation, Cutting text to fit the window.]
+    code:
+      file: window.py
+      source: |
+        def fit_window(messages, limit):
+            kept = []
+            used = 0
+            for msg in reversed(messages):
+                cost = len(msg.split())
+                if used + cost > limit:
+                    break
+                kept.insert(0, msg)
+                used += cost
+            return kept
+
+        chat = ["You are a tutor", "My name is Priya", "Explain RAG", "What is my name?"]
+        print(fit_window(chat, 8))
+      notes:
+        1: ["A function that keeps as many recent messages as fit.", "Sliding-window truncation by word count."]
+        4: ["Start from the newest message and go backwards.", "Iterate newest-first."]
+        5: ["Count its 'tokens' (words, for simplicity).", "Approximate token cost."]
+        6: ["If it doesn't fit, stop.", "Budget check."]
+        8: ["Otherwise keep it, at the front to keep the order.", "Prepend to preserve chronology."]
+        12: ["Our chat history.", "List of messages."]
+        13: ["With a limit of 8, the oldest messages fall out.", "Note the system prompt is lost: pin it in real apps."]
+    exercise:
+      prompt: "Change fit_window so the first message (the system prompt) is always kept, and the rest fill what's left."
+      starter: |
+        def fit_window(messages, limit):
+            kept = []
+            used = 0
+            for msg in reversed(messages):
+                cost = len(msg.split())
+                if used + cost > limit:
+                    break
+                kept.insert(0, msg)
+                used += cost
+            return kept
+      tests: |
+        chat = ["You are a tutor", "My name is Priya", "Explain RAG", "What is my name?"]
+        out = fit_window(chat, 8)
+        assert out[0] == "You are a tutor", "The system prompt must always be first."
+        assert sum(len(m.split()) for m in out) <= 8, "Stay within the limit."
+        assert out[-1] == "What is my name?", "Keep the newest message."
+      solution: |
+        def fit_window(messages, limit):
+            system, rest = messages[0], messages[1:]
+            kept = []
+            used = len(system.split())
+            for msg in reversed(rest):
+                cost = len(msg.split())
+                if used + cost > limit:
+                    break
+                kept.insert(0, msg)
+                used += cost
+            return [system] + kept
+    checks:
+      - id: shares
+        type: multi
+        prompt: "What counts toward the context window? Pick all that apply."
+        options: ["The system prompt", "Previous chat messages", "The model's reply", "The user's screen size"]
+        answer: [0, 1, 2]
+        explain: "Everything the model reads or writes in that call shares the window."
+      - id: overflow
+        type: predict
+        prompt: "A simple chatbot drops the oldest text first. The first message was 'My name is Priya'. After a long chat you ask 'What's my name?'"
+        options: ["It answers Priya", "It may not know anymore", "It refuses to answer"]
+        answer: 1
+        explain: "That message fell out of the window, so the model can't see it."
+      - id: strategy
+        type: mcq
+        prompt: "Which is the best way to keep a bot's rules from being forgotten?"
+        options: ["Repeat them in every user message", "Pin the system prompt and trim old chat instead", "Use a bigger font"]
+        answer: 1
+        explain: "Pin what must stay; drop or summarise what can go."
+
+- slug: next-token-prediction
+  title: Next-token prediction
+  summary: A model writes by scoring every possible next token, picking one, and repeating.
+  minutes: 9
+  body:
+    objectives:
+      - Describe the generate loop step by step
+      - Explain greedy versus sampled choices
+      - Know why the same prompt can give different answers
+    intro: >-
+      An LLM writes one token at a time. It scores every possible next token, picks one, adds it
+      to the text, and runs again. A whole essay is this loop repeated a few hundred times.
+    intro_eng: >-
+      Autoregressive decoding: compute next-token logits, convert to probabilities with softmax,
+      select a token (argmax or sampling), append, repeat until a stop token or length limit.
+    scenes:
+      - engine: bars
+        title: How an LLM writes, one word at a time
+        track: [Read, Score, Pick, Append, Repeat]
+        switches:
+          - {id: greedy, label: Always pick the top word, label_on: "ON · same answer every time", label_off: "OFF · sample, so it can vary", track: 2}
+        steps:
+          - {at: 0, text: "The cat sat on the", bars: [[mat, 0.62], [floor, 0.18], [sofa, 0.10], [roof, 0.06], [moon, 0.04]], grow: false, caption: "The model reads everything written so far."}
+          - {at: 1, text: "The cat sat on the", bars: [[mat, 0.62], [floor, 0.18], [sofa, 0.10], [roof, 0.06], [moon, 0.04]], caption: "It gives every possible next word a probability. mat scores highest, at 62%."}
+          - {at: 2, when: greedy, text: "The cat sat on the", bars: [[mat, 0.62], [floor, 0.18], [sofa, 0.10], [roof, 0.06], [moon, 0.04]], pick: 0, caption: "Greedy decoding always takes the top word: mat."}
+          - {at: 2, when: "!greedy", text: "The cat sat on the", bars: [[mat, 0.62], [floor, 0.18], [sofa, 0.10], [roof, 0.06], [moon, 0.04]], pick: 2, caption: "Sampling rolls a weighted dice. This time it picked sofa, with only 10%."}
+          - {at: 3, when: greedy, text: "The cat sat on the **mat**", bars: [[".", 0.48], [and, 0.27], [while, 0.12], [all, 0.08], [again, 0.05]], grow: false, caption: "The chosen word is added, and the whole sentence goes back into the model."}
+          - {at: 3, when: "!greedy", text: "The cat sat on the **sofa**", bars: [[".", 0.48], [and, 0.27], [while, 0.12], [all, 0.08], [again, 0.05]], grow: false, caption: "The chosen word is added, and the whole sentence goes back into the model."}
+          - {at: 4, when: greedy, text: "The cat sat on the **mat** **.**", bars: [[".", 0.48], [and, 0.27], [while, 0.12], [all, 0.08], [again, 0.05]], pick: 0, tone: good, caption: "The same loop picks the next token. A whole answer is just this loop, repeated."}
+          - {at: 4, when: "!greedy", text: "The cat sat on the **sofa** **.**", bars: [[".", 0.48], [and, 0.27], [while, 0.12], [all, 0.08], [again, 0.05]], pick: 0, tone: good, caption: "The same loop picks the next token. A whole answer is just this loop, repeated."}
+    points:
+      - {title: Score everything, text: "Every token in the vocabulary gets a probability.", step: 1}
+      - {title: Pick one, text: "Greedy takes the top; sampling picks by chance, weighted by probability.", step: 2}
+      - {title: Append and repeat, text: "The new token becomes part of the input for the next round.", step: 3}
+      - {title: Why answers vary, text: "With sampling, the same prompt can take a different path each time.", eng: "Non-determinism comes from sampling (and, in practice, batching and floating-point effects), not from the weights changing.", step: 4}
+    words:
+      - [Probability, "How likely something is, from 0 to 1 (0% to 100%)."]
+      - [Greedy decoding, Always picking the most likely token.]
+      - [Sampling, Picking randomly but weighted by probability.]
+    code:
+      file: generate.py
+      source: |
+        import random
+
+        next_words = {
+            "the cat sat on the": {"mat": 0.62, "floor": 0.18, "sofa": 0.10, "roof": 0.06, "moon": 0.04},
+        }
+
+        def pick(probs, greedy=True):
+            if greedy:
+                return max(probs, key=probs.get)
+            return random.choices(list(probs), weights=list(probs.values()))[0]
+
+        text = "the cat sat on the"
+        print(text, pick(next_words[text]))
+        print(text, pick(next_words[text], greedy=False))
+      notes:
+        1: ["Bring in Python's dice-roller.", "Import random for sampling."]
+        3: ["Pretend scores the model gave for the next word.", "A stand-in for the model's softmax output."]
+        7: ["A function that chooses one word.", "Decoding strategy as a function."]
+        8: ["In greedy mode…", "Branch on strategy."]
+        9: ["…take the word with the highest score.", "argmax over the distribution."]
+        10: ["Otherwise roll a weighted dice.", "Categorical sampling with random.choices."]
+        13: ["Greedy always prints mat.", "Deterministic."]
+        14: ["Sampling usually prints mat, but not always. Run it a few times.", "Stochastic: re-run to see different outputs."]
+    checks:
+      - id: loop-order
+        type: order
+        prompt: "Put one round of generation in order."
+        items: ["Read the text so far", "Score every possible next token", "Pick one token", "Append it to the text"]
+        explain: "Read, score, pick, append. Then repeat."
+      - id: greedy
+        type: predict
+        prompt: "With greedy decoding, you send the same prompt twice. What happens?"
+        options: ["Same answer both times", "Different answers", "Error"]
+        answer: 0
+        explain: "Greedy always picks the top token, so the path is the same."
+      - id: why-vary
+        type: mcq
+        prompt: "Why might ChatGPT give a different answer when you ask again?"
+        options: ["It learned from your last question", "It samples the next token with some randomness", "The internet changed"]
+        answer: 1
+        explain: "Sampling means a less likely token is sometimes chosen, changing the rest of the answer."
+    lab: lab-sampling
+
+- slug: inference-parameters
+  title: Temperature, top-k, top-p and max tokens
+  summary: Four settings that control how creative, focused and long the output is.
+  minutes: 10
+  body:
+    objectives:
+      - Explain what temperature does to probabilities
+      - Use top-k and top-p to cut unlikely tokens
+      - Choose settings for factual versus creative tasks
+    intro: >-
+      You can't change what the model learned, but you can change how it picks words. Temperature
+      makes choices bolder or safer. Top-k and top-p remove unlikely words. Max tokens caps the
+      length.
+    intro_eng: >-
+      Temperature scales logits before softmax (p ∝ exp(z/T)). Top-k keeps the k highest tokens;
+      top-p keeps the smallest set whose cumulative probability ≥ p. Survivors are renormalised.
+    scenes:
+      - engine: bars
+        title: Turning the temperature knob
+        track: [Normal, Cool, Hot, Top-k, Top-p]
+        steps:
+          - {at: 0, text: "The capital of France is", bars: [[Paris, 0.87], [a, 0.05], [the, 0.04], [located, 0.02], [Lyon, 0.01]], caption: "At temperature 1.0 these are the model's normal probabilities. Paris dominates."}
+          - {at: 1, text: "temperature = 0.3", bars: [[Paris, 0.99], [a, 0.005], [the, 0.003], [located, 0.001], [Lyon, 0.0005]], caption: "Low temperature sharpens the bars. The top choice becomes almost certain. Good for facts."}
+          - {at: 2, text: "temperature = 1.8", bars: [[Paris, 0.62], [a, 0.13], [the, 0.11], [located, 0.08], [Lyon, 0.05]], tone: bad, caption: "High temperature flattens them. Odd words get real chances. Good for brainstorming, risky for facts."}
+          - {at: 3, text: "temperature = 1.8, top-k = 2", bars: [[Paris, 0.83], [a, 0.17], [the, 0], [located, 0], [Lyon, 0]], caption: "Top-k = 2 keeps only the 2 best tokens and rescales them to add up to 100%."}
+          - {at: 4, text: "temperature = 1.8, top-p = 0.8", bars: [[Paris, 0.72], [a, 0.15], [the, 0.13], [located, 0], [Lyon, 0]], tone: good, caption: "Top-p = 0.8 keeps the fewest tokens that add up to 80%: here Paris, a and the."}
+    points:
+      - {title: Temperature controls boldness, text: "Low (0–0.3) for facts and code. Higher (0.8–1.2) for creative writing.", step: 1}
+      - {title: Top-k keeps the best k, text: "Everything outside the top k gets zero chance.", step: 3}
+      - {title: Top-p keeps the likely set, text: "It adapts: few tokens when the model is sure, more when it isn't.", step: 4}
+      - {title: Max tokens caps the length, text: "The reply stops when it hits the cap, even mid-sentence, so set it with room to spare.", eng: "max_tokens bounds completion length only; prompt tokens count toward the context window separately."}
+    words:
+      - [Temperature, A knob that makes choices safer (low) or bolder (high).]
+      - [Top-k, "Keep only the k most likely tokens."]
+      - [Top-p, "Keep the smallest set of tokens that add up to p."]
+      - [Max tokens, The most tokens the reply may contain.]
+    code:
+      file: temperature.py
+      source: |
+        import math
+
+        def softmax(scores, temperature=1.0):
+            scaled = [s / temperature for s in scores]
+            biggest = max(scaled)
+            exps = [math.exp(s - biggest) for s in scaled]
+            total = sum(exps)
+            return [round(e / total, 3) for e in exps]
+
+        scores = [6.0, 3.2, 2.9]
+        print(softmax(scores, 1.0))
+        print(softmax(scores, 0.3))
+        print(softmax(scores, 2.0))
+      notes:
+        1: ["Bring in maths tools.", "math.exp for the exponential."]
+        3: ["Turn raw scores into probabilities, with a temperature knob.", "Temperature-scaled softmax."]
+        4: ["Divide every score by the temperature.", "z / T: small T stretches gaps, large T shrinks them."]
+        5: ["Find the biggest, to keep numbers small.", "Max-subtraction for numerical stability."]
+        6: ["Exponentiate: bigger scores grow much bigger.", "exp(z - max)."]
+        7: ["Add them up.", "Normaliser."]
+        8: ["Divide so they add up to 1.", "Probabilities, rounded for display."]
+        10: ["Three raw scores from a model.", "Example logits."]
+        11: ["Normal temperature.", "T = 1."]
+        12: ["Cool: the top one takes almost everything.", "T < 1 sharpens."]
+        13: ["Hot: the others catch up.", "T > 1 flattens."]
+    exercise:
+      prompt: "Write top_k(probs, k) that keeps the k highest probabilities, sets the rest to 0, and rescales the kept ones to add up to 1."
+      starter: |
+        def top_k(probs, k):
+            # probs is a list like [0.6, 0.3, 0.1]
+            pass
+      tests: |
+        out = top_k([0.6, 0.3, 0.1], 2)
+        assert len(out) == 3, "Return a list the same length as probs."
+        assert out[2] == 0, "The lowest one should become 0."
+        assert abs(sum(out) - 1) < 1e-6, "The kept probabilities should add up to 1."
+        assert abs(out[0] - 0.6667) < 0.01, "0.6 should rescale to about 0.667."
+      solution: |
+        def top_k(probs, k):
+            keep = sorted(range(len(probs)), key=lambda i: probs[i], reverse=True)[:k]
+            total = sum(probs[i] for i in keep)
+            return [probs[i] / total if i in keep else 0 for i in range(len(probs))]
+    checks:
+      - id: facts
+        type: mcq
+        prompt: "You're building a bot that answers bank FAQ questions. Which temperature?"
+        options: ["0.0–0.3", "1.5", "2.0"]
+        answer: 0
+        explain: "Low temperature keeps answers focused and repeatable."
+      - id: tune-paris
+        type: tune
+        prompt: "Move temperature until \"Paris\" lands between 60% and 70%."
+        labels: [Paris, a, the, located, Lyon, known]
+        logits: [6.0, 3.2, 2.9, 2.4, 1.5, 1.2]
+        target: 0
+        min: 0.6
+        max: 0.7
+        range: [0.1, 2.0]
+        explain: "Around 1.5, Paris drops to about two-thirds. Temperature never changes which token is top, only by how much."
+        hint: "Higher temperature lowers the top bar. Try between 1.3 and 1.7."
+      - id: topp
+        type: predict
+        prompt: "The model is very sure: Paris 95%, everything else tiny. With top-p = 0.9, how many tokens survive?"
+        options: ["1", "5", "All of them"]
+        answer: 0
+        explain: "Paris alone already reaches 90%, so top-p keeps only Paris."
+      - id: maxtok
+        type: debug
+        prompt: "Answers keep stopping mid-sentence. Tap the setting that causes it."
+        code: |
+          model = "any-llm"
+          temperature = 0.2
+          top_p = 0.9
+          max_tokens = 20
+        answer: 4
+        explain: "20 tokens is about 15 words. The reply is cut off at the cap."
+
+- slug: embeddings-fundamentals
+  title: Embeddings fundamentals
+  summary: An embedding turns text into a list of numbers so that similar meanings sit close together.
+  minutes: 8
+  body:
+    objectives:
+      - Explain an embedding in plain words
+      - Predict which texts land close together
+      - Know where embeddings are used (search, RAG, memory)
+    intro: >-
+      An embedding is a list of numbers that captures what a piece of text means. Texts with
+      similar meaning get similar numbers, so on a map they land close together. That's how AI
+      search finds "puppy training" when you type "how to teach my dog".
+    intro_eng: >-
+      An embedding model maps text to a dense vector (typically 384–3072 dimensions). Semantic
+      similarity is measured with cosine similarity or dot product between vectors.
+    scenes:
+      - engine: space
+        title: Words on a map of meaning
+        track: [Place, Cluster, Query, Nearest]
+        groups: {pets: l4, food: l2, code: l7}
+        points:
+          - {label: puppy, x: 70, y: 60, group: pets}
+          - {label: kitten, x: 108, y: 92, group: pets}
+          - {label: dog food, x: 120, y: 48, group: pets}
+          - {label: pizza, x: 300, y: 58, group: food}
+          - {label: biryani, x: 338, y: 92, group: food}
+          - {label: pasta, x: 282, y: 104, group: food}
+          - {label: python, x: 200, y: 186, group: code}
+          - {label: bug fix, x: 246, y: 206, group: code}
+        query: {label: "how to teach my dog", x: 92, y: 74}
+        steps:
+          - {at: 0, caption: "Each word or sentence becomes a point. The numbers decide where it lands."}
+          - {at: 1, caption: "Similar meanings land near each other: pets here, food there, code below."}
+          - {at: 2, show_query: true, caption: "A new sentence, 'how to teach my dog', is embedded the same way."}
+          - {at: 3, show_query: true, lines: true, top: 2, results: true, tone: good, caption: "It lands next to puppy and dog food, even though it shares no words with them. That's meaning, not keywords."}
+    points:
+      - {title: Text becomes numbers, text: "An embedding is a long list of numbers for one piece of text.", step: 0}
+      - {title: Close means similar, text: "Similar meanings get nearby points.", step: 1}
+      - {title: Meaning beats keywords, text: "It finds matches even with different words.", step: 3}
+      - {title: The base of RAG and memory, text: "Levels 3 and 4 build search and RAG on top of this.", eng: "Embeddings power semantic search, clustering, deduplication, recommendation and agent long-term memory."}
+    words:
+      - [Embedding, A list of numbers representing meaning.]
+      - [Vector, Another name for that list of numbers.]
+      - [Semantic, To do with meaning.]
+    checks:
+      - id: closest
+        type: predict
+        prompt: "Which lands closest to 'car repair near me'?"
+        options: ["mechanic shop", "carrot recipe", "car-pet cleaning"]
+        answer: 0
+        explain: "Meaning, not spelling. 'carrot' shares letters with 'car' but not meaning."
+      - id: what-is
+        type: mcq
+        prompt: "What is an embedding?"
+        options: ["A compressed file", "A list of numbers that captures meaning", "A type of database"]
+        answer: 1
+        explain: "Text in, vector of numbers out."
+      - id: uses
+        type: multi
+        prompt: "Where are embeddings used? Pick all that apply."
+        options: ["Semantic search", "Finding relevant chunks for RAG", "Agent long-term memory", "Choosing the font"]
+        answer: [0, 1, 2]
+        explain: "Anywhere you need to find things by meaning."
+
+- slug: model-selection
+  title: Choosing a model
+  summary: Pick models by trading off quality, speed and cost for each task.
+  minutes: 8
+  body:
+    objectives:
+      - Compare models on quality, speed and cost
+      - Match a model size to a task
+      - Estimate the monthly cost of a feature
+    intro: >-
+      There's no single best model. Big models are smarter but slower and pricier. Small models
+      are fast and cheap but make more mistakes. Good engineers pick per task, and measure.
+    intro_eng: >-
+      Selection criteria: task quality on your own eval set, latency (time to first token and
+      tokens/s), price per million input/output tokens, context length, tool-calling support,
+      and deployment constraints (hosted API vs open weights).
+    scenes:
+      - engine: meter
+        title: Three models, one task
+        track: [Task, Small, Medium, Large, Decide]
+        gauges:
+          - {label: Quality, max: 100, format: pct, color: l3}
+          - {label: Wait time, max: 4000, format: ms, color: l1}
+          - {label: Cost / 1k requests, max: 600, format: inr, color: l2}
+        steps:
+          - {at: 0, values: [0, 0, 0], log: "Task: classify support emails into 5 categories", caption: "Same task for all three models. We measure on 200 real emails."}
+          - {at: 1, values: [86, 300, 20], log: "Small model", caption: "The small model is fast and very cheap. 86% correct."}
+          - {at: 2, values: [93, 900, 110], log: "Medium model", caption: "Medium: 93% correct, three times slower, five times the cost."}
+          - {at: 3, values: [95, 3200, 560], log: "Large model", tone: bad, caption: "Large: only 2 points better, but over 3 seconds and five times the cost again."}
+          - {at: 4, values: [93, 900, 110], log: "Pick: medium for this task", tone: good, caption: "For simple classification, medium wins. Save the large model for hard reasoning."}
+    points:
+      - {title: Quality, speed, cost, text: "Every choice trades these three.", step: 1}
+      - {title: Measure on your own data, text: "Leaderboards don't know your task. Test on 50–200 real examples.", step: 0}
+      - {title: Bigger isn't always better, text: "A small gain in quality can cost a lot in speed and money.", step: 3}
+      - {title: Mix models, text: "Many apps route easy requests to a small model and hard ones to a large one.", eng: "Routing/cascades: try a cheap model first and escalate on low confidence or failed validation.", step: 4}
+    words:
+      - [Latency, How long you wait for an answer.]
+      - [Open weights, A model you can download and run yourself.]
+      - [Eval set, Real examples you test models on.]
+    code:
+      file: cost.py
+      source: |
+        def monthly_cost(requests_per_day, tokens_per_request, price_per_million):
+            tokens = requests_per_day * 30 * tokens_per_request
+            return tokens / 1_000_000 * price_per_million
+
+        print(round(monthly_cost(2000, 800, 15), 2))
+        print(round(monthly_cost(2000, 800, 300), 2))
+      notes:
+        1: ["Estimate a month's bill for a feature.", "Linear cost model: requests × tokens × price."]
+        2: ["Total tokens in 30 days.", "requests/day × 30 × tokens/request."]
+        3: ["Convert to millions and multiply by the price (₹ per million tokens).", "Price is usually quoted per 1M tokens."]
+        5: ["A cheap model at ₹15 per million tokens.", "Example small model."]
+        6: ["A big model at ₹300 per million: 20 times the bill.", "Example large model."]
+    checks:
+      - id: pick
+        type: mcq
+        prompt: "You need to tag 1 million product titles with a category overnight. Which model first?"
+        options: ["The largest model available", "A small, cheap model, tested on samples first", "No model, do it by hand"]
+        answer: 1
+        explain: "High volume and a simple task: start small, measure quality on a sample, escalate only if needed."
+      - id: measure
+        type: predict
+        prompt: "A leaderboard says Model X is best. On your 100 test emails, Model Y scores higher. Which should you trust?"
+        options: ["The leaderboard", "Your own test", "Neither"]
+        answer: 1
+        explain: "Your data is what matters for your product."
+      - id: order-select
+        type: order
+        prompt: "Put a sensible model-selection process in order."
+        items: ["Collect real examples of the task", "Run 2–3 candidate models on them", "Compare quality, speed and cost", "Pick, then keep monitoring"]
+        explain: "Data first, then candidates, then trade-offs, then keep watching."
+
+project:
+  slug: token-budget-calculator
+  title: Token budget calculator
+  body:
+    problem: >-
+      Teams launching an AI feature keep getting surprised by long prompts being cut off and by
+      the monthly bill. Build a small Python tool that estimates tokens, checks the context
+      window and estimates cost for a given prompt and traffic.
+    requirements:
+      - "A function estimate_tokens(text) using a simple tokenizer (words and long-word pieces is fine)"
+      - "A function fits(prompt, reply_tokens, window) that says whether prompt plus reply fits"
+      - "A function monthly_cost(requests_per_day, tokens_per_request, price_per_million)"
+      - "A short command-line or notebook demo with three example prompts"
+      - "A README that explains your tokenizer's limits compared with a real BPE tokenizer"
+    milestones:
+      - Write estimate_tokens and test it on five sentences
+      - Write fits() and show one prompt that doesn't fit
+      - Write monthly_cost() and compare a small and a large model
+      - Add the demo
+      - Write the README
+    rubric:
+      - {name: Token estimate works, points: 25, pass: "Counts are sensible and long words split into several pieces"}
+      - {name: Window check is correct, points: 20, pass: "Prompt + reply compared against the window, edge cases handled"}
+      - {name: Cost maths is correct, points: 20, pass: "Uses tokens per million correctly, shows two models"}
+      - {name: Demo runs, points: 15, pass: "A reviewer can run it from the README in under 5 minutes"}
+      - {name: README explains limits, points: 20, pass: "Honest about how a real tokenizer differs"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."

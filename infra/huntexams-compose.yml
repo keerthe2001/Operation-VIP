@@ -1,0 +1,23 @@
+# HuntExams: Postgres + API + web.   HX_SECRET_KEY=... docker compose -f infra/huntexams-compose.yml up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: huntexams, POSTGRES_PASSWORD: huntexams, POSTGRES_DB: huntexams }
+    volumes: [hx-db:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U huntexams"], interval: 5s, retries: 10 }
+  api:
+    build: ../huntexams/api
+    environment:
+      HX_DATABASE_URL: postgresql+asyncpg://huntexams:huntexams@db:5432/huntexams
+      HX_SECRET_KEY: ${HX_SECRET_KEY:?Set HX_SECRET_KEY (32+ random characters)}
+      HX_COOKIE_SECURE: ${HX_COOKIE_SECURE:-false}
+      HX_ADMIN_EMAILS: ${HX_ADMIN_EMAILS:-}
+      HX_ADSENSE_PUBLISHER_ID: ${HX_ADSENSE_PUBLISHER_ID:-}
+      HX_PUBLIC_SITE_URL: ${HX_PUBLIC_SITE_URL:-http://localhost:8080}
+    depends_on: { db: { condition: service_healthy } }
+  web:
+    build: { context: .., dockerfile: apps/huntexams/Dockerfile }
+    ports: ["8080:80"]
+    depends_on: [api]
+volumes:
+  hx-db:

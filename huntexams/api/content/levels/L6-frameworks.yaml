@@ -1,0 +1,809 @@
+number: 6
+slug: agentic-frameworks
+title: Agentic Frameworks
+summary: LangChain, LangGraph and MCP, plus multi-agent systems, and when a framework helps or hurts.
+hours: 20
+topics:
+
+- slug: frameworks-overview
+  title: Introduction to agent frameworks
+  summary: What frameworks give you, what they cost, and how to choose.
+  minutes: 7
+  body:
+    objectives:
+      - Say what problems frameworks solve
+      - Weigh framework versus plain code
+    intro: >-
+      You built an agent from scratch in Level 5. Frameworks package those same pieces (model
+      calls, tools, state, memory, tracing) so you write less glue. The cost is learning their way
+      of doing things, and more layers between you and the model.
+    intro_eng: >-
+      Frameworks standardise model/provider abstractions, tool schemas, state graphs,
+      persistence and observability. Evaluate by debuggability, control over prompts, ecosystem,
+      and lock-in risk.
+    scenes:
+      - engine: meter
+        title: Same agent, two ways
+        track: [From scratch, Framework, Trade-off]
+        gauges:
+          - {label: Lines of glue code, max: 400, format: num, color: l1}
+          - {label: Control over details, max: 100, format: pct, color: l3}
+        steps:
+          - {at: 0, values: [320, 100], log: "Plain Python: loop, tools, state, retries, tracing", caption: "From scratch: lots of glue, full control."}
+          - {at: 1, values: [90, 70], log: "With a framework", caption: "With a framework: far less glue, less direct control."}
+          - {at: 2, values: [90, 70], log: "Use frameworks once you understand the plain version", tone: good, caption: "Learn the plain version first (you did), then let a framework save time."}
+    points:
+      - {title: Frameworks package common pieces, text: "Model calls, tools, state, memory, tracing.", step: 1}
+      - {title: Less code, less control, text: "That's the trade.", step: 1}
+      - {title: Understand first, text: "Debugging a framework is easy when you know what it does underneath.", step: 2}
+    words:
+      - [Framework, A library that shapes how you build an app.]
+      - [Lock-in, When changing tools later becomes expensive.]
+    checks:
+      - id: why-fw
+        type: mcq
+        prompt: "What's the main benefit of an agent framework?"
+        options: ["Smarter models", "Less glue code for common pieces", "Free API calls"]
+        answer: 1
+        explain: "The model is the same; the plumbing is ready-made."
+      - id: when-plain
+        type: predict
+        prompt: "A tiny script makes one model call with no tools. Framework or plain code?"
+        options: ["Framework, always", "Plain code is fine"]
+        answer: 1
+        explain: "Frameworks pay off as complexity grows."
+
+- slug: langchain-fundamentals
+  title: LangChain fundamentals
+  summary: Models, prompts, output parsers and tools as composable pieces.
+  minutes: 8
+  body:
+    objectives:
+      - Name LangChain's core building blocks
+      - Read a simple prompt | model | parser pipeline
+    intro: >-
+      LangChain gives standard building blocks: prompt templates, chat models from many providers,
+      output parsers and tools. You snap them together with a pipe ( | ), so data flows from one
+      to the next.
+    intro_eng: >-
+      LCEL (LangChain Expression Language) composes Runnables with |; each supports invoke,
+      batch and stream, which gives uniform tracing and parallelism.
+    scenes:
+      - engine: flow
+        title: prompt | model | parser
+        track: [Input, Prompt, Model, Parser, Output]
+        actors:
+          - {id: in, label: Input, icon: chat, x: 10, y: 60}
+          - {id: p, label: Prompt, icon: doc, x: 32, y: 60}
+          - {id: m, label: Model, icon: brain, x: 56, y: 60}
+          - {id: o, label: Parser, icon: filter, x: 78, y: 60}
+          - {id: out, label: Output, icon: list, x: 94, y: 22}
+        steps:
+          - {at: 0, from: in, to: p, packet: "{topic: 'RAG'}", tone: ask, caption: "Input is a dictionary of variables."}
+          - {at: 1, from: p, to: m, packet: "Explain RAG in 3 bullets", tone: ask, caption: "The prompt template fills the slots."}
+          - {at: 2, from: m, to: o, packet: "AI message text", tone: ask, caption: "The chat model returns a message."}
+          - {at: 3, think: o, notes: {o: "text → list"}, caption: "The output parser turns text into the shape you need."}
+          - {at: 4, from: o, to: out, packet: "['finds facts', …]", tone: good, caption: "A clean Python value comes out the end."}
+    points:
+      - {title: Prompt templates, text: "Reusable prompts with variables.", step: 1}
+      - {title: Chat models, text: "One interface for many providers.", step: 2}
+      - {title: Output parsers, text: "Text in, structured data out.", step: 3}
+      - {title: Pipes connect them, text: "prompt | model | parser.", step: 4}
+    words:
+      - [Runnable, A LangChain piece you can run and connect.]
+      - [Parser, Turns model text into data.]
+    checks:
+      - id: pipe-order
+        type: order
+        prompt: "Order a basic LangChain pipeline."
+        items: ["prompt template", "chat model", "output parser"]
+        explain: "Fill the prompt, call the model, parse the result."
+      - id: parser
+        type: mcq
+        prompt: "What does an output parser do?"
+        options: ["Speeds up the model", "Turns model text into structured data", "Stores vectors"]
+        answer: 1
+        explain: "It's the last step that makes output usable in code."
+
+- slug: langchain-chains
+  title: LangChain components and chains
+  summary: Combine steps into chains, including retrieval chains for RAG.
+  minutes: 8
+  body:
+    objectives:
+      - Build a multi-step chain
+      - Recognise a retrieval chain
+    intro: >-
+      A chain is several steps where each output feeds the next. A retrieval chain, for example,
+      takes a question, fetches chunks with a retriever, fills a prompt and calls the model.
+      It's the RAG pipeline from Level 4 as composable parts.
+    intro_eng: >-
+      Retrievers are Runnables too; RunnableParallel can fetch context and pass the question
+      through concurrently before a prompt/model/parser tail.
+    scenes:
+      - engine: graph
+        title: A retrieval chain
+        track: [Question, Retriever, Prompt, Model, Answer]
+        nodes:
+          q: {x: 50, y: 120, label: question}
+          r: {x: 150, y: 60, label: retriever}
+          p: {x: 250, y: 120, label: prompt}
+          m: {x: 340, y: 60, label: model}
+          a: {x: 380, y: 190, label: answer}
+        edges: [[q, r], [q, p], [r, p], [p, m], [m, a]]
+        steps:
+          - {at: 0, node: q, state: {question: "casual leave days?"}, caption: "A question enters the chain."}
+          - {at: 1, node: r, edge: q-r, state: {question: "casual leave days?", context: "3 chunks"}, caption: "The retriever fetches relevant chunks."}
+          - {at: 2, node: p, edge: r-p, state: {prompt: "question + 3 chunks"}, caption: "The prompt combines question and context."}
+          - {at: 3, node: m, edge: p-m, state: {prompt: "question + 3 chunks", raw: "12 days [1]"}, caption: "The model answers."}
+          - {at: 4, node: a, edge: m-a, state: {answer: "12 days a year [1]"}, tone: good, caption: "The chain returns the final answer."}
+    points:
+      - {title: Steps feed steps, text: "Output of one is input of the next.", step: 1}
+      - {title: RAG as a chain, text: "Retriever → prompt → model → parser.", step: 2}
+      - {title: Same parts, less glue, text: "What you wrote by hand in Level 4.", step: 4}
+    words:
+      - [Chain, Steps connected so each feeds the next.]
+      - [Retriever, A component that fetches relevant documents.]
+    checks:
+      - id: chain-order
+        type: order
+        prompt: "Order a retrieval chain."
+        items: ["Receive the question", "Retrieve chunks", "Fill the prompt", "Call the model"]
+        explain: "Retrieve before prompting."
+      - id: chain-bug
+        type: debug
+        prompt: "This chain answers without any context. Tap the line that's missing the retriever."
+        code: |
+          question = get_question()
+          context = ""
+          prompt = template.format(context=context, question=question)
+          answer = model.invoke(prompt)
+        answer: 2
+        explain: "context should come from retriever.invoke(question), not an empty string."
+
+- slug: langgraph-architecture
+  title: LangGraph architecture
+  summary: Agents as graphs of nodes that read and update shared state.
+  minutes: 9
+  body:
+    objectives:
+      - Explain nodes, edges and state in LangGraph
+      - Say why graphs suit agents better than straight chains
+    intro: >-
+      Real agents loop and branch, which straight chains can't express well. LangGraph models the
+      agent as a graph: nodes do work, edges decide what runs next, and a shared state object is
+      passed along and updated.
+    intro_eng: >-
+      StateGraph defines a typed state, nodes as functions returning partial state updates, and
+      edges (static or conditional). Compiled graphs support cycles, streaming, checkpointing and
+      interrupts.
+    scenes:
+      - engine: graph
+        title: An agent as a graph
+        track: [Start, Agent node, Tools node, Loop back, End]
+        nodes:
+          s: {x: 50, y: 120, label: START}
+          ag: {x: 180, y: 120, label: agent}
+          tl: {x: 320, y: 60, label: tools}
+          e: {x: 320, y: 190, label: END}
+        edges: [[s, ag], [ag, tl], [tl, ag], [ag, e]]
+        steps:
+          - {at: 0, node: s, state: {messages: 1}, caption: "The graph starts with a state holding the user's message."}
+          - {at: 1, node: ag, edge: s-ag, state: {messages: 2, tool_call: get_weather}, caption: "The agent node calls the LLM, which asks for a tool."}
+          - {at: 2, node: tl, edge: ag-tl, state: {messages: 3, tool_result: "31°C"}, caption: "The tools node runs it and adds the result to state."}
+          - {at: 3, node: ag, edge: tl-ag, state: {messages: 4, final: true}, caption: "An edge loops back to the agent, which now answers."}
+          - {at: 4, node: e, edge: ag-e, state: {messages: 4, done: true}, tone: good, caption: "No more tool calls, so the graph ends."}
+    points:
+      - {title: Nodes do work, text: "Each node is a function.", step: 1}
+      - {title: Edges choose the next node, text: "Fixed or conditional.", step: 3}
+      - {title: State flows through, text: "Every node reads and updates it.", step: 2}
+      - {title: Loops are natural, text: "agent → tools → agent is just a cycle.", step: 3}
+    words:
+      - [Node, A step in the graph.]
+      - [Edge, A connection that decides what runs next.]
+    checks:
+      - id: why-graph
+        type: mcq
+        prompt: "Why model agents as graphs?"
+        options: ["Graphs are prettier", "Agents loop and branch, which graphs express naturally", "It's faster"]
+        answer: 1
+        explain: "Cycles and branches are first-class in a graph."
+      - id: loop
+        type: predict
+        prompt: "After the tools node runs, where does a typical agent graph go?"
+        options: ["Straight to END", "Back to the agent node", "To START"]
+        answer: 1
+        explain: "The agent reads the tool result and decides again."
+
+- slug: graph-workflows
+  title: Graph-based workflows
+  summary: Design multi-step workflows as graphs and trace a request through them.
+  minutes: 7
+  body:
+    objectives:
+      - Sketch a workflow as nodes and edges
+      - Trace one request through a graph
+    intro: >-
+      Not every graph is an open-ended agent. Many are workflows with known steps: classify,
+      fetch, draft, review. Drawing them as graphs makes each step testable and the path visible.
+    intro_eng: >-
+      Prefer deterministic workflows where the path is known and reserve LLM-driven routing for
+      genuinely open decisions; graphs let you mix both.
+    scenes:
+      - engine: graph
+        title: A support-email workflow
+        track: [Receive, Classify, Draft, Review, Send]
+        nodes:
+          in: {x: 50, y: 120, label: email in}
+          cl: {x: 150, y: 60, label: classify}
+          dr: {x: 250, y: 120, label: draft reply}
+          rv: {x: 340, y: 60, label: review}
+          out: {x: 370, y: 190, label: send}
+        edges: [[in, cl], [cl, dr], [dr, rv], [rv, out]]
+        steps:
+          - {at: 0, node: in, state: {email: "Can't log in"}, caption: "An email arrives."}
+          - {at: 1, node: cl, edge: in-cl, state: {email: "Can't log in", type: account}, caption: "Classify it."}
+          - {at: 2, node: dr, edge: cl-dr, state: {type: account, draft: "Reset link steps…"}, caption: "Draft a reply using the right help article."}
+          - {at: 3, node: rv, edge: dr-rv, state: {draft: "Reset link steps…", checks: "tone ok, links ok"}, caption: "Review checks tone and links."}
+          - {at: 4, node: out, edge: rv-out, state: {sent: true}, tone: good, caption: "Send. Each step was a separate, testable node."}
+    points:
+      - {title: Known steps, known path, text: "Workflows don't need open-ended agents.", step: 1}
+      - {title: Each node is testable, text: "Test classify alone, draft alone.", step: 3}
+      - {title: Mix both, text: "Use LLM decisions only where the path is unknown."}
+    words:
+      - [Workflow, A process with known steps.]
+    checks:
+      - id: wf-vs-agent
+        type: mcq
+        prompt: "An invoice always goes extract → validate → save. Agent or fixed workflow?"
+        options: ["Open-ended agent", "Fixed workflow"]
+        answer: 1
+        explain: "The path is known; don't let a model guess it."
+      - id: wf-order
+        type: order
+        prompt: "Order the support workflow."
+        items: ["Receive email", "Classify", "Draft reply", "Review", "Send"]
+        explain: "Same as the scene."
+
+- slug: nodes-edges-state
+  title: Nodes, edges and state
+  summary: Nodes return partial state updates that the graph merges.
+  minutes: 8
+  body:
+    objectives:
+      - Write a node as a function of state
+      - Explain how updates are merged
+    intro: >-
+      In LangGraph a node is just a function: it receives the current state and returns only the
+      fields it changed. The graph merges those changes into the state and passes it on.
+    intro_eng: >-
+      State is typically a TypedDict; nodes return partial dicts; reducers (e.g. add_messages)
+      define how list fields accumulate instead of being overwritten.
+    scenes:
+      - engine: code
+        title: Nodes as plain functions
+        track: [State, Node 1, Merge, Node 2, Merge]
+        source: |
+          state = {"question": "leave days?", "docs": [], "answer": ""}
+          update = {"docs": ["Casual leave is 12 days"]}
+          state = {**state, **update}
+          update = {"answer": "12 days"}
+          state = {**state, **update}
+        steps:
+          - {at: 0, line: 1, vars: {state: "{question, docs: [], answer: ''}"}, changed: [state], out: "", caption: "The graph's state."}
+          - {at: 1, line: 2, vars: {state: "{question, docs: [], answer: ''}", update: "{docs: [1 chunk]}"}, changed: [update], out: "", caption: "The retrieve node returns only what it changed: docs."}
+          - {at: 2, line: 3, vars: {state: "{question, docs: [1 chunk], answer: ''}", update: "{docs: [1 chunk]}"}, changed: [state], out: "", caption: "The graph merges the update into state."}
+          - {at: 3, line: 4, vars: {state: "{question, docs: [1 chunk], answer: ''}", update: "{answer: '12 days'}"}, changed: [update], out: "", caption: "The generate node returns just the answer."}
+          - {at: 4, line: 5, vars: {state: "{question, docs: [1 chunk], answer: '12 days'}", update: "{answer: '12 days'}"}, changed: [state], out: "", tone: good, caption: "Merged again. Each node only touches its own fields."}
+    points:
+      - {title: A node is a function, text: "state in, partial update out.", step: 1}
+      - {title: The graph merges, text: "You don't rebuild the whole state.", step: 2}
+      - {title: Lists can accumulate, text: "Reducers append messages instead of replacing them.", eng: "Annotated[list, add_messages] makes message history append-only."}
+    words:
+      - [Partial update, Only the fields a node changed.]
+      - [Reducer, A rule for merging updates into a field.]
+    code:
+      file: nodes.py
+      source: |
+        def retrieve(state):
+            return {"docs": ["Casual leave is 12 days"]}
+
+        def generate(state):
+            return {"answer": f"Answer from {len(state['docs'])} doc(s): 12 days"}
+
+        state = {"question": "leave days?", "docs": [], "answer": ""}
+        for node in (retrieve, generate):
+            state = {**state, **node(state)}
+        print(state)
+      notes:
+        1: ["A node: reads state, returns what it changed.", "Node function."]
+        4: ["Another node that uses the docs.", "Downstream node."]
+        8: ["Run nodes in order, merging each update.", "A two-node linear graph, by hand."]
+        9: ["Merge: new fields win.", "Dict unpacking merge."]
+    checks:
+      - id: node-return
+        type: mcq
+        prompt: "What should a LangGraph node usually return?"
+        options: ["The whole state, rebuilt", "Only the fields it changed", "Nothing"]
+        answer: 1
+        explain: "The graph merges partial updates."
+      - id: merge-fill
+        type: fill
+        prompt: "Merge a node's update into state."
+        code: |
+          state = {**state, **____}
+        options: ["update", "state", "None"]
+        answer: "update"
+        explain: "Later keys win, so the update overrides old values."
+
+- slug: conditional-routing
+  title: Conditional routing
+  summary: A router edge sends each request down the right path based on state.
+  minutes: 8
+  body:
+    objectives:
+      - Write a routing function
+      - Trace both branches of a conditional edge
+    intro: >-
+      A conditional edge looks at the state and picks the next node. Billing questions go to the
+      billing node, technical ones to tech support. The other branch is skipped entirely.
+    intro_eng: >-
+      add_conditional_edges(source, router_fn, mapping): router_fn(state) returns a key; keep
+      routers deterministic where possible and validate LLM-produced labels.
+    scenes:
+      - engine: graph
+        title: How does a graph route a request?
+        track: [Start, Classify, Route, Handle, Answer]
+        nodes:
+          start: {x: 46, y: 120, label: START}
+          classify: {x: 150, y: 120, label: classify}
+          billing: {x: 278, y: 52, label: billing}
+          tech: {x: 278, y: 188, label: tech support}
+          answer: {x: 382, y: 120, label: answer → END}
+        edges: [[start, classify], [classify, billing], [classify, tech], [billing, answer], [tech, answer]]
+        switches:
+          - {id: bill, label: Message is about billing, label_on: "ON · goes down the billing path", label_off: "OFF · a tech question instead", track: 2}
+        steps:
+          - {at: 0, when: bill, node: start, state: {message: "My card was charged twice"}, caption: "A message enters at START. State holds just the message."}
+          - {at: 0, when: "!bill", node: start, state: {message: "The app crashes on login"}, caption: "A message enters at START. State holds just the message."}
+          - {at: 1, when: bill, node: classify, edge: start-classify, state: {message: "My card was charged twice", intent: "…"}, caption: "The classify node decides what kind of request it is."}
+          - {at: 1, when: "!bill", node: classify, edge: start-classify, state: {message: "The app crashes on login", intent: "…"}, caption: "The classify node decides what kind of request it is."}
+          - {at: 2, when: bill, node: billing, edge: classify-billing, dim: [tech], state: {message: "My card was charged twice", intent: billing}, caption: "The conditional edge reads state.intent and goes to billing. Tech is skipped."}
+          - {at: 2, when: "!bill", node: tech, edge: classify-tech, dim: [billing], state: {message: "The app crashes on login", intent: tech}, caption: "The conditional edge reads state.intent and goes to tech support. Billing is skipped."}
+          - {at: 3, when: bill, node: billing, dim: [tech], state: {message: "My card was charged twice", intent: billing, result: "duplicate ₹499 found"}, caption: "The billing node finds the duplicate charge."}
+          - {at: 3, when: "!bill", node: tech, dim: [billing], state: {message: "The app crashes on login", intent: tech, result: "known issue, fix: update app"}, caption: "The tech node finds a known issue and its fix."}
+          - {at: 4, when: bill, node: answer, edge: billing-answer, dim: [tech], state: {intent: billing, reply: "Refund of ₹499 started."}, tone: good, caption: "Both paths meet at answer, which writes the reply. Then the graph ends."}
+          - {at: 4, when: "!bill", node: answer, edge: tech-answer, dim: [billing], state: {intent: tech, reply: "Please update to v2.3.1."}, tone: good, caption: "Both paths meet at answer, which writes the reply. Then the graph ends."}
+    points:
+      - {title: A router reads state, text: "It returns the name of the next node.", step: 2}
+      - {title: One branch runs, text: "The other is skipped.", step: 2}
+      - {title: Paths can rejoin, text: "Both branches end at the same answer node.", step: 4}
+      - {title: Validate the label, text: "If an LLM classifies, check its answer is a known route.", eng: "Map unknown labels to a fallback node instead of failing."}
+    words:
+      - [Router, A function that picks the next node.]
+      - [Conditional edge, An edge whose target depends on state.]
+    code:
+      file: router.py
+      source: |
+        def classify(state):
+            text = state["message"].lower()
+            return {"intent": "billing" if "charged" in text or "refund" in text else "tech"}
+
+        def route(state):
+            return state["intent"]
+
+        nodes = {
+            "billing": lambda s: {"reply": "Refund started."},
+            "tech": lambda s: {"reply": "Please update the app."},
+        }
+
+        state = {"message": "My card was charged twice"}
+        state.update(classify(state))
+        state.update(nodes[route(state)](state))
+        print(state)
+      notes:
+        1: ["A node that labels the request.", "Classifier (rule-based here; often an LLM)."]
+        5: ["The router: reads intent, names the next node.", "Conditional edge function."]
+        8: ["The two possible next nodes.", "Branch targets."]
+        14: ["Run classify.", "First node."]
+        15: ["Follow the route to billing or tech.", "Conditional dispatch."]
+    checks:
+      - id: route-predict
+        type: predict
+        prompt: "The message is 'Please refund my order'. Which node runs?"
+        options: ["billing", "tech", "both"]
+        answer: 0
+        explain: "'refund' sets intent to billing."
+      - id: unknown-route
+        type: mcq
+        prompt: "An LLM classifier returns 'shipping', which isn't a node. Best design?"
+        options: ["Crash", "Send unknown labels to a fallback node", "Pick randomly"]
+        answer: 1
+        explain: "Always handle labels you didn't expect."
+      - id: tune-route
+        type: debug
+        prompt: "Billing messages keep going to tech. Tap the buggy line."
+        code: |
+          def classify(state):
+              text = state["message"]
+              return {"intent": "billing" if "refund" in text else "tech"}
+        answer: 2
+        explain: "'Refund' with a capital R doesn't match. Lower-case the text first."
+
+- slug: checkpointing
+  title: Checkpointing and persistence
+  summary: Save state after each node so a workflow can pause, resume or recover.
+  minutes: 7
+  body:
+    objectives:
+      - Explain checkpoints
+      - Resume a workflow after a crash
+    intro: >-
+      A checkpoint saves the graph's state after each step. If the server restarts, or the
+      workflow pauses for a human, it resumes from the last checkpoint instead of starting over.
+    intro_eng: >-
+      Checkpointers (memory, SQLite, Postgres) persist state per thread_id and step, enabling
+      resume, time-travel debugging, human interrupts and durable multi-turn conversations.
+    scenes:
+      - engine: graph
+        title: Crash and resume
+        track: [Step 1, Save, Step 2, Crash, Resume]
+        nodes:
+          a: {x: 60, y: 120, label: fetch data}
+          b: {x: 200, y: 120, label: analyse}
+          c: {x: 340, y: 120, label: write report}
+          cp: {x: 200, y: 200, label: checkpoint}
+        edges: [[a, b], [b, c], [b, cp]]
+        steps:
+          - {at: 0, node: a, state: {step: 1, data: "500 rows"}, caption: "Step 1 fetches data."}
+          - {at: 1, node: cp, state: {saved_after: "fetch data"}, caption: "State is saved: a checkpoint."}
+          - {at: 2, node: b, edge: a-b, state: {step: 2, analysis: "done"}, caption: "Step 2 analyses it, and another checkpoint is saved."}
+          - {at: 3, node: c, edge: b-c, state: {step: 3, error: "server restarted"}, tone: bad, caption: "The server crashes during step 3."}
+          - {at: 4, node: c, state: {resumed_from: "after analyse", step: 3}, tone: good, caption: "On restart it resumes from the last checkpoint. Steps 1 and 2 aren't repeated."}
+    points:
+      - {title: Save after every step, text: "That's a checkpoint.", step: 1}
+      - {title: Resume, don't restart, text: "Crashes and pauses become harmless.", step: 4}
+      - {title: Needed for human approval, text: "A paused workflow may wait hours for a person."}
+    words:
+      - [Checkpoint, A saved copy of state at one step.]
+      - [Thread, One conversation or workflow run with its own checkpoints.]
+    checks:
+      - id: crash
+        type: predict
+        prompt: "With checkpoints, the server restarts during step 4 of 5. What happens?"
+        options: ["Start again from step 1", "Resume from the checkpoint after step 3", "Lose everything"]
+        answer: 1
+        explain: "Work up to the last checkpoint is kept."
+      - id: hitl-need
+        type: mcq
+        prompt: "Why do approval workflows need checkpointing?"
+        options: ["They don't", "The workflow may wait hours for a human and must survive restarts", "It speeds up the model"]
+        answer: 1
+        explain: "Pausing safely needs saved state."
+
+- slug: hitl-workflows
+  title: Human-in-the-loop workflows
+  summary: Interrupt the graph, let a person review or edit state, then resume.
+  minutes: 7
+  body:
+    objectives:
+      - Place an interrupt before a risky node
+      - Let a human edit state before resuming
+    intro: >-
+      In a graph, human approval is an interrupt: the run stops before a chosen node, a person
+      reviews and can edit the state (fix the draft, change the amount), and the run resumes from
+      there.
+    intro_eng: >-
+      interrupt_before/after or dynamic interrupts persist state at the checkpoint; resume with a
+      Command carrying the human's decision or state edits.
+    scenes:
+      - engine: graph
+        title: Edit, then approve
+        track: [Draft, Interrupt, Edit, Resume, Send]
+        nodes:
+          d: {x: 70, y: 120, label: draft email}
+          i: {x: 200, y: 60, label: interrupt}
+          h: {x: 200, y: 190, label: human edits}
+          s: {x: 350, y: 120, label: send email}
+        edges: [[d, i], [h, i], [i, s]]
+        steps:
+          - {at: 0, node: d, state: {draft: "Dear customer, refund ₹5,000"}, caption: "The agent drafts a customer email."}
+          - {at: 1, node: i, edge: d-i, state: {draft: "Dear customer, refund ₹5,000", status: paused}, caption: "The graph interrupts before 'send'. State is checkpointed."}
+          - {at: 2, node: h, edge: h-i, state: {draft: "Dear Asha, refund ₹500", status: edited}, caption: "A person fixes the amount and the name."}
+          - {at: 3, node: i, state: {draft: "Dear Asha, refund ₹500", status: approved}, caption: "They approve. The run resumes with the edited state."}
+          - {at: 4, node: s, edge: i-s, state: {sent: "Dear Asha, refund ₹500"}, tone: good, caption: "The corrected email is sent."}
+    points:
+      - {title: Interrupt before risk, text: "Stop just before the node with side effects.", step: 1}
+      - {title: Humans can edit, text: "Not just yes/no: fix the state.", step: 2}
+      - {title: Resume from the checkpoint, text: "The run continues where it stopped.", step: 3}
+    words:
+      - [Interrupt, A deliberate pause in a graph run.]
+    checks:
+      - id: hitl-edit
+        type: mcq
+        prompt: "The draft has the wrong refund amount. With an interrupt, the reviewer can…"
+        options: ["Only reject it", "Edit the amount in state, then approve", "Nothing"]
+        answer: 1
+        explain: "Editing state is part of human-in-the-loop."
+      - id: hitl-order2
+        type: order
+        prompt: "Order an interrupt."
+        items: ["Graph reaches the interrupt", "State is saved", "Human reviews and edits", "Run resumes"]
+        explain: "Pause, save, decide, resume."
+
+- slug: mcp-architecture
+  title: MCP architecture and protocol
+  summary: The Model Context Protocol standardises how AI apps discover and call tools and data.
+  minutes: 9
+  body:
+    objectives:
+      - Explain what MCP standardises
+      - Name hosts, clients and servers
+      - Trace a tool call over MCP
+    intro: >-
+      Every app used to wire tools in its own way. The Model Context Protocol (MCP) is a standard
+      plug: a tool provider writes one MCP server, and any MCP-capable AI app can discover and use
+      its tools.
+    intro_eng: >-
+      MCP uses JSON-RPC between a client (inside the host app) and servers that expose tools,
+      resources and prompts. Flow: initialise, list capabilities (e.g. tools/list), invoke
+      (tools/call), return structured results.
+    scenes:
+      - engine: flow
+        title: One tool call over MCP
+        track: [Connect, List tools, Call, Result]
+        actors:
+          - {id: host, label: AI app, icon: brain, x: 14, y: 60}
+          - {id: client, label: MCP client, icon: code, x: 46, y: 60}
+          - {id: server, label: MCP server, icon: server, x: 84, y: 60}
+        steps:
+          - {at: 0, from: client, to: server, packet: "initialize", tone: ask, caption: "The client connects to the server and agrees on versions and capabilities."}
+          - {at: 1, from: server, to: client, packet: "tools: search_tickets, …", tone: good, notes: {client: "knows 3 tools"}, caption: "tools/list: the server describes its tools with schemas."}
+          - {at: 2, from: client, to: server, packet: "tools/call search_tickets", tone: ask, caption: "When the model wants a tool, the client sends tools/call with arguments."}
+          - {at: 3, from: server, to: host, packet: "3 open tickets", tone: good, caption: "The result comes back in a standard format the app passes to the model."}
+    points:
+      - {title: A standard plug for tools, text: "Write a server once, use it from any MCP app.", step: 1}
+      - {title: Host, client, server, text: "The app hosts a client that talks to servers.", step: 0}
+      - {title: Discover, then call, text: "tools/list, then tools/call.", step: 2}
+    words:
+      - [MCP, "Model Context Protocol: a standard for connecting AI apps to tools."]
+      - [MCP server, A program that exposes tools over MCP.]
+    checks:
+      - id: mcp-what
+        type: mcq
+        prompt: "What problem does MCP solve?"
+        options: ["Makes models smarter", "Gives one standard way for AI apps to discover and call tools", "Stores embeddings"]
+        answer: 1
+        explain: "It's a protocol, like a standard plug."
+      - id: mcp-order
+        type: order
+        prompt: "Order an MCP interaction."
+        items: ["initialize", "tools/list", "tools/call", "return result"]
+        explain: "Connect, discover, call, respond."
+
+- slug: mcp-servers-clients
+  title: MCP servers and clients
+  summary: One client can use many servers; each server exposes tools, resources and prompts.
+  minutes: 7
+  body:
+    objectives:
+      - Describe what a server exposes
+      - Explain how a client aggregates many servers
+    intro: >-
+      An MCP server can expose tools (actions), resources (readable data like files) and prompts
+      (reusable templates). An AI app can connect to several servers at once, so its tool menu is
+      the combination of all of them.
+    intro_eng: >-
+      Servers run locally (stdio) or remotely (HTTP). Clients namespace and merge capabilities;
+      permissions and trust decisions stay with the host and user.
+    scenes:
+      - engine: flow
+        title: One app, three servers
+        track: [Files, Tickets, Calendar, Menu]
+        actors:
+          - {id: app, label: AI app, icon: brain, x: 16, y: 60}
+          - {id: f, label: Files server, icon: folder, x: 80, y: 20}
+          - {id: t, label: Tickets server, icon: list, x: 80, y: 60}
+          - {id: c, label: Calendar server, icon: clock, x: 80, y: 98}
+        steps:
+          - {at: 0, from: f, to: app, packet: "read_file, list_dir", tone: good, caption: "The files server offers file tools."}
+          - {at: 1, from: t, to: app, packet: "search_tickets", tone: good, caption: "The tickets server offers ticket tools."}
+          - {at: 2, from: c, to: app, packet: "list_events", tone: good, caption: "The calendar server offers calendar tools."}
+          - {at: 3, active: [app], notes: {app: "5 tools from 3 servers"}, tone: good, caption: "The app's tool menu combines all three. Add a server, get its tools."}
+    points:
+      - {title: Tools, resources, prompts, text: "Three kinds of things a server can expose.", step: 0}
+      - {title: Many servers, one app, text: "Capabilities are combined.", step: 3}
+      - {title: Trust matters, text: "Only connect servers you trust; they act on your behalf."}
+    words:
+      - [Resource, Read-only data an MCP server exposes.]
+    checks:
+      - id: many
+        type: predict
+        prompt: "An app connects to 3 MCP servers with 2, 3 and 1 tools. How many tools can the model see?"
+        options: ["3", "6", "1"]
+        answer: 1
+        explain: "The client combines them: 2 + 3 + 1."
+      - id: trust
+        type: mcq
+        prompt: "Why be careful which MCP servers you connect?"
+        options: ["They slow down typing", "Their tools can read data and take actions on your behalf", "They change the model"]
+        answer: 1
+        explain: "A server's tools act with your permissions."
+
+- slug: tools-via-mcp
+  title: Tool integration using MCP
+  summary: Write a tool once as an MCP server and let an agent discover and use it.
+  minutes: 8
+  body:
+    objectives:
+      - Describe a minimal MCP tool server
+      - Explain how the agent learns the tool
+    intro: >-
+      A minimal MCP server registers a function as a tool with a name, description and input
+      schema. The agent never needs custom code for it: it lists the server's tools, reads the
+      description, and calls it like any other.
+    intro_eng: >-
+      SDKs provide decorators (e.g. @mcp.tool()) that derive JSON Schema from type hints and
+      docstrings; the host maps MCP tools into the model's tool-calling interface.
+    scenes:
+      - engine: flow
+        title: A brand-new tool, used without new code
+        track: [Write, Register, Discover, Use]
+        actors:
+          - {id: dev, label: Developer, icon: person, x: 12, y: 60}
+          - {id: srv, label: MCP server, icon: server, x: 46, y: 60}
+          - {id: agent, label: Agent, icon: brain, x: 84, y: 60}
+        steps:
+          - {at: 0, from: dev, to: srv, packet: "def get_fine(roll_no)", tone: ask, caption: "A developer writes a normal function."}
+          - {at: 1, active: [srv], notes: {srv: "tool: get_fine(roll_no: str)"}, caption: "The server registers it as a tool, with a description and input schema."}
+          - {at: 2, from: srv, to: agent, packet: "tools/list → get_fine", tone: good, caption: "The agent discovers it. No changes to the agent's code."}
+          - {at: 3, from: agent, to: srv, packet: "get_fine('21CS042')", tone: ask, caption: "Asked about a library fine, the agent calls the new tool."}
+    points:
+      - {title: Normal function, text: "The tool is ordinary code.", step: 0}
+      - {title: Described once, text: "Name, description and schema come from the server.", step: 1}
+      - {title: Discovered at runtime, text: "Agents learn new tools without redeploying.", step: 2}
+    words:
+      - [Discovery, Finding available tools at runtime.]
+    checks:
+      - id: no-agent-change
+        type: predict
+        prompt: "You add a new tool to an MCP server. What must change in the agent's code?"
+        options: ["Nothing: it discovers the tool", "Rewrite the agent loop", "Retrain the model"]
+        answer: 0
+        explain: "That's the point of discovery."
+      - id: desc
+        type: mcq
+        prompt: "How does the agent know when to use get_fine?"
+        options: ["It guesses", "From the tool's name and description", "From the server's IP address"]
+        answer: 1
+        explain: "Descriptions are what the model reads."
+
+- slug: multi-agent-systems
+  title: Multi-agent systems
+  summary: Several specialised agents that pass work between them.
+  minutes: 8
+  body:
+    objectives:
+      - Explain why to split work across agents
+      - Know the costs of multi-agent designs
+    intro: >-
+      Instead of one agent doing everything, you can use specialists: a researcher gathers facts,
+      a writer drafts, a reviewer checks. Each has a focused prompt and tools. It's more
+      powerful, but costs more calls and is harder to debug.
+    intro_eng: >-
+      Patterns: pipeline (sequential hand-offs), supervisor/worker, and peer collaboration.
+      Measure against a single-agent baseline; extra agents multiply tokens and failure points.
+    scenes:
+      - engine: graph
+        title: Researcher, writer, reviewer
+        track: [Research, Write, Review, Revise, Done]
+        nodes:
+          r: {x: 60, y: 120, label: researcher}
+          w: {x: 200, y: 60, label: writer}
+          v: {x: 340, y: 120, label: reviewer}
+          d: {x: 200, y: 200, label: final draft}
+        edges: [[r, w], [w, v], [v, w], [v, d]]
+        steps:
+          - {at: 0, node: r, state: {facts: 6}, caption: "The researcher gathers six facts with search tools."}
+          - {at: 1, node: w, edge: r-w, state: {facts: 6, draft: "v1"}, caption: "The writer drafts from those facts."}
+          - {at: 2, node: v, edge: w-v, state: {draft: "v1", issues: "1 unsupported claim"}, tone: bad, caption: "The reviewer finds a claim with no source."}
+          - {at: 3, node: w, edge: v-w, state: {draft: "v2", issues: 0}, caption: "Back to the writer to fix it."}
+          - {at: 4, node: d, edge: v-d, state: {final: "v2", llm_calls: 5}, tone: good, caption: "Approved. Better quality, but 5 LLM calls instead of 1."}
+    points:
+      - {title: Specialists, text: "Each agent has a narrow job and its own tools.", step: 0}
+      - {title: Hand-offs, text: "Work passes between them.", step: 1}
+      - {title: Costs multiply, text: "More calls, more tokens, more places to fail.", step: 4}
+    words:
+      - [Multi-agent, Several agents working on one task.]
+    checks:
+      - id: when-multi
+        type: mcq
+        prompt: "When is a multi-agent design worth it?"
+        options: ["Always", "When specialists measurably beat one agent on your task", "Never"]
+        answer: 1
+        explain: "Compare against a single-agent baseline."
+      - id: cost
+        type: predict
+        prompt: "Going from 1 agent to 4 agents that each make 2 calls. Roughly how many LLM calls per task?"
+        options: ["2", "8", "1"]
+        answer: 1
+        explain: "4 × 2 = 8 calls."
+
+- slug: agent-orchestration
+  title: Agent orchestration
+  summary: A supervisor assigns tasks to workers and assembles the results.
+  minutes: 8
+  body:
+    objectives:
+      - Describe the supervisor pattern
+      - Run independent subtasks in parallel
+    intro: >-
+      A supervisor agent splits a task, hands parts to worker agents, and combines their results.
+      Independent parts can run at the same time, which saves waiting.
+    intro_eng: >-
+      Supervisor routes via tool-calls or structured output to worker subgraphs; fan-out/fan-in
+      parallelism (map-reduce) reduces wall-clock time; enforce global budgets.
+    scenes:
+      - engine: graph
+        title: A supervisor plans a college fest
+        track: [Split, Workers, Collect, Combine]
+        nodes:
+          sup: {x: 70, y: 120, label: supervisor}
+          w1: {x: 240, y: 40, label: venue worker}
+          w2: {x: 240, y: 120, label: budget worker}
+          w3: {x: 240, y: 200, label: sponsor worker}
+          out: {x: 380, y: 120, label: plan}
+        edges: [[sup, w1], [sup, w2], [sup, w3], [w1, out], [w2, out], [w3, out]]
+        steps:
+          - {at: 0, node: sup, state: {task: "plan the fest", parts: 3}, caption: "The supervisor splits the task into three parts."}
+          - {at: 1, node: w2, state: {venue: working, budget: working, sponsors: working}, caption: "Three workers run at the same time."}
+          - {at: 2, node: out, state: {venue: "auditorium", budget: "₹1.8L", sponsors: 4}, caption: "Each returns its result."}
+          - {at: 3, node: out, state: {plan: "ready", time_saved: "about 2×"}, tone: good, caption: "The supervisor combines them into one plan, in about half the time of doing it in sequence."}
+    points:
+      - {title: Split the work, text: "The supervisor decides the parts.", step: 0}
+      - {title: Run in parallel, text: "Independent parts don't wait for each other.", step: 1}
+      - {title: Combine, text: "The supervisor assembles and checks the result.", step: 3}
+    words:
+      - [Supervisor, An agent that assigns work to others.]
+      - [Parallel, Running at the same time.]
+    checks:
+      - id: parallel
+        type: predict
+        prompt: "Three independent worker tasks take 10 s each. In parallel, the total is about…"
+        options: ["30 s", "10 s", "3 s"]
+        answer: 1
+        explain: "They run together, so the slowest one sets the time."
+      - id: orch-order
+        type: order
+        prompt: "Order the supervisor pattern."
+        items: ["Split the task", "Workers run their parts", "Collect results", "Combine and check"]
+        explain: "Split, work, collect, combine."
+
+project:
+  slug: langgraph-approval-flow
+  title: LangGraph flow with an approval step
+  body:
+    problem: >-
+      A student council handles reimbursement requests. Build a LangGraph workflow that classifies
+      each request, checks it against rules, drafts a decision, and pauses for a council member's
+      approval before anything is recorded.
+    requirements:
+      - "A LangGraph StateGraph with typed state and at least 4 nodes"
+      - "A conditional edge that routes by request type, with a fallback for unknown types"
+      - "An interrupt before the 'record decision' node, with the ability to edit the draft"
+      - "Checkpointing so a paused run survives a restart"
+      - "A README with a diagram of your graph and two traced example runs"
+    milestones:
+      - Define state and nodes
+      - Add conditional routing with a fallback
+      - Add the interrupt and resume
+      - Add a checkpointer and test resume after restart
+      - Write the README with the diagram and runs
+    rubric:
+      - {name: Graph design, points: 25, pass: "Clear nodes, typed state, sensible edges"}
+      - {name: Routing, points: 20, pass: "Correct branches and a fallback for unknown types"}
+      - {name: Human approval, points: 25, pass: "Nothing is recorded without approval; edits are applied"}
+      - {name: Persistence, points: 15, pass: "A paused run resumes after restart"}
+      - {name: README, points: 15, pass: "Diagram and two traced runs"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."

@@ -1,0 +1,734 @@
+number: 3
+slug: embeddings-vector-databases
+title: Embeddings & Vector Databases
+summary: Turn text into vectors, measure similarity, and store and search millions of them fast.
+hours: 14
+topics:
+
+- slug: what-are-embeddings
+  title: What are embeddings?
+  summary: A fixed-length list of numbers that represents the meaning of a piece of text.
+  minutes: 8
+  body:
+    objectives:
+      - Explain embeddings without maths
+      - Say why every text gets the same number of numbers
+      - Name three uses of embeddings
+    intro: >-
+      An embedding gives each piece of text an address on a giant map of meaning. Texts about
+      the same thing get nearby addresses. Once text has an address, a computer can find
+      "things like this" just by measuring distance.
+    intro_eng: >-
+      An embedding model maps variable-length text to a fixed-dimension dense vector (e.g. 384,
+      768, 1536). Geometry in that space approximates semantic relationships learned in training.
+    scenes:
+      - engine: space
+        title: Sentences find their place on the map
+        track: [Empty map, Place, Clusters, New text]
+        groups: {money: l2, health: l3, travel: l4}
+        points:
+          - {label: refund my order, x: 70, y: 60, group: money}
+          - {label: payment failed, x: 112, y: 88, group: money}
+          - {label: EMI options, x: 58, y: 110, group: money}
+          - {label: fever and cough, x: 300, y: 54, group: health}
+          - {label: book a doctor, x: 336, y: 94, group: health}
+          - {label: train to Madurai, x: 186, y: 190, group: travel}
+          - {label: flight delayed, x: 246, y: 206, group: travel}
+        query: {label: "money back please", x: 92, y: 76}
+        steps:
+          - {at: 0, filter: [none], caption: "Imagine a huge map. Every sentence will get one point on it."}
+          - {at: 1, caption: "An embedding model reads each sentence and gives it coordinates. That list of numbers is the embedding."}
+          - {at: 2, caption: "Sentences about the same thing land together: money, health, travel. Nobody told the model these groups."}
+          - {at: 3, show_query: true, lines: true, top: 2, results: true, tone: good, caption: "A new sentence, 'money back please', lands right next to 'refund my order'. Different words, same meaning."}
+    points:
+      - {title: One text, one list of numbers, text: "Every sentence becomes a list of the same length, often hundreds of numbers.", step: 1}
+      - {title: Meaning becomes distance, text: "Similar meaning means nearby points.", step: 2}
+      - {title: Works across wording, text: "It matches meaning even when no words are shared.", step: 3}
+      - {title: The map is learned, text: "Nobody draws the groups. The embedding model learned them from data.", eng: "Contrastive training pulls paired texts together and pushes unrelated ones apart."}
+    words:
+      - [Embedding, The list of numbers for one piece of text.]
+      - [Dimension, "How many numbers are in the list."]
+    checks:
+      - id: same-length
+        type: mcq
+        prompt: "A 3-word sentence and a 300-word paragraph are embedded with the same model. Their embeddings…"
+        options: ["Have different lengths", "Have the same length", "Can't be compared"]
+        answer: 1
+        explain: "The model always outputs the same number of dimensions, which is what makes comparing them possible."
+      - id: nearest
+        type: predict
+        prompt: "Which lands closest to 'I want my money back'?"
+        options: ["refund my order", "book a doctor", "flight delayed"]
+        answer: 0
+        explain: "Same meaning, different words."
+      - id: uses
+        type: multi
+        prompt: "What can you build with embeddings? Pick all that apply."
+        options: ["Semantic search", "Grouping similar support tickets", "Finding duplicate questions", "Making images load faster"]
+        answer: [0, 1, 2]
+        explain: "Anything that needs 'find similar meaning'."
+
+- slug: text-to-vectors
+  title: Text-to-vector conversion
+  summary: How text becomes a vector, and how to store and compare them in code.
+  minutes: 9
+  body:
+    objectives:
+      - Describe the steps from text to vector
+      - Store vectors as Python lists
+      - Normalise a vector
+    intro: >-
+      To get an embedding you send text to an embedding model and get back a list of numbers.
+      In code it's just a list of floats. You'll often normalise it, which means scaling it so its
+      length is 1, to make comparisons simpler.
+    intro_eng: >-
+      Pipeline: tokenise → transformer encoder → pooling (mean or CLS) → optional L2
+      normalisation. Normalised vectors make dot product equal to cosine similarity.
+    scenes:
+      - engine: flow
+        title: From sentence to vector
+        track: [Text, Tokens, Model, Pool, Vector]
+        actors:
+          - {id: txt, label: Text, icon: doc, x: 10, y: 60}
+          - {id: tok, label: Tokenizer, icon: grid, x: 32, y: 60}
+          - {id: enc, label: Encoder, icon: brain, x: 56, y: 60}
+          - {id: vec, label: Vector, icon: list, x: 86, y: 60}
+        steps:
+          - {at: 0, from: txt, to: tok, packet: "refund my order", tone: ask, caption: "Start with plain text."}
+          - {at: 1, from: tok, to: enc, packet: "[ref, und, my, order]", tone: ask, caption: "It's split into tokens, just like for chat models."}
+          - {at: 2, think: enc, notes: {enc: "one vector per token"}, caption: "The encoder produces a vector for every token, each shaped by the tokens around it."}
+          - {at: 3, active: [enc], notes: {enc: "average → one vector"}, caption: "Pooling averages them into a single vector for the whole text."}
+          - {at: 4, from: enc, to: vec, packet: "[0.12, -0.80, 0.33, …]", tone: good, caption: "Out comes one list of numbers: the embedding, ready to store and compare."}
+    points:
+      - {title: Text in, list out, text: "An embedding model returns a list of floats.", step: 4}
+      - {title: Same model for everything, text: "Embed your documents and your questions with the same model, or the map won't match.", step: 2}
+      - {title: Normalise, text: "Scale vectors to length 1 so comparisons are fair.", eng: "After L2 normalisation, dot product equals cosine similarity and is cheaper to compute."}
+    words:
+      - [Encoder, The part of a model that turns text into vectors.]
+      - [Pooling, Combining many token vectors into one.]
+      - [Normalise, Scale a vector so its length is 1.]
+    code:
+      file: normalise.py
+      source: |
+        import math
+
+        def normalise(v):
+            length = math.sqrt(sum(x * x for x in v))
+            return [round(x / length, 3) for x in v]
+
+        doc = [3.0, 4.0]
+        print(normalise(doc))
+      notes:
+        3: ["A function that scales a vector to length 1.", "L2 normalisation."]
+        4: ["Its length: square each number, add, square-root.", "Euclidean norm."]
+        5: ["Divide every number by the length.", "Unit vector."]
+        7: ["A tiny 2-number vector.", "Toy 2D embedding."]
+        8: ["[0.6, 0.8]: same direction, length 1.", "3-4-5 triangle."]
+    exercise:
+      prompt: "Write dot(a, b) that multiplies matching numbers and adds them up. dot([1,2],[3,4]) should be 11."
+      starter: |
+        def dot(a, b):
+            pass
+      tests: |
+        assert dot([1, 2], [3, 4]) == 11, "dot([1,2],[3,4]) should be 1*3 + 2*4 = 11"
+        assert dot([0, 1], [1, 0]) == 0, "Perpendicular vectors have dot product 0"
+      solution: |
+        def dot(a, b):
+            return sum(x * y for x, y in zip(a, b))
+    checks:
+      - id: same-model
+        type: mcq
+        prompt: "You embed documents with model A and questions with model B. What happens?"
+        options: ["Works fine", "Search results are meaningless: the maps don't match", "It's faster"]
+        answer: 1
+        explain: "Each model makes its own map. Always use the same one for both."
+      - id: norm
+        type: predict
+        prompt: "What does normalise([0, 5]) return?"
+        options: ["[0, 5]", "[0.0, 1.0]", "[1, 1]"]
+        answer: 1
+        explain: "Length is 5, so divide by 5."
+      - id: order-embed
+        type: order
+        prompt: "Order text-to-vector."
+        items: ["Split into tokens", "Encode each token in context", "Pool into one vector", "Normalise"]
+        explain: "Tokens, encode, pool, normalise."
+
+- slug: choosing-embedding-models
+  title: Embedding models and how to choose
+  summary: Compare models on quality for your data, dimensions, speed, cost and language.
+  minutes: 7
+  body:
+    objectives:
+      - List what matters when choosing an embedding model
+      - Explain the dimension/cost trade-off
+      - Know why language support matters in India
+    intro: >-
+      Embedding models differ in quality, size and languages. Bigger vectors can capture more but
+      cost more to store and search. If your users write in Hindi or Tamil, check the model
+      actually understands them.
+    intro_eng: >-
+      Evaluate on your own retrieval set (recall@k, nDCG). Consider dimensions (storage and
+      latency), max input tokens, multilingual coverage, licence, and hosted vs local inference.
+    scenes:
+      - engine: meter
+        title: Three embedding models compared
+        track: [Task, Small, Large, Multilingual]
+        gauges:
+          - {label: Found the right doc, max: 100, format: pct, color: l3}
+          - {label: Dimensions, max: 3072, format: num, color: l4}
+          - {label: Storage for 1M docs (GB), max: 12, format: num, color: l2}
+        steps:
+          - {at: 0, values: [0, 0, 0], log: "500 real questions, English and Hindi mixed", caption: "Measure on your own questions, not a leaderboard."}
+          - {at: 1, values: [78, 384, 2], log: "Small model, 384 dimensions", caption: "Small and cheap to store. Finds the right document 78% of the time."}
+          - {at: 2, values: [86, 3072, 12], log: "Large model, 3072 dimensions", caption: "Better, but six times the storage."}
+          - {at: 3, values: [89, 768, 3], log: "Multilingual model, 768 dimensions", tone: good, caption: "On mixed-language questions, a multilingual model beats both."}
+    points:
+      - {title: Measure on your data, text: "Test 100–500 real questions and count how often the right document is found.", step: 0}
+      - {title: Dimensions cost money, text: "More numbers per vector means more storage and slower search.", step: 2}
+      - {title: Language matters, text: "Check support for the languages your users write in.", step: 3}
+    words:
+      - [Recall@k, "How often the right document is in the top k results."]
+      - [Multilingual, Works across many languages.]
+    checks:
+      - id: pick
+        type: mcq
+        prompt: "Your users ask in Tamil and English. What matters most?"
+        options: ["The largest dimensions", "Multilingual quality, tested on your questions", "The newest model"]
+        answer: 1
+        explain: "A model that doesn't understand Tamil can't place Tamil text correctly."
+      - id: storage
+        type: predict
+        prompt: "Going from 768 to 1536 dimensions roughly does what to vector storage?"
+        options: ["Halves it", "Doubles it", "No change"]
+        answer: 1
+        explain: "Twice the numbers per vector, twice the storage."
+
+- slug: semantic-similarity
+  title: Semantic similarity
+  summary: Measuring how close two meanings are, and where it goes wrong.
+  minutes: 7
+  body:
+    objectives:
+      - Explain semantic versus keyword similarity
+      - Spot cases where similarity misleads
+    intro: >-
+      Semantic similarity is "how close in meaning". It's powerful, but not perfect: 'I love
+      this phone' and 'I don't love this phone' can look very similar because they share most of
+      their meaning except one crucial word.
+    intro_eng: >-
+      Embedding similarity captures topical relatedness well but can underweight negation,
+      numbers and exact identifiers, which is one reason hybrid (keyword + vector) search exists.
+    scenes:
+      - engine: bars
+        title: How similar are these to "cheap flights to Goa"?
+        track: [Compare, Scores, Trap]
+        format: num
+        max: 1
+        steps:
+          - {at: 0, text: "query: cheap flights to Goa", bars: [["budget airfare to Goa", 0.91], ["Goa beach hotels", 0.63], ["train tickets to Pune", 0.41], ["chocolate cake recipe", 0.05]], grow: false, caption: "Compare one query with four texts."}
+          - {at: 1, text: "query: cheap flights to Goa", bars: [["budget airfare to Goa", 0.91], ["Goa beach hotels", 0.63], ["train tickets to Pune", 0.41], ["chocolate cake recipe", 0.05]], pick: 0, tone: good, caption: "Different words, same meaning, top score."}
+          - {at: 2, text: "query: flights NOT to Goa", bars: [["budget airfare to Goa", 0.88], ["flights to Kerala", 0.61]], pick: 0, tone: bad, caption: "Trap: 'NOT to Goa' still scores highest against Goa flights. Embeddings can miss negation."}
+    points:
+      - {title: Meaning, not spelling, text: "Similar ideas score high even with different words.", step: 1}
+      - {title: It's a score from 0 to 1, text: "Higher means more similar (for most models).", step: 1}
+      - {title: Watch for negation and numbers, text: "'not', exact codes and amounts can be underweighted.", step: 2}
+    words:
+      - [Semantic similarity, How close two texts are in meaning.]
+    checks:
+      - id: trap
+        type: predict
+        prompt: "Query: 'phones under ₹10,000'. Which might wrongly score high?"
+        options: ["a phone review costing ₹45,000", "cake recipes", "train timetables"]
+        answer: 0
+        explain: "It's about phones and prices, so it's 'similar', even though the number is wrong. Use filters for hard constraints."
+      - id: fix
+        type: mcq
+        prompt: "How do you enforce 'price under ₹10,000' reliably?"
+        options: ["Hope the embedding gets it", "Use a metadata filter on price", "Raise top-k"]
+        answer: 1
+        explain: "Hard constraints belong in filters, not in similarity."
+
+- slug: cosine-and-distance
+  title: Cosine similarity and distance metrics
+  summary: Cosine measures the angle between vectors; Euclidean measures straight-line distance.
+  minutes: 9
+  body:
+    objectives:
+      - Compute cosine similarity by hand
+      - Explain why length doesn't change cosine
+      - Pick a metric for normalised vectors
+    intro: >-
+      Cosine similarity looks only at direction: two arrows pointing the same way score 1,
+      perpendicular arrows score 0, opposite arrows score −1. Length is ignored, which is usually
+      what you want for meaning.
+    intro_eng: >-
+      cos(a, b) = a·b / (‖a‖‖b‖). For unit vectors, cosine = dot product, and Euclidean distance
+      is a monotonic function of cosine, so they rank results identically.
+    scenes:
+      - engine: code
+        title: Cosine similarity, one line at a time
+        track: [Vectors, Dot, Lengths, Cosine]
+        source: |
+          a = [2, 1]
+          b = [4, 2]
+          dot = a[0]*b[0] + a[1]*b[1]
+          len_a = (a[0]**2 + a[1]**2) ** 0.5
+          len_b = (b[0]**2 + b[1]**2) ** 0.5
+          cos = dot / (len_a * len_b)
+        steps:
+          - {at: 0, line: 2, vars: {a: "[2, 1]", b: "[4, 2]"}, changed: [a, b], out: "", caption: "Two vectors. b is exactly twice a: same direction, twice as long."}
+          - {at: 1, line: 3, vars: {a: "[2, 1]", b: "[4, 2]", dot: "10"}, changed: [dot], out: "", caption: "Dot product: multiply matching numbers and add. 2×4 + 1×2 = 10."}
+          - {at: 2, line: 5, vars: {a: "[2, 1]", b: "[4, 2]", dot: "10", len_a: "2.236", len_b: "4.472"}, changed: [len_a, len_b], out: "", caption: "Each vector's length, using Pythagoras."}
+          - {at: 3, line: 6, vars: {a: "[2, 1]", b: "[4, 2]", dot: "10", len_a: "2.236", len_b: "4.472", cos: "1.0"}, changed: [cos], out: "", tone: good, caption: "10 / (2.236 × 4.472) = 1.0. Same direction means similarity 1, whatever the length."}
+    points:
+      - {title: Cosine is about angle, text: "1 = same direction, 0 = unrelated, −1 = opposite.", step: 3}
+      - {title: Length doesn't matter, text: "Doubling a vector doesn't change its cosine.", step: 3}
+      - {title: Normalised vectors make it cheap, text: "If length is always 1, cosine is just the dot product.", eng: "That's why many vector DBs default to inner product on normalised embeddings."}
+    words:
+      - [Cosine similarity, A score of how aligned two vectors are.]
+      - [Euclidean distance, Straight-line distance between two points.]
+    code:
+      file: cosine.py
+      source: |
+        import math
+
+        def cosine(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            la = math.sqrt(sum(x * x for x in a))
+            lb = math.sqrt(sum(x * x for x in b))
+            return dot / (la * lb)
+
+        print(round(cosine([2, 1], [4, 2]), 3))
+        print(round(cosine([1, 0], [0, 1]), 3))
+        print(round(cosine([1, 0], [-1, 0]), 3))
+      notes:
+        3: ["Cosine similarity of two vectors.", "a·b / (|a||b|)."]
+        4: ["Dot product.", "Sum of element-wise products."]
+        5: ["Length of a.", "L2 norm."]
+        7: ["Divide.", "Normalise by both lengths."]
+        9: ["Same direction: 1.0", "Parallel."]
+        10: ["At right angles: 0.0", "Orthogonal."]
+        11: ["Opposite: -1.0", "Antiparallel."]
+    exercise:
+      prompt: "Write most_similar(query, docs) that returns the index of the doc vector with the highest cosine to query. A cosine() helper is provided."
+      starter: |
+        import math
+
+        def cosine(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            return dot / (math.sqrt(sum(x*x for x in a)) * math.sqrt(sum(x*x for x in b)))
+
+        def most_similar(query, docs):
+            pass
+      tests: |
+        docs = [[1, 0], [0.7, 0.7], [0, 1]]
+        assert most_similar([0.1, 1], docs) == 2, "[0.1, 1] points almost straight up, like doc 2"
+        assert most_similar([1, 0.9], docs) == 1, "[1, 0.9] is closest to the diagonal doc 1"
+      solution: |
+        import math
+
+        def cosine(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            return dot / (math.sqrt(sum(x*x for x in a)) * math.sqrt(sum(x*x for x in b)))
+
+        def most_similar(query, docs):
+            scores = [cosine(query, d) for d in docs]
+            return scores.index(max(scores))
+    checks:
+      - id: scaled
+        type: predict
+        prompt: "Two vectors point the same way, but one is three times longer. Cosine similarity?"
+        options: ["0.33", "1.0", "3.0"]
+        answer: 1
+        explain: "Cosine ignores length."
+      - id: perp
+        type: mcq
+        prompt: "cosine([1, 0], [0, 1]) is…"
+        options: ["1", "0", "-1"]
+        answer: 1
+        explain: "Perpendicular vectors share no direction."
+      - id: cos-fill
+        type: fill
+        prompt: "Complete cosine similarity."
+        code: |
+          cos = dot / (len_a ____ len_b)
+        options: ["*", "+", "-"]
+        answer: "*"
+        explain: "Divide the dot product by the product of the lengths."
+
+- slug: vector-indexing
+  title: Vector indexing
+  summary: Indexes avoid comparing your query with every single vector, trading a little accuracy for a lot of speed.
+  minutes: 8
+  body:
+    objectives:
+      - Explain why brute force doesn't scale
+      - Describe how a cluster-based index speeds up search
+      - Understand the speed/recall trade-off
+    intro: >-
+      Comparing a question with 10 documents is instant. With 10 million it's too slow. An index
+      groups similar vectors in advance so a search only checks the most promising groups.
+      Sometimes it misses a result just outside those groups; that's the trade-off.
+    intro_eng: >-
+      Approximate nearest neighbour (ANN) indexes such as IVF (cluster then probe nprobe lists)
+      and HNSW (navigable small-world graphs) give sub-linear search with tunable recall.
+    scenes:
+      - engine: space
+        title: Searching only the nearby cluster
+        track: [All points, Clusters, Query, Probe, Result]
+        groups: {a: l4, b: l2, c: l7}
+        points:
+          - {label: d1, x: 60, y: 60, group: a}
+          - {label: d2, x: 96, y: 84, group: a}
+          - {label: d3, x: 78, y: 112, group: a}
+          - {label: d4, x: 290, y: 60, group: b}
+          - {label: d5, x: 330, y: 92, group: b}
+          - {label: d6, x: 300, y: 112, group: b}
+          - {label: d7, x: 180, y: 190, group: c}
+          - {label: d8, x: 226, y: 204, group: c}
+        query: {label: query, x: 88, y: 72}
+        steps:
+          - {at: 0, caption: "Brute force would compare the query with every point. Fine for 8, not for 10 million."}
+          - {at: 1, caption: "In advance, the index groups points into clusters (blue, yellow, teal)."}
+          - {at: 2, show_query: true, caption: "A query arrives. First, find the nearest cluster: blue."}
+          - {at: 3, show_query: true, filter: [a], lines: true, caption: "Only the blue cluster's points are compared. Most of the work is skipped."}
+          - {at: 4, show_query: true, filter: [a], lines: true, top: 2, results: true, tone: good, caption: "Fast answer. If the true best match sat in another cluster, it could be missed: that's why it's 'approximate'."}
+    points:
+      - {title: Brute force is exact but slow, text: "Work grows with every vector you add.", step: 0}
+      - {title: Indexes pre-organise, text: "Clusters or graphs are built once, ahead of time.", step: 1}
+      - {title: Search probes a few groups, text: "Much less work per query.", step: 3}
+      - {title: Speed versus recall, text: "Probe more groups for better recall, fewer for more speed.", eng: "Tune nprobe (IVF) or efSearch (HNSW) against measured recall@k.", step: 4}
+    words:
+      - [ANN, "Approximate nearest neighbour: fast, slightly inexact search."]
+      - [Recall, The share of true best matches you actually find.]
+    checks:
+      - id: why-index
+        type: mcq
+        prompt: "Why use an index instead of comparing with every vector?"
+        options: ["It's more accurate", "It's much faster at large scale", "It uses less storage"]
+        answer: 1
+        explain: "Indexes trade a tiny bit of accuracy for big speed."
+      - id: probe-more
+        type: predict
+        prompt: "You let the search check more clusters per query. What happens?"
+        options: ["Faster and less accurate", "Slower and more accurate", "No change"]
+        answer: 1
+        explain: "More clusters checked, more chances to find the true best match, more work."
+
+- slug: vector-db-architecture
+  title: Vector database architecture
+  summary: What a vector database stores and the operations it supports.
+  minutes: 7
+  body:
+    objectives:
+      - Name the parts of a vector record
+      - Describe insert, index and query
+      - Choose between a library, an extension and a service
+    intro: >-
+      A vector database stores records: an ID, the vector, the original text, and metadata like
+      source or date. It indexes the vectors for fast search and lets you filter by metadata.
+    intro_eng: >-
+      Options range from libraries (FAISS), to extensions on your existing DB (pgvector), to
+      managed services. Core concerns: upserts, index build, filtered ANN, persistence, scaling.
+    scenes:
+      - engine: flow
+        title: Write path and read path
+        track: [Insert, Index, Query, Filter, Return]
+        actors:
+          - {id: app, label: Your app, icon: code, x: 12, y: 60}
+          - {id: store, label: Records, icon: db, x: 45, y: 32}
+          - {id: idx, label: Index, icon: layers, x: 45, y: 82}
+          - {id: res, label: Results, icon: list, x: 86, y: 60}
+        steps:
+          - {at: 0, from: app, to: store, packet: "{id, vector, text, source}", tone: ask, caption: "Insert a record: ID, vector, original text and metadata."}
+          - {at: 1, from: store, to: idx, packet: "add to index", tone: ask, notes: {idx: "clusters / graph"}, caption: "The vector is added to the search index."}
+          - {at: 2, from: app, to: idx, packet: "query vector, k=3", tone: ask, caption: "A query vector arrives with how many results it wants."}
+          - {at: 3, active: [store], notes: {store: "source = HR policy"}, caption: "A metadata filter narrows which records count."}
+          - {at: 4, from: idx, to: res, packet: "3 records + scores", tone: good, caption: "The closest matching records come back with their text and scores."}
+    points:
+      - {title: A record is more than a vector, text: "Keep the original text and metadata alongside it.", step: 0}
+      - {title: Index for speed, text: "The index makes search fast.", step: 1}
+      - {title: Filter by metadata, text: "Restrict by source, date, user or language.", step: 3}
+      - {title: Start simple, text: "If you already run Postgres, pgvector is often enough for Release 1.", eng: "Managed services pay off at large scale or for advanced features (hybrid search, multi-tenancy)."}
+    words:
+      - [Metadata, "Extra facts about a record, like its source or date."]
+      - [Upsert, Insert a record or update it if the ID exists.]
+    checks:
+      - id: record
+        type: multi
+        prompt: "What should a vector record usually contain? Pick all that apply."
+        options: ["An ID", "The vector", "The original text", "The user's password"]
+        answer: [0, 1, 2]
+        explain: "ID, vector, text and useful metadata. Never secrets."
+      - id: flow-order
+        type: order
+        prompt: "Order the life of a document in a vector DB."
+        items: ["Embed the text", "Insert the record", "Index the vector", "Find it in a query"]
+        explain: "Embed, insert, index, query."
+
+- slug: metadata-filtering
+  title: Metadata filtering
+  summary: Restrict a search to records that match exact conditions before ranking by similarity.
+  minutes: 7
+  body:
+    objectives:
+      - Use filters for hard constraints
+      - Explain pre-filtering versus post-filtering
+    intro: >-
+      Similarity is fuzzy. Some conditions aren't: only this customer's documents, only 2024
+      policies, only Tamil. Metadata filters enforce those exactly, then similarity ranks what's
+      left.
+    intro_eng: >-
+      Pre-filtering restricts the candidate set before ANN search; post-filtering removes results
+      afterwards and can return fewer than k. Access-control filters must never be skipped.
+    scenes:
+      - engine: space
+        title: Only search this year's policies
+        track: [All docs, Filter, Search, Result]
+        groups: {y2024: l3, y2022: l1}
+        points:
+          - {label: leave 2024, x: 80, y: 70, group: y2024}
+          - {label: leave 2022, x: 100, y: 60, group: y2022}
+          - {label: travel 2024, x: 260, y: 90, group: y2024}
+          - {label: travel 2022, x: 290, y: 70, group: y2022}
+          - {label: payroll 2024, x: 190, y: 190, group: y2024}
+        query: {label: "casual leave rules", x: 96, y: 78}
+        steps:
+          - {at: 0, show_query: true, caption: "Old and new policies sit side by side. The 2022 leave policy is actually the closest match."}
+          - {at: 1, show_query: true, filter: [y2024], caption: "Filter: year = 2024. The old documents are excluded completely."}
+          - {at: 2, show_query: true, filter: [y2024], lines: true, caption: "Similarity runs only on what's left."}
+          - {at: 3, show_query: true, filter: [y2024], lines: true, top: 1, results: true, tone: good, caption: "The current leave policy wins, and the outdated one can't sneak in."}
+    points:
+      - {title: Filters are exact, text: "Use them for rules that must hold.", step: 1}
+      - {title: Similarity ranks the rest, text: "Filter first, then rank by meaning.", step: 2}
+      - {title: Security uses filters too, text: "Always filter by user or tenant so people only see their own documents.", eng: "Treat tenant/user filters as authorisation: enforce server-side, never from client input alone."}
+    words:
+      - [Filter, An exact condition a record must meet.]
+      - [Tenant, One customer's separate set of data.]
+    checks:
+      - id: when-filter
+        type: mcq
+        prompt: "A user should only see their own uploaded files. How?"
+        options: ["Hope similarity keeps them separate", "Filter by user_id on every search, enforced on the server", "Use a bigger model"]
+        answer: 1
+        explain: "That's a security rule. It must be an exact filter."
+      - id: outdated
+        type: predict
+        prompt: "Without a year filter, an old policy is the closest match. What does the user get?"
+        options: ["The current policy", "Possibly the outdated policy", "An error"]
+        answer: 1
+        explain: "Similarity doesn't know about 'current'. Filters do."
+
+- slug: similarity-search
+  title: Similarity search
+  summary: Embed the query, find the top-k nearest records, and return them with scores.
+  minutes: 8
+  body:
+    objectives:
+      - Implement top-k search in Python
+      - Choose k sensibly
+      - Use a score threshold
+    intro: >-
+      Similarity search is the core operation: turn the question into a vector, compare it with
+      stored vectors, and return the k most similar records. A score threshold stops weak matches
+      from being treated as answers.
+    intro_eng: >-
+      Top-k retrieval with an optional minimum score. k balances recall against prompt length;
+      thresholds reduce irrelevant context but must be tuned per model.
+    scenes:
+      - engine: space
+        title: How does a vector DB find similar documents?
+        track: [Embed, Query, Measure, Rank, Return]
+        groups: {pets: l4, food: l2, code: l7}
+        points:
+          - {label: puppy training, x: 62, y: 58, group: pets}
+          - {label: dog food brands, x: 112, y: 40, group: pets}
+          - {label: cat toys, x: 48, y: 108, group: pets}
+          - {label: kitten care, x: 104, y: 98, group: pets}
+          - {label: pasta recipe, x: 300, y: 52, group: food}
+          - {label: pizza dough, x: 340, y: 84, group: food}
+          - {label: python loops, x: 190, y: 190, group: code}
+          - {label: SQL joins, x: 250, y: 206, group: code}
+        query: {label: "train my puppy?", x: 86, y: 74}
+        steps:
+          - {at: 0, caption: "Every document is a point on the meaning map."}
+          - {at: 1, show_query: true, caption: "The question is embedded the same way and lands on the map."}
+          - {at: 2, show_query: true, lines: true, caption: "Measure how close it is to every document."}
+          - {at: 3, show_query: true, lines: true, top: 3, caption: "Keep the 3 closest (top-k = 3). The rest are ignored."}
+          - {at: 4, show_query: true, lines: true, top: 3, results: true, tone: good, caption: "Return those 3 with their scores."}
+    points:
+      - {title: Embed the query, text: "With the same model used for the documents.", step: 1}
+      - {title: Score every candidate, text: "Or let an index narrow candidates first.", step: 2}
+      - {title: Keep the top k, text: "Often 3 to 10 for RAG.", step: 3}
+      - {title: Use a threshold, text: "If even the best score is low, say 'not found' instead of guessing.", step: 4}
+    words:
+      - [Top-k, The k best matches.]
+      - [Threshold, A minimum score to count as a match.]
+    code:
+      file: search.py
+      source: |
+        import math
+
+        def cosine(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            return dot / (math.sqrt(sum(x*x for x in a)) * math.sqrt(sum(x*x for x in b)))
+
+        docs = {"puppy training": [0.9, 0.1], "pasta recipe": [0.1, 0.9], "dog food": [0.8, 0.3]}
+        query = [0.85, 0.2]
+        scores = {name: round(cosine(query, v), 3) for name, v in docs.items()}
+        top = sorted(scores, key=scores.get, reverse=True)[:2]
+        print(top)
+      notes:
+        7: ["Three documents with tiny made-up 2-number embeddings.", "Toy vectors for illustration."]
+        8: ["The question's embedding.", "Query vector."]
+        9: ["Score every document against the question.", "Brute-force scoring."]
+        10: ["Sort by score and keep the best 2.", "Top-k selection."]
+        11: ["puppy training and dog food win.", "Result."]
+    exercise:
+      prompt: "Write top_k(scores, k, min_score) returning names of the best k with score ≥ min_score, best first."
+      starter: |
+        def top_k(scores, k, min_score):
+            # scores is a dict like {"a": 0.9, "b": 0.2}
+            pass
+      tests: |
+        s = {"a": 0.91, "b": 0.42, "c": 0.77, "d": 0.12}
+        assert top_k(s, 2, 0.0) == ["a", "c"], "Best two should be a then c"
+        assert top_k(s, 3, 0.5) == ["a", "c"], "Only scores ≥ 0.5 count"
+        assert top_k(s, 3, 0.95) == [], "Nothing clears 0.95"
+      solution: |
+        def top_k(scores, k, min_score):
+            ok = [n for n in scores if scores[n] >= min_score]
+            return sorted(ok, key=scores.get, reverse=True)[:k]
+    checks:
+      - id: k-big
+        type: predict
+        prompt: "You set k = 50 for a chatbot's RAG context. Likely effect?"
+        options: ["Better answers always", "Longer, costlier prompts with more irrelevant text", "Fewer results"]
+        answer: 1
+        explain: "More chunks means more noise and tokens. Most apps use 3–10."
+      - id: threshold
+        type: mcq
+        prompt: "The best match scores 0.21 (low). What should the app do?"
+        options: ["Answer from it anyway", "Say it couldn't find this in the documents", "Increase temperature"]
+        answer: 1
+        explain: "A threshold prevents confident answers from weak evidence."
+    lab: lab-semantic-search
+
+- slug: hands-on-vector-db
+  title: Hands-on vector database
+  summary: Build a tiny in-memory vector store with insert, filter and search.
+  minutes: 12
+  body:
+    objectives:
+      - Implement add() and search() for a vector store
+      - Add metadata filtering
+      - Explain what a real vector DB adds on top
+    intro: >-
+      The fastest way to understand a vector database is to build a tiny one. A Python list of
+      records, a cosine function, a filter and a sort is a working vector store. Real ones add
+      indexes, persistence and scale.
+    intro_eng: >-
+      A brute-force store is O(N·d) per query; production systems add ANN indexes, durable
+      storage, concurrent writes, replication and filtered search at scale.
+    scenes:
+      - engine: code
+        title: A vector store in a few lines
+        track: [Store, Add, Add, Search]
+        source: |
+          store = []
+          store.append({"id": 1, "v": [0.9, 0.1], "src": "faq"})
+          store.append({"id": 2, "v": [0.2, 0.8], "src": "blog"})
+          hits = [r["id"] for r in store if r["src"] == "faq"]
+        steps:
+          - {at: 0, line: 1, vars: {store: "[]"}, changed: [store], out: "", caption: "The store is just a list of records."}
+          - {at: 1, line: 2, vars: {store: "[{id 1, faq}]"}, changed: [store], out: "", caption: "Add a record with an ID, a vector and metadata."}
+          - {at: 2, line: 3, vars: {store: "[{id 1, faq}, {id 2, blog}]"}, changed: [store], out: "", caption: "Add another."}
+          - {at: 3, line: 4, vars: {store: "[{id 1, faq}, {id 2, blog}]", hits: "[1]"}, changed: [hits], out: "", tone: good, caption: "A metadata filter keeps only FAQ records. Next, rank them by cosine."}
+    points:
+      - {title: Records in a list, text: "That's a vector store at its simplest.", step: 1}
+      - {title: Filter, then rank, text: "Exact conditions first, similarity second.", step: 3}
+      - {title: Real DBs add scale, text: "Indexes, saving to disk, many users at once.", eng: "Plus deletes/updates, backups, monitoring and access control."}
+    words:
+      - [In-memory, Kept in RAM; lost when the program stops.]
+    code:
+      file: tiny_store.py
+      source: |
+        import math
+
+        def cosine(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            return dot / (math.sqrt(sum(x*x for x in a)) * math.sqrt(sum(x*x for x in b)))
+
+        class TinyStore:
+            def __init__(self):
+                self.rows = []
+
+            def add(self, id, vector, text, source):
+                self.rows.append({"id": id, "v": vector, "text": text, "source": source})
+
+            def search(self, query, k=2, source=None):
+                rows = [r for r in self.rows if source is None or r["source"] == source]
+                ranked = sorted(rows, key=lambda r: cosine(query, r["v"]), reverse=True)
+                return [r["text"] for r in ranked[:k]]
+
+        db = TinyStore()
+        db.add(1, [0.9, 0.1], "Casual leave is 12 days", "hr")
+        db.add(2, [0.2, 0.9], "Pantry opens at 9", "office")
+        db.add(3, [0.8, 0.3], "Sick leave needs a note", "hr")
+        print(db.search([0.85, 0.2], k=2, source="hr"))
+      notes:
+        7: ["A tiny vector store as a class.", "Encapsulate state and operations."]
+        9: ["It keeps records in a list.", "Backing storage."]
+        11: ["add() saves a record.", "Insert."]
+        14: ["search() finds the best matches.", "Query with optional filter."]
+        15: ["Apply the filter first.", "Pre-filtering."]
+        16: ["Rank by cosine, best first.", "Brute-force ranking."]
+        17: ["Return the top k texts.", "Top-k."]
+        23: ["Search only HR documents.", "Filtered search."]
+    checks:
+      - id: what-adds
+        type: multi
+        prompt: "What does a real vector DB add beyond this tiny store? Pick all that apply."
+        options: ["Indexes for fast search", "Saving to disk", "Handling many users at once", "Making embeddings smarter"]
+        answer: [0, 1, 2]
+        explain: "Embedding quality comes from the model, not the database."
+      - id: filter-bug
+        type: debug
+        prompt: "search(source='hr') returns office documents too. Tap the buggy line."
+        code: |
+          def search(self, query, k=2, source=None):
+              rows = [r for r in self.rows if source is None or r["source"] != source]
+              ranked = sorted(rows, key=lambda r: cosine(query, r["v"]), reverse=True)
+              return ranked[:k]
+        answer: 2
+        explain: "It uses != so it keeps everything except the requested source. It should be ==."
+
+project:
+  slug: semantic-search-notes
+  title: Semantic search over your notes
+  body:
+    problem: >-
+      Students have years of notes they can never find again. Build a semantic search tool over
+      a folder of text notes: embed them, store them with metadata, and search by meaning with
+      filters.
+    requirements:
+      - "Load at least 30 short notes (text files or a JSON list) with a subject field"
+      - "Embed them with any embedding model or library, and store vectors with metadata"
+      - "A search(query, k, subject=None) function returning text, subject and score"
+      - "A score threshold that returns 'nothing relevant' for unrelated queries"
+      - "A README with 5 example queries, their results, and one failure you found"
+    milestones:
+      - Collect and clean 30+ notes
+      - Embed and store them
+      - Implement search with top-k
+      - Add the subject filter and threshold
+      - Write the README with examples and a failure analysis
+    rubric:
+      - {name: Search works by meaning, points: 30, pass: "Queries with different wording find the right notes"}
+      - {name: Filter and threshold, points: 20, pass: "Subject filter is exact; threshold blocks unrelated queries"}
+      - {name: Code quality, points: 15, pass: "Clear functions, no secrets in code"}
+      - {name: README examples, points: 20, pass: "5 queries with results and scores"}
+      - {name: Honest failure analysis, points: 15, pass: "One real failure explained"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."

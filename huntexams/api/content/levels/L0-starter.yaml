@@ -1,0 +1,540 @@
+number: 0
+slug: starter
+title: Python in plain words
+summary: >-
+  For complete beginners. What a program is, and the five Python ideas you need before AI:
+  variables, text, lists and loops, functions, and dictionaries.
+hours: 16
+optional: true
+topics:
+
+- slug: what-is-a-program
+  title: What is a program?
+  summary: A program is a list of instructions the computer follows, one line at a time.
+  minutes: 6
+  body:
+    objectives:
+      - Say what a program is in one sentence
+      - Explain why the order of lines matters
+      - Read a three-line Python program
+    intro: >-
+      A program is a recipe. Each line is one instruction, and the computer follows them from
+      top to bottom without skipping or guessing. Python is a language for writing those
+      instructions in words that are close to English.
+    intro_eng: >-
+      A Python program is a sequence of statements executed top to bottom by the interpreter.
+      Control flow (loops, conditions, function calls) changes that order; nothing else does.
+    scenes:
+      - engine: code
+        title: The computer follows your lines, in order
+        track: [Line 1, Line 2, Line 3, Done]
+        source: |
+          print("Good morning")
+          print("Making tea")
+          print("Tea is ready")
+        steps:
+          - {at: 0, line: 1, vars: {}, out: "Good morning\n", caption: "Python reads line 1 and does exactly what it says: show the words Good morning."}
+          - {at: 1, line: 2, vars: {}, out: "Good morning\nMaking tea\n", caption: "Then line 2. It never jumps ahead. It always goes to the next line."}
+          - {at: 2, line: 3, vars: {}, out: "Good morning\nMaking tea\nTea is ready\n", caption: "Then line 3. The output appears in the same order as the lines."}
+          - {at: 3, vars: {}, out: "Good morning\nMaking tea\nTea is ready\n", caption: "No more lines, so the program ends. That's all a program is: steps in order.", tone: good}
+    points:
+      - {title: A program is a list of steps, text: "Like a recipe, each line is one instruction.", step: 0}
+      - {title: Order matters, text: "Python runs line 1, then line 2, then line 3. Swap two lines and the result changes.", step: 1}
+      - {title: print shows text on screen, text: "print(\"hello\") displays hello. The quotes mark it as text.", step: 2}
+      - {title: The program stops at the end, text: "When there are no lines left, the program is done.", step: 3}
+    words:
+      - [Program, A list of instructions for a computer.]
+      - [Python, A programming language that reads a lot like English.]
+      - [Output, What the program shows you, here the printed lines.]
+    code:
+      file: hello.py
+      source: |
+        print("Good morning")
+        print("Making tea")
+        print("Tea is ready")
+      notes:
+        1: ["Show the words Good morning.", "Calls the built-in print() with a string literal."]
+        2: ["Next, show Making tea.", "Statements run sequentially, so this prints second."]
+        3: ["Last, show Tea is ready.", "Final statement; the module then finishes executing."]
+    exercise:
+      prompt: Add a fourth line that prints Time to study.
+      starter: |
+        print("Good morning")
+        print("Making tea")
+        print("Tea is ready")
+      tests: |
+        assert "Time to study" in __stdout__, "Print the words Time to study on a new line."
+      solution: |
+        print("Good morning")
+        print("Making tea")
+        print("Tea is ready")
+        print("Time to study")
+    checks:
+      - id: order
+        type: predict
+        prompt: "If you swap line 1 and line 3, what is printed first?"
+        options: ["Good morning", "Tea is ready", "Nothing, it breaks"]
+        answer: 1
+        explain: "Python always starts at the top. Whatever is on line 1 is printed first."
+        hint: "Python never skips ahead. Which text would be on line 1?"
+      - id: what-is
+        type: mcq
+        prompt: "Which sentence best describes a program?"
+        options: ["A website", "A list of instructions the computer follows in order", "A file full of numbers"]
+        answer: 1
+        explain: "A program is instructions, followed one at a time, top to bottom."
+    lab: lab-first-program
+
+- slug: variables
+  title: Variables are labelled boxes
+  summary: A variable gives a name to a value so you can use it later.
+  minutes: 8
+  body:
+    objectives:
+      - Create a variable and change it
+      - Predict a variable's value after each line
+      - Use a variable inside print
+    intro: >-
+      A variable is a labelled box. You put a value in it once, then use the label whenever you
+      need the value. If you put something new in the box, the old value is replaced.
+    intro_eng: >-
+      A variable is a name bound to a value. Assignment with = rebinds the name; reading the name
+      evaluates to whatever it is currently bound to.
+    scenes:
+      - engine: code
+        title: Watch the boxes fill and change
+        track: [Create, Create, Change, Use]
+        source: |
+          price = 120
+          quantity = 2
+          price = 150
+          total = price * quantity
+          print(total)
+        steps:
+          - {at: 0, line: 1, vars: {price: "120"}, changed: [price], out: "", caption: "price = 120 makes a box called price and puts 120 inside."}
+          - {at: 1, line: 2, vars: {price: "120", quantity: "2"}, changed: [quantity], out: "", caption: "A second box, quantity, holds 2."}
+          - {at: 2, line: 3, vars: {price: "150", quantity: "2"}, changed: [price], out: "", caption: "price = 150 replaces what was in the box. The 120 is gone."}
+          - {at: 3, line: 4, vars: {price: "150", quantity: "2", total: "300"}, changed: [total], out: "", caption: "total uses the current values: 150 × 2 = 300."}
+          - {at: 3, line: 5, vars: {price: "150", quantity: "2", total: "300"}, out: "300\n", caption: "print(total) shows what's in the total box: 300.", tone: good}
+    points:
+      - {title: "= means put this value in the box", text: "price = 120 stores 120 under the name price. It does not mean 'equals' like in maths.", step: 0}
+      - {title: Each box has one value at a time, text: "Assigning again replaces the old value.", step: 2}
+      - {title: Use the name to get the value, text: "Writing price later gives you whatever is in the box right now.", step: 3}
+    words:
+      - [Variable, A name that points to a value.]
+      - [Assignment, "Putting a value in a variable with =."]
+      - [Value, "The data itself: 120, \"Priya\", True."]
+    code:
+      file: bill.py
+      source: |
+        price = 120
+        quantity = 2
+        price = 150
+        total = price * quantity
+        print(total)
+      notes:
+        1: ["Make a box called price and put 120 in it.", "Bind the name price to the int 120."]
+        2: ["Make a box called quantity with 2.", "Bind quantity to 2."]
+        3: ["Replace 120 with 150 in the price box.", "Rebind price; the old int is no longer referenced."]
+        4: ["Multiply what's in the two boxes, store it in total.", "Evaluates price * quantity with current bindings."]
+        5: ["Show the total.", "print writes repr-free str(total) to stdout."]
+    exercise:
+      prompt: "Make a variable called name with your name in quotes, then print it."
+      starter: |
+        # write your line below
+      tests: |
+        assert "name" in dir(), "Create a variable called name."
+        assert isinstance(name, str) and name.strip(), "Put some text in quotes, like name = \"Priya\"."
+        assert name in __stdout__, "Print the name with print(name)."
+      solution: |
+        name = "Priya"
+        print(name)
+    checks:
+      - id: rebind
+        type: predict
+        prompt: "x = 5, then x = 9. What is x now?"
+        options: ["5", "9", "14"]
+        answer: 1
+        explain: "Assigning again replaces the value. The 5 is gone."
+      - id: total
+        type: fill
+        prompt: "Complete the line so total is price times quantity."
+        code: "total = price ____ quantity"
+        options: ["+", "*", "="]
+        answer: "*"
+        explain: "* multiplies in Python."
+      - id: bug
+        type: debug
+        prompt: "This should print 300 but crashes. Tap the line with the mistake."
+        code: |
+          price = 150
+          quantity = 2
+          total = price * quantty
+          print(total)
+        answer: 3
+        explain: "quantty is misspelled, so Python can't find that box. Names must match exactly."
+        hint: "Compare each name with where it was created."
+    lab: lab-variables
+
+- slug: text-and-strings
+  title: Text in Python (strings)
+  summary: Strings hold text. You can join them, measure them and split them into words.
+  minutes: 8
+  body:
+    objectives:
+      - Create strings and join them
+      - Use len() and .split()
+      - Use an f-string to put a variable inside text
+    intro: >-
+      Text in Python is called a string. You write it in quotes. Strings are how you'll talk to
+      AI models later, so it's worth getting comfortable with them now.
+    intro_eng: >-
+      str is an immutable sequence of Unicode characters. Methods like split, join, lower and
+      f-string interpolation are the daily tools of prompt building.
+    scenes:
+      - engine: code
+        title: Building a message from pieces
+        track: [Store, Join, Measure, Split]
+        source: |
+          name = "Priya"
+          greeting = f"Hi {name}, ready to learn?"
+          length = len(greeting)
+          words = greeting.split()
+        steps:
+          - {at: 0, line: 1, vars: {name: "'Priya'"}, changed: [name], out: "", caption: "A string is text in quotes. name now holds 'Priya'."}
+          - {at: 1, line: 2, vars: {name: "'Priya'", greeting: "'Hi Priya, ready to learn?'"}, changed: [greeting], out: "", caption: "The f before the quotes lets you drop a variable inside {}. Python fills in Priya."}
+          - {at: 2, line: 3, vars: {name: "'Priya'", greeting: "'Hi Priya, ready to learn?'", length: "25"}, changed: [length], out: "", caption: "len() counts characters, spaces and commas included: 25."}
+          - {at: 3, line: 4, vars: {name: "'Priya'", greeting: "'Hi Priya, ready to learn?'", length: "25", words: "['Hi', 'Priya,', 'ready', 'to', 'learn?']"}, changed: [words], out: "", caption: "split() cuts the text at spaces and gives you a list of words.", tone: good}
+    points:
+      - {title: Strings live in quotes, text: "\"hello\" and 'hello' are both strings.", step: 0}
+      - {title: f-strings fill in variables, text: "f\"Hi {name}\" puts the value of name into the text.", step: 1}
+      - {title: len counts characters, text: "Spaces and punctuation count too.", step: 2}
+      - {title: split makes a list of words, text: "This is a very rough version of what tokenizers do for AI.", step: 3}
+    words:
+      - [String, Text inside quotes.]
+      - [f-string, "A string with f in front that fills in {variables}."]
+      - [Method, "An action a value can do, written after a dot: text.split()."]
+    code:
+      file: strings.py
+      source: |
+        name = "Priya"
+        greeting = f"Hi {name}, ready to learn?"
+        print(greeting)
+        print(len(greeting))
+        print(greeting.split())
+      notes:
+        1: ["Store the text Priya.", "str literal bound to name."]
+        2: ["Build a sentence with name inside it.", "f-string interpolation evaluates {name} at runtime."]
+        3: ["Show the sentence.", "print the str."]
+        4: ["Show how many characters it has.", "len() returns the number of code points."]
+        5: ["Show it cut into words.", "str.split() with no args splits on runs of whitespace."]
+    exercise:
+      prompt: "Make a variable topic = \"tokens\" and print the sentence: Today I learn tokens (use an f-string)."
+      starter: |
+        topic = "tokens"
+      tests: |
+        assert "Today I learn tokens" in __stdout__, "Print exactly: Today I learn tokens"
+      solution: |
+        topic = "tokens"
+        print(f"Today I learn {topic}")
+    checks:
+      - id: len
+        type: predict
+        prompt: "What does len(\"AI is fun\") give?"
+        options: ["3", "7", "9"]
+        answer: 2
+        explain: "A-I-space-i-s-space-f-u-n is 9 characters. Spaces count."
+      - id: split
+        type: mcq
+        prompt: "What does \"learn by doing\".split() return?"
+        options: ["\"learnbydoing\"", "['learn', 'by', 'doing']", "3"]
+        answer: 1
+        explain: "split() returns a list of the words."
+      - id: fstring
+        type: fill
+        prompt: "Fill the blank so the text says Hello Arjun."
+        code: |
+          name = "Arjun"
+          msg = ____"Hello {name}"
+        options: ["f", "s", "+"]
+        answer: "f"
+        explain: "The f prefix makes Python fill in {name}."
+
+- slug: lists-and-loops
+  title: Lists and loops
+  summary: A list holds many values in order. A loop does the same job for each one.
+  minutes: 10
+  body:
+    objectives:
+      - Create a list and read items from it
+      - Write a for loop that visits every item
+      - Use a loop to add up numbers
+    intro: >-
+      A list is a row of boxes under one name. A for loop takes one item at a time and runs the
+      same lines for it. Together they let you handle 3 items or 3 million with the same code.
+    intro_eng: >-
+      list is an ordered, mutable sequence. A for statement iterates any iterable, binding the
+      loop variable to each element and executing the body once per element.
+    scenes:
+      - engine: code
+        title: Adding up a bill, one item at a time
+        track: [List, Start, Round 1, Round 2, Round 3, Result]
+        source: |
+          prices = [40, 25, 55]
+          total = 0
+          for p in prices:
+              total = total + p
+          print(total)
+        steps:
+          - {at: 0, line: 1, vars: {prices: "[40, 25, 55]"}, changed: [prices], out: "", caption: "A list of three prices, in order."}
+          - {at: 1, line: 2, vars: {prices: "[40, 25, 55]", total: "0"}, changed: [total], out: "", caption: "total starts at 0 before we add anything."}
+          - {at: 2, line: 3, vars: {prices: "[40, 25, 55]", total: "0", p: "40"}, changed: [p], out: "", caption: "Round 1: the loop takes the first item. p is 40."}
+          - {at: 2, line: 4, vars: {prices: "[40, 25, 55]", total: "40", p: "40"}, changed: [total], out: "", caption: "total = 0 + 40, so total is 40."}
+          - {at: 3, line: 3, vars: {prices: "[40, 25, 55]", total: "40", p: "25"}, changed: [p], out: "", caption: "Round 2: p is now 25. The same line runs again."}
+          - {at: 3, line: 4, vars: {prices: "[40, 25, 55]", total: "65", p: "25"}, changed: [total], out: "", caption: "total = 40 + 25 = 65."}
+          - {at: 4, line: 3, vars: {prices: "[40, 25, 55]", total: "65", p: "55"}, changed: [p], out: "", caption: "Round 3: p is 55, the last item."}
+          - {at: 4, line: 4, vars: {prices: "[40, 25, 55]", total: "120", p: "55"}, changed: [total], out: "", caption: "total = 65 + 55 = 120."}
+          - {at: 5, line: 5, vars: {prices: "[40, 25, 55]", total: "120", p: "55"}, out: "120\n", caption: "No items left, so the loop ends and the total is printed.", tone: good}
+    points:
+      - {title: "A list keeps items in order", text: "[40, 25, 55] has three items. The first is at position 0.", step: 0}
+      - {title: "for p in prices visits each item", text: "Each round, p becomes the next item.", step: 2}
+      - {title: "The indented lines repeat", text: "Lines indented under for run once per item.", step: 3}
+      - {title: "After the loop, code continues", text: "The unindented print runs once, at the end.", step: 5}
+    words:
+      - [List, "Several values in square brackets, in order."]
+      - [Loop, A way to repeat lines for each item.]
+      - [Indent, "Spaces at the start of a line. They show which lines belong to the loop."]
+    code:
+      file: bill.py
+      source: |
+        prices = [40, 25, 55]
+        total = 0
+        for p in prices:
+            total = total + p
+        print(total)
+        print(prices[0])
+      notes:
+        1: ["A list of three prices.", "list literal with three ints."]
+        2: ["Start counting from 0.", "Accumulator initialised before the loop."]
+        3: ["Take each price, one at a time, and call it p.", "Iterates the list; p is rebound each iteration."]
+        4: ["Add this price to the total.", "Loop body: accumulate."]
+        5: ["After the loop, show the total.", "Dedented, so runs once after iteration ends."]
+        6: ["Show the first item. Positions start at 0.", "Zero-based indexing."]
+    exercise:
+      prompt: "Count how many words in the list are longer than 4 letters. Store the answer in count."
+      starter: |
+        words = ["agent", "tool", "memory", "plan", "answer"]
+        count = 0
+        # loop over words and add 1 to count when len(word) > 4
+      tests: |
+        assert count == 3, f"count should be 3 (agent, memory, answer). Yours is {count}."
+      solution: |
+        words = ["agent", "tool", "memory", "plan", "answer"]
+        count = 0
+        for word in words:
+            if len(word) > 4:
+                count = count + 1
+    checks:
+      - id: rounds
+        type: predict
+        prompt: "How many times does the indented line run for prices = [40, 25, 55]?"
+        options: ["1", "3", "55"]
+        answer: 1
+        explain: "Once per item. Three items, three rounds."
+      - id: index
+        type: mcq
+        prompt: "What is [\"a\", \"b\", \"c\"][0]?"
+        options: ["\"a\"", "\"b\"", "Error"]
+        answer: 0
+        explain: "Positions start at 0, so [0] is the first item."
+      - id: order-loop
+        type: order
+        prompt: "Put the lines in the right order to add up a list."
+        items: ["nums = [1, 2, 3]", "total = 0", "for n in nums:", "    total = total + n", "print(total)"]
+        explain: "Make the list, start at 0, loop, add inside the loop, print after."
+    lab: lab-lists-loops
+
+- slug: functions
+  title: Functions are reusable recipes
+  summary: A function packages lines under a name so you can run them again with different inputs.
+  minutes: 9
+  body:
+    objectives:
+      - Define a function with def
+      - Pass inputs and get a value back with return
+      - Explain the difference between print and return
+    intro: >-
+      A function is a recipe with a name. You write the steps once, then use it as many times as
+      you like with different ingredients. In AI work, tools are just functions the AI can call.
+    intro_eng: >-
+      def creates a function object bound to a name. Parameters are local names bound to the
+      arguments on each call; return hands a value back to the caller.
+    scenes:
+      - engine: code
+        title: Calling a function twice
+        track: [Define, Call, Inside, Return, Again]
+        source: |
+          def add_gst(price):
+              return price * 1.18
+
+          a = add_gst(100)
+          b = add_gst(250)
+        steps:
+          - {at: 0, line: 1, vars: {add_gst: "function"}, changed: [add_gst], out: "", caption: "def creates the recipe and names it add_gst. Nothing is calculated yet."}
+          - {at: 1, line: 4, vars: {add_gst: "function"}, out: "", caption: "Here we use it: add_gst(100). Python jumps into the function with price = 100."}
+          - {at: 2, line: 2, vars: {add_gst: "function", "price (inside)": "100"}, changed: ["price (inside)"], out: "", caption: "Inside, price is 100, so price * 1.18 is 118.0."}
+          - {at: 3, line: 4, vars: {add_gst: "function", a: "118.0"}, changed: [a], out: "", caption: "return hands 118.0 back, and it's stored in a."}
+          - {at: 4, line: 5, vars: {add_gst: "function", a: "118.0", b: "295.0"}, changed: [b], out: "", caption: "Same recipe, new input: add_gst(250) gives 295.0.", tone: good}
+    points:
+      - {title: def defines, it doesn't run, text: "The lines inside run only when you call the function.", step: 0}
+      - {title: Inputs go in brackets, text: "add_gst(100) sets price to 100 for that call.", step: 1}
+      - {title: return gives a value back, text: "You can store the result, like a = add_gst(100).", step: 3}
+      - {title: Write once, use many times, text: "That's why AI tools are written as functions.", step: 4}
+    words:
+      - [Function, A named block of code you can run again.]
+      - [Parameter, "The input name inside the function, like price."]
+      - [return, Sends a value back to whoever called the function.]
+    code:
+      file: gst.py
+      source: |
+        def add_gst(price):
+            return price * 1.18
+
+        a = add_gst(100)
+        b = add_gst(250)
+        print(a, b)
+      notes:
+        1: ["Make a recipe called add_gst that takes a price.", "Define a function with one parameter."]
+        2: ["Give back the price plus 18%.", "return the computed float."]
+        4: ["Use it with 100 and keep the answer in a.", "Call with argument 100; bind result."]
+        5: ["Use it again with 250.", "Second call, independent local scope."]
+        6: ["Show both answers.", "print with two args, separated by a space."]
+    exercise:
+      prompt: "Write a function count_words(text) that returns how many words are in text."
+      starter: |
+        def count_words(text):
+            # return the number of words
+            pass
+      tests: |
+        assert count_words("agents use tools") == 3, "count_words('agents use tools') should be 3"
+        assert count_words("hello") == 1, "count_words('hello') should be 1"
+      solution: |
+        def count_words(text):
+            return len(text.split())
+    checks:
+      - id: def-runs
+        type: predict
+        prompt: "A file has only a def block and no call. What happens when you run it?"
+        options: ["The function runs once", "Nothing visible happens", "Error"]
+        answer: 1
+        explain: "def only defines the recipe. It runs when called."
+      - id: return-vs-print
+        type: mcq
+        prompt: "Why use return instead of print inside a function?"
+        options: ["return is faster", "return gives the value back so other code can use it", "print doesn't work in functions"]
+        answer: 1
+        explain: "print only shows text. return hands back a value you can store and reuse."
+      - id: fn-bug
+        type: debug
+        prompt: "This function always gives None. Tap the line to fix."
+        code: |
+          def double(n):
+              result = n * 2
+          print(double(4))
+        answer: 2
+        explain: "The function calculates result but never returns it. Use return n * 2."
+        hint: "What does the function give back?"
+    lab: lab-functions
+
+- slug: dictionaries
+  title: Dictionaries and JSON
+  summary: A dictionary stores values under names (keys). It's the shape of almost all AI data.
+  minutes: 9
+  body:
+    objectives:
+      - Create a dictionary and read a value by key
+      - Add and change keys
+      - Recognise JSON as dictionary-shaped text
+    intro: >-
+      A dictionary is like a form: each field has a name and a value. AI models send and receive
+      data in this shape (as JSON), so you'll see it in every agent and API.
+    intro_eng: >-
+      dict maps hashable keys to values. JSON objects map one-to-one onto Python dicts via
+      json.loads and json.dumps, which is how tool calls and structured outputs travel.
+    scenes:
+      - engine: code
+        title: Filling in a student's form
+        track: [Create, Read, Add, Change]
+        source: |
+          student = {"name": "Kavya", "year": 3}
+          who = student["name"]
+          student["skill"] = "Python"
+          student["year"] = 4
+        steps:
+          - {at: 0, line: 1, vars: {student: "{'name': 'Kavya', 'year': 3}"}, changed: [student], out: "", caption: "A dictionary with two fields: name and year."}
+          - {at: 1, line: 2, vars: {student: "{'name': 'Kavya', 'year': 3}", who: "'Kavya'"}, changed: [who], out: "", caption: "student[\"name\"] looks up the value stored under the key name."}
+          - {at: 2, line: 3, vars: {student: "{'name': 'Kavya', 'year': 3, 'skill': 'Python'}", who: "'Kavya'"}, changed: [student], out: "", caption: "Assigning to a new key adds a field."}
+          - {at: 3, line: 4, vars: {student: "{'name': 'Kavya', 'year': 4, 'skill': 'Python'}", who: "'Kavya'"}, changed: [student], out: "", caption: "Assigning to an existing key changes it. year is now 4.", tone: good}
+    points:
+      - {title: Keys name the values, text: "{\"name\": \"Kavya\"} stores Kavya under the key name.", step: 0}
+      - {title: Read with square brackets, text: "student[\"name\"] gives Kavya.", step: 1}
+      - {title: Add or change by assigning, text: "student[\"skill\"] = \"Python\" adds a field.", step: 2}
+      - {title: JSON looks the same, text: "AI tools send JSON, which turns into a dictionary in Python.", step: 3}
+    words:
+      - [Dictionary, A set of key → value pairs.]
+      - [Key, The name you look a value up by.]
+      - [JSON, Text format for dictionary-shaped data used by almost every API.]
+    code:
+      file: student.py
+      source: |
+        import json
+
+        student = {"name": "Kavya", "year": 3}
+        student["skill"] = "Python"
+        text = json.dumps(student)
+        print(text)
+        back = json.loads(text)
+        print(back["skill"])
+      notes:
+        1: ["Bring in Python's JSON helper.", "Import the stdlib json module."]
+        3: ["A dictionary with two fields.", "dict literal."]
+        4: ["Add a skill field.", "Insert a new key."]
+        5: ["Turn the dictionary into JSON text.", "json.dumps serialises to a str."]
+        6: ["Show the JSON text.", "Note the double quotes: JSON requires them."]
+        7: ["Turn the text back into a dictionary.", "json.loads parses into a dict."]
+        8: ["Read one field from it.", "Key lookup on the parsed dict."]
+    exercise:
+      prompt: "Parse the JSON text into a dictionary called call, then store its tool name in tool."
+      starter: |
+        import json
+        raw = '{"tool": "get_weather", "args": {"city": "Chennai"}}'
+      tests: |
+        assert isinstance(call, dict), "call should be a dictionary from json.loads(raw)"
+        assert tool == "get_weather", "tool should be call[\"tool\"]"
+      solution: |
+        import json
+        raw = '{"tool": "get_weather", "args": {"city": "Chennai"}}'
+        call = json.loads(raw)
+        tool = call["tool"]
+    checks:
+      - id: lookup
+        type: predict
+        prompt: "d = {\"city\": \"Pune\"}. What is d[\"city\"]?"
+        options: ["\"city\"", "\"Pune\"", "Error"]
+        answer: 1
+        explain: "Looking up a key gives its value."
+      - id: missing
+        type: mcq
+        prompt: "What happens with d[\"country\"] if that key doesn't exist?"
+        options: ["It returns None", "KeyError", "It returns an empty string"]
+        answer: 1
+        explain: "A missing key raises KeyError. Use d.get(\"country\") to get None instead."
+      - id: nested
+        type: fill
+        prompt: "Get the city out of this tool call."
+        code: |
+          call = {"tool": "get_weather", "args": {"city": "Chennai"}}
+          city = call["args"][____]
+        options: ["\"city\"", "\"tool\"", "0"]
+        answer: "\"city\""
+        explain: "args is itself a dictionary, so look up \"city\" inside it."

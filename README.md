@@ -1,3 +1,6 @@
+> This repository also contains **HuntExams**, an interactive AI-engineering learning platform
+> (`apps/huntexams`, `huntexams/api`). See [`huntexams/README.md`](huntexams/README.md).
+
 # Job Application Copilot
 
 Upload your resume once. Copilot builds a reusable profile from it, and a Chrome side

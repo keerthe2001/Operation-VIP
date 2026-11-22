@@ -1,0 +1,156 @@
+- slug: lab-semantic-search
+  title: Build semantic search from scratch
+  topic: similarity-search
+  body:
+    intro: >-
+      You'll build a working search over a few documents: cosine similarity, ranking and a
+      threshold. The document vectors here are small made-up examples so you can see every number;
+      real embeddings have hundreds of dimensions but work the same way.
+    minutes: 18
+    steps:
+      - id: docs
+        say: "Here are three documents with tiny 3-number embeddings. Press **Run** to see them in the Variables panel."
+        kind: read
+        starter: |
+          import math
+
+          docs = {
+              "Casual leave is 12 days a year": [0.9, 0.1, 0.2],
+              "Pantry opens at 9am": [0.1, 0.9, 0.1],
+              "Sick leave needs a doctor's note": [0.7, 0.2, 0.6],
+          }
+        explain: "Each document is a name and a list of numbers."
+      - id: cosine
+        say: "Write a **cosine(a, b)** function: dot product divided by the two lengths."
+        append: "\n"
+        show: |
+          def cosine(a, b):
+              dot = sum(x * y for x, y in zip(a, b))
+              return dot / (math.sqrt(sum(x*x for x in a)) * math.sqrt(sum(x*x for x in b)))
+        check: {expr: "abs(cosine([1, 0], [1, 0]) - 1) < 1e-9 and abs(cosine([1, 0], [0, 1])) < 1e-9", fail: "cosine([1,0],[1,0]) should be 1 and cosine([1,0],[0,1]) should be 0."}
+        explain: "Same direction gives 1, right angles give 0."
+      - id: query
+        say: "The question 'how many leave days?' embeds to **[0.85, 0.1, 0.3]**. Score every document against it."
+        append: "\n"
+        show: |
+          query = [0.85, 0.1, 0.3]
+          scores = {text: round(cosine(query, v), 3) for text, v in docs.items()}
+          print(scores)
+        check: {expr: "max(scores, key=scores.get) == 'Casual leave is 12 days a year'", fail: "The casual leave document should score highest."}
+        explain: "Watch the replay: one score per document, built up in a dictionary."
+      - id: rank
+        say: "Sort documents by score, best first, and keep the top 2."
+        append: "\n"
+        show: |
+          top = sorted(scores, key=scores.get, reverse=True)[:2]
+          print(top)
+        check: {expr: "top == ['Casual leave is 12 days a year', \"Sick leave needs a doctor's note\"]", fail: "top should hold the two leave documents, casual first."}
+      - id: threshold
+        say: "Add a threshold: only keep documents scoring at least **0.95**. Both leave documents are close, so only the best one should survive."
+        append: "\n"
+        show: |
+          good = [t for t in top if scores[t] >= 0.95]
+          print(good if good else "Not found in the documents")
+        check: {expr: "good == ['Casual leave is 12 days a year']", fail: "Only the casual leave document clears 0.95."}
+        explain: "That's semantic search with an honest 'not found' when nothing is close enough."
+
+- slug: lab-chunking
+  title: Chunk a document, with and without overlap
+  topic: chunk-size-overlap
+  body:
+    intro: >-
+      You'll write a chunker, then add overlap and watch the number of chunks change. Every chunk
+      appears in the Variables panel as it's created.
+    minutes: 15
+    steps:
+      - id: text
+        say: "Store the policy text in **doc**. Press **Show me**."
+        starter: ""
+        show: 'doc = "Casual leave is 12 days a year. It cannot be carried forward. Sick leave needs a note."'
+        check: {expr: "doc.startswith('Casual leave')", fail: "doc should hold the policy sentence."}
+      - id: fixed
+        say: "Write **chunk(text, size)** that cuts every *size* characters, then chunk doc with size 30."
+        append: "\n\n"
+        show: |
+          def chunk(text, size):
+              return [text[i:i + size] for i in range(0, len(text), size)]
+
+          pieces = chunk(doc, 30)
+          print(len(pieces), pieces)
+        check: {expr: "len(pieces) == 3", fail: "With size 30 you should get 3 chunks."}
+        explain: "Look at the chunks: 'It cannot be carried forward' is cut in two."
+      - id: overlap
+        replace: true
+        say: "Add overlap. Replace your chunk function with one that moves forward by **size - overlap**."
+        show: |
+          doc = "Casual leave is 12 days a year. It cannot be carried forward. Sick leave needs a note."
+
+          def chunk(text, size, overlap=0):
+              out, start = [], 0
+              while start < len(text):
+                  out.append(text[start:start + size])
+                  start += size - overlap
+              return out
+
+          pieces = chunk(doc, 30, overlap=10)
+          print(len(pieces), pieces)
+        check: {expr: "len(pieces) == 5 and pieces[1].startswith(pieces[0][-10:])", fail: "With size 30 and overlap 10 you should get 5 chunks, each starting with the last 10 characters of the previous one."}
+        hint: "The only change is how far start moves: size - overlap."
+        explain: "Same text, more chunks, and each one repeats the end of the last. Facts at the edges survive."
+      - id: compare
+        say: "Predict, then check: how many chunks with overlap **20**? Print **len(chunk(doc, 30, 20))**."
+        append: "\n"
+        show: "print(len(chunk(doc, 30, 20)))"
+        check: {stdout: "9", fail: "It should print 9. The window now moves only 10 characters each time."}
+        explain: "More overlap, more chunks, more storage. That's the trade-off you tune."
+
+- slug: lab-agent-loop
+  title: Build an agent loop
+  topic: agent-execution-loop
+  body:
+    intro: >-
+      You'll build a working agent loop around a stand-in "LLM" (a plain function, not a real
+      model) so you can watch every decision, tool call and state change in the replay.
+    minutes: 18
+    steps:
+      - id: tools
+        say: "Create two tools in a dictionary: **get_weather** returns 31, **convert** turns °C into °F."
+        starter: ""
+        show: |
+          tools = {
+              "get_weather": lambda city: 31,
+              "convert": lambda c: c * 9 / 5 + 32,
+          }
+        check: {expr: "tools['convert'](100) == 212 and tools['get_weather']('Chennai') == 31", fail: "convert(100) should be 212 and get_weather should return 31."}
+        explain: "A tool registry: names the agent can ask for, mapped to real functions."
+      - id: decide
+        say: "Write **decide(state)**, the stand-in LLM. It asks for weather first, then conversion, then answers."
+        append: "\n\n"
+        show: |
+          def decide(state):
+              if "c" not in state:
+                  return ("get_weather", {"city": "Chennai"})
+              if "f" not in state:
+                  return ("convert", {"c": state["c"]})
+              return ("final", f"About {round(state['f'])}°F")
+        check: {expr: "decide({}) == ('get_weather', {'city': 'Chennai'}) and decide({'c': 31, 'f': 87.8})[0] == 'final'", fail: "decide({}) should ask for get_weather; with c and f known it should return final."}
+      - id: loop
+        say: "Now the loop: decide, run the tool, store the result, and stop on 'final' or after **5 steps**."
+        append: "\n\n"
+        show: |
+          state, steps = {}, 0
+          while steps < 5:
+              steps += 1
+              name, payload = decide(state)
+              if name == "final":
+                  answer = payload
+                  break
+              result = tools[name](**payload)
+              state["c" if name == "get_weather" else "f"] = result
+          print(answer, "after", steps, "decisions")
+        check: {stdout: "About 88°F after 3 decisions", fail: "It should print: About 88°F after 3 decisions"}
+        explain: "Step through the replay: watch state gain c, then f, then the loop exits. Three decisions, just like the scene."
+      - id: limit
+        kind: read
+        say: "Experiment: change **decide** so it never returns 'final' (make the last line return another tool call). Run it and see the step limit save you. Then press Continue."
+        hint: "Change the last return to ('get_weather', {'city': 'Chennai'})."

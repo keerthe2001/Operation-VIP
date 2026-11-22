@@ -1,0 +1,109 @@
+- slug: what-does-an-agentic-ai-engineer-do
+  title: What does an Agentic AI Engineer actually do?
+  summary: The day-to-day work, the skills in order, and how freshers can show they're ready.
+  category: Career guide
+  minutes: 6
+  body:
+    sections:
+      - text: >-
+          An agentic AI engineer builds software where a language model decides some of the next
+          steps: which tool to call, what to look up, when to ask a human. The job is less about
+          training models and more about wiring them into systems that are reliable, safe and
+          affordable.
+      - heading: A day in the job
+        text: >-
+          Most days mix three kinds of work. First, improving retrieval so the model gets the
+          right facts: better chunking, filters, reranking. Second, adding or fixing tools the
+          agent can call, with validation and approval steps for anything risky. Third, measuring:
+          running the test set after every change and reading traces when users report bad
+          answers.
+      - heading: Skills you need, in order
+        bullets:
+          - "Python: functions, dictionaries, JSON, and reading other people's code"
+          - "How LLMs work: tokens, context windows, sampling, and why they hallucinate"
+          - "Prompting and structured outputs, with validation"
+          - "Embeddings, vector search and RAG, measured with real metrics"
+          - "Agents: the loop, tools, state, memory, retries and human approval"
+          - "Frameworks such as LangGraph and protocols such as MCP"
+          - "Production basics: FastAPI, Docker, observability, evaluation, security and cost"
+      - heading: Is it a good path for freshers?
+        text: >-
+          Teams hiring for these roles ask candidates to explain systems they built, not
+          certificates they collected. A small RAG app you can defend line by line, with a test
+          set and numbers in its README, says more than a long list of courses.
+
+
+          If you're from a non-IT background, start with Python basics and keep going one level
+          at a time. The concepts are visual and logical; the hard part is practice, which is why
+          every topic on HuntExams ends with something you build.
+      - heading: How to show you're ready
+        bullets:
+          - "One deployed project with a public URL and a README a stranger can run"
+          - "Numbers: hit rate, faithfulness, latency and cost, before and after your changes"
+          - "One honest failure you found and how you fixed it"
+          - "The ability to explain every design choice in under a minute"
+
+- slug: rag-explained-for-beginners
+  title: RAG explained for beginners
+  summary: Why AI makes things up, and how retrieval-augmented generation fixes much of it.
+  category: Tutorial
+  minutes: 5
+  body:
+    sections:
+      - text: >-
+          Ask a chatbot about your college's attendance rules and it may answer confidently and
+          wrongly. It wasn't trained on your rules, so it predicts plausible text. Retrieval-
+          augmented generation (RAG) fixes this by finding the right pages first and giving them to
+          the model with the question.
+      - heading: The open-book exam
+        text: >-
+          Think of RAG as an open-book exam. Instead of answering from memory, the model first
+          looks up the relevant pages, then writes the answer from them, and can say which page
+          it used.
+      - heading: The five steps
+        bullets:
+          - "Split your documents into small chunks"
+          - "Turn each chunk into an embedding, a list of numbers that captures its meaning"
+          - "When a question arrives, embed it the same way and find the closest chunks"
+          - "Paste those chunks into the prompt as context"
+          - "Ask the model to answer only from that context, and to cite it"
+      - heading: What RAG doesn't fix
+        text: >-
+          If the right chunk isn't retrieved, the answer can still be wrong. That's why good RAG
+          systems measure retrieval separately, and why they say "I couldn't find that in the
+          documents" instead of guessing.
+      - heading: Try it
+        text: >-
+          The HuntExams Level 4 lesson "RAG architecture and workflow" has a motion scene where you
+          can switch retrieval off and watch the answer turn into a hallucination.
+
+- slug: 90-day-ai-engineer-plan
+  title: A 90-day plan to become job-ready in AI engineering
+  summary: A realistic week-by-week plan at one hour a day, built around projects.
+  category: Career guide
+  minutes: 6
+  body:
+    sections:
+      - text: >-
+          Ninety days at one hour a day is about 90 hours. That isn't enough to learn everything,
+          but it's enough to build three real projects and talk about them well. Here's how to
+          spend it.
+      - heading: "Days 1–20: foundations"
+        bullets:
+          - "If you're new to coding, finish the Python starter pack first"
+          - "Level 1: tokens, context windows, sampling. Build the token budget calculator"
+          - "Level 2: prompts and structured outputs. Build the JSON extractor with a test set"
+      - heading: "Days 21–55: retrieval"
+        bullets:
+          - "Level 3: embeddings and vector search. Build semantic search over your notes"
+          - "Level 4: complete RAG. Build ask-the-handbook with citations and evaluation"
+          - "Write a README with real numbers for each project"
+      - heading: "Days 56–80: agents"
+        bullets:
+          - "Level 5: build an agent from scratch with tools, a step limit and an approval gate"
+          - "Level 6: rebuild a workflow in LangGraph and expose one tool over MCP"
+      - heading: "Days 81–90: make it shine"
+        text: >-
+          Deploy your best project, add tracing and a cost table, and practise explaining it out
+          loud in two minutes. Interviewers remember the candidate who can say exactly why they
+          chose a chunk size, not the one with the longest course list.

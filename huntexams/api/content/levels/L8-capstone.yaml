@@ -1,0 +1,1408 @@
+number: 8
+slug: capstone
+title: Capstone
+summary: Build and deploy one complete agentic AI application that proves everything you've learned.
+hours: 30
+topics:
+- slug: capstone-ingestion
+  title: Ingestion and RAG
+  summary: 'Your capstone starts with its own documents: pick a real domain, ingest, clean and chunk it.'
+  minutes: 10
+  body:
+    objectives:
+    - Pick a domain with real documents (college rules, a product manual, government scheme FAQs)
+    - Write a repeatable ingestion script with metadata
+    - Justify your chunking with numbers
+    intro: 'Your capstone starts with its own documents: pick a real domain, ingest, clean and chunk it. Choose
+      documents people actually need answers from. A narrow, real domain beats a broad, vague one.'
+    scenes:
+    - engine: graph
+      title: 'Your capstone: ingestion and rag'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: ing
+        dim:
+        - db
+        - ret
+        - agent
+        - mem
+        - flow
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: Ingestion and RAG
+        caption: 'This topic: Ingestion and RAG. Your capstone starts with its own documents: pick a real domain,
+          ingest, clean and chunk it.'
+      - at: 2
+        node: ing
+        state:
+          building: Ingestion and RAG
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Real documents
+      text: Use a domain you can test with real questions.
+      step: 1
+    - title: Repeatable ingestion
+      text: One command rebuilds the index from scratch.
+    - title: Metadata from day one
+      text: Source, page and date for every chunk.
+      step: 2
+    checks:
+    - id: cap-ing-1
+      type: mcq
+      prompt: Which capstone domain is strongest?
+      options:
+      - '''All knowledge on the internet'''
+      - Your state's scholarship scheme FAQs and rules
+      - Random Wikipedia pages
+      answer: 1
+      explain: Narrow and real means you can test it properly.
+    - id: cap-ing-2
+      type: order
+      prompt: Order the ingestion part of your capstone.
+      items:
+      - Collect documents
+      - Load and clean
+      - Chunk with metadata
+      - Embed and store
+      explain: Same as Level 4, now for your own domain.
+- slug: capstone-vector-search
+  title: Embeddings and vector search
+  summary: Store and search your chunks with the right embedding model, filters and threshold.
+  minutes: 10
+  body:
+    objectives:
+    - Choose an embedding model by testing it
+    - Add metadata filters
+    - Set a score threshold
+    intro: Store and search your chunks with the right embedding model, filters and threshold. Test two embedding
+      models on 20 real questions before committing. Record recall@4 for each.
+    scenes:
+    - engine: graph
+      title: 'Your capstone: embeddings and vector search'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: db
+        dim:
+        - ing
+        - ret
+        - agent
+        - mem
+        - flow
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: Embeddings and vector search
+        caption: 'This topic: Embeddings and vector search. Store and search your chunks with the right embedding
+          model, filters and threshold.'
+      - at: 2
+        node: db
+        state:
+          building: Embeddings and vector search
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Measure the model
+      text: Pick by recall on your questions.
+      step: 1
+    - title: Filters
+      text: Access and freshness rules as exact filters.
+    - title: Threshold
+      text: Return 'not found' for weak matches.
+      step: 2
+    checks:
+    - id: cap-vec-1
+      type: predict
+      prompt: Model A recall@4 = 0.71, Model B = 0.83 on your questions. Which do you pick?
+      options:
+      - A
+      - B
+      answer: 1
+      explain: Your data decides.
+    - id: cap-vec-2
+      type: multi
+      prompt: What belongs in your vector search? Pick all that apply.
+      options:
+      - Metadata filters
+      - A score threshold
+      - The same embedding model for docs and queries
+      - A different model for queries
+      answer:
+      - 0
+      - 1
+      - 2
+      explain: Same model on both sides, always.
+- slug: capstone-retrieval-rerank
+  title: Intelligent retrieval and reranking
+  summary: Add hybrid search and reranking, and prove they help.
+  minutes: 10
+  body:
+    objectives:
+    - Add keyword search alongside vectors
+    - Add a reranker on a shortlist
+    - Show before/after metrics
+    intro: 'Add hybrid search and reranking, and prove they help. Keep a results table: baseline, + hybrid, + reranker,
+      with hit rate and latency for each.'
+    scenes:
+    - engine: graph
+      title: 'Your capstone: intelligent retrieval and reranking'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: ret
+        dim:
+        - ing
+        - db
+        - agent
+        - mem
+        - flow
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: Intelligent retrieval and reranking
+        caption: 'This topic: Intelligent retrieval and reranking. Add hybrid search and reranking, and prove they
+          help.'
+      - at: 2
+        node: ret
+        state:
+          building: Intelligent retrieval and reranking
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Hybrid
+      text: Exact terms and meaning both work.
+      step: 1
+    - title: Rerank a shortlist
+      text: Precision where it matters.
+    - title: Prove it
+      text: Every addition shows a metric change.
+      step: 2
+    checks:
+    - id: cap-ret-1
+      type: mcq
+      prompt: Reranking raised hit@4 from 0.78 to 0.80 but added 900 ms. Your users need answers under 2 s and you're
+        at 1.6 s. Keep it?
+      options:
+      - Yes, always
+      - 'Probably not: +2 points isn''t worth breaking the latency budget'
+      answer: 1
+      explain: Every addition is a trade-off; write it down.
+    - id: cap-ret-2
+      type: order
+      prompt: Order the retrieval stack.
+      items:
+      - Hybrid retrieve top 30
+      - Rerank
+      - Keep top 4
+      explain: Wide, then precise.
+- slug: capstone-agent-tools
+  title: Agent-based tool execution
+  summary: Give your app an agent with real tools beyond retrieval.
+  minutes: 10
+  body:
+    objectives:
+    - Add at least two tools besides search
+    - Validate every tool call
+    - Gate one risky tool behind approval
+    intro: 'Give your app an agent with real tools beyond retrieval. Good capstone tools act on the domain: check
+      eligibility, calculate a fee, create a ticket.'
+    scenes:
+    - engine: graph
+      title: 'Your capstone: agent-based tool execution'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: agent
+        dim:
+        - ing
+        - db
+        - ret
+        - mem
+        - flow
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: Agent-based tool execution
+        caption: 'This topic: Agent-based tool execution. Give your app an agent with real tools beyond retrieval.'
+      - at: 2
+        node: agent
+        state:
+          building: Agent-based tool execution
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Useful tools
+      text: Actions users actually need.
+      step: 1
+    - title: Validation
+      text: Schemas and clear errors.
+    - title: Approval
+      text: At least one gated action.
+      step: 2
+    checks:
+    - id: cap-agent-1
+      type: mcq
+      prompt: Which is the best extra tool for a scholarship assistant?
+      options:
+      - tell_joke()
+      - check_eligibility(income, category, marks)
+      - random_number()
+      answer: 1
+      explain: Tools should do domain work users need.
+    - id: cap-agent-2
+      type: predict
+      prompt: submit_application() has no approval step. What's the risk?
+      options:
+      - None
+      - The agent could submit on a user's behalf without them confirming
+      answer: 1
+      explain: Side effects need confirmation.
+- slug: capstone-state-memory
+  title: State and memory management
+  summary: Track task state and remember user preferences across sessions.
+  minutes: 10
+  body:
+    objectives:
+    - Use typed state for each task
+    - Persist conversations with checkpoints
+    - Store a small, user-deletable memory
+    intro: 'Track task state and remember user preferences across sessions. Store only what helps: preferred language,
+      category, previous applications. Let users clear it.'
+    scenes:
+    - engine: graph
+      title: 'Your capstone: state and memory management'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: mem
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - flow
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: State and memory management
+        caption: 'This topic: State and memory management. Track task state and remember user preferences across
+          sessions.'
+      - at: 2
+        node: mem
+        state:
+          building: State and memory management
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Typed state
+      text: Inspectable task progress.
+      step: 1
+    - title: Checkpoints
+      text: Resume after restarts and approvals.
+    - title: User-controlled memory
+      text: View and delete.
+      step: 2
+    checks:
+    - id: cap-mem-1
+      type: multi
+      prompt: What should your capstone remember long-term? Pick all that apply.
+      options:
+      - Preferred language
+      - Scholarship category
+      - Every message verbatim forever
+      - Applications already submitted
+      answer:
+      - 0
+      - 1
+      - 3
+      explain: Useful and minimal.
+    - id: cap-mem-2
+      type: mcq
+      prompt: Why checkpoint conversations?
+      options:
+      - To resume after restarts and approval pauses
+      - To make answers longer
+      - It's required by Python
+      answer: 0
+      explain: Durability.
+- slug: capstone-workflows
+  title: Multi-step workflows
+  summary: Model your main user journey as a graph with routing and a human step.
+  minutes: 10
+  body:
+    objectives:
+    - Draw the workflow as a graph
+    - Add conditional routing with a fallback
+    - Add an interrupt for review
+    intro: Model your main user journey as a graph with routing and a human step. Draw it first on paper. Every
+      box becomes a node, every arrow an edge.
+    scenes:
+    - engine: graph
+      title: 'Your capstone: multi-step workflows'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: flow
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - mem
+        - api
+        - eval
+        - cost
+        - dep
+        state:
+          building: Multi-step workflows
+        caption: 'This topic: Multi-step workflows. Model your main user journey as a graph with routing and a human
+          step.'
+      - at: 2
+        node: flow
+        state:
+          building: Multi-step workflows
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Graph first
+      text: Draw it before coding.
+      step: 1
+    - title: Routing
+      text: Branches with a fallback.
+    - title: Human step
+      text: Interrupt where it matters.
+      step: 2
+    checks:
+    - id: cap-flow-1
+      type: order
+      prompt: Order building the workflow.
+      items:
+      - Draw nodes and edges
+      - Implement nodes
+      - Add routing
+      - Add the interrupt
+      explain: Design, build, branch, gate.
+    - id: cap-flow-2
+      type: predict
+      prompt: Your router meets a label it doesn't know. With no fallback, what happens?
+      options:
+      - It works anyway
+      - The run fails
+      answer: 1
+      explain: Always route unknowns somewhere safe.
+- slug: capstone-api
+  title: API development
+  summary: Expose the capstone as a validated, rate-limited API.
+  minutes: 10
+  body:
+    objectives:
+    - FastAPI endpoints with validation
+    - Authentication or API keys for writes
+    - Streaming responses
+    intro: Expose the capstone as a validated, rate-limited API. Your API is how others use your work. Make errors
+      clear and documented.
+    scenes:
+    - engine: graph
+      title: 'Your capstone: api development'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: api
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - mem
+        - flow
+        - eval
+        - cost
+        - dep
+        state:
+          building: API development
+        caption: 'This topic: API development. Expose the capstone as a validated, rate-limited API.'
+      - at: 2
+        node: api
+        state:
+          building: API development
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Validated endpoints
+      text: Bad input never reaches your agent.
+      step: 1
+    - title: Auth on writes
+      text: Only allowed users can act.
+    - title: Streaming
+      text: Fast-feeling answers.
+      step: 2
+    checks:
+    - id: cap-api-1
+      type: mcq
+      prompt: Which endpoint must require authentication?
+      options:
+      - GET /health
+      - POST /applications
+      - GET /docs
+      answer: 1
+      explain: Anything that changes data.
+    - id: cap-api-2
+      type: predict
+      prompt: A request has an empty question. Your API should return…
+      options:
+      - '500'
+      - 422 with a clear message
+      - 200 with a guess
+      answer: 1
+      explain: Validation errors are 422s.
+- slug: capstone-evaluation
+  title: Evaluation and observability
+  summary: Prove quality with a test set, metrics, traces and an evaluation gate.
+  minutes: 10
+  body:
+    objectives:
+    - A 30+ case test set from real questions
+    - Retrieval and answer metrics
+    - Traces for every request and a CI gate
+    intro: 'Prove quality with a test set, metrics, traces and an evaluation gate. Your README should show numbers,
+      not adjectives: hit rate, faithfulness, p95 latency, cost.'
+    scenes:
+    - engine: graph
+      title: 'Your capstone: evaluation and observability'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: eval
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - mem
+        - flow
+        - api
+        - cost
+        - dep
+        state:
+          building: Evaluation and observability
+        caption: 'This topic: Evaluation and observability. Prove quality with a test set, metrics, traces and an
+          evaluation gate.'
+      - at: 2
+        node: eval
+        state:
+          building: Evaluation and observability
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Test set
+      text: 30+ real cases, including tricky ones.
+      step: 1
+    - title: Metrics
+      text: Retrieval and generation.
+    - title: Gate
+      text: Block regressions automatically.
+      step: 2
+    checks:
+    - id: cap-eval-1
+      type: multi
+      prompt: What belongs in your capstone README? Pick all that apply.
+      options:
+      - Hit rate
+      - Faithfulness
+      - p95 latency
+      - '''It works really well'''
+      answer:
+      - 0
+      - 1
+      - 2
+      explain: Numbers, not adjectives.
+    - id: cap-eval-2
+      type: mcq
+      prompt: Where should the evaluation gate run?
+      options:
+      - Only on your laptop, sometimes
+      - Automatically on every change
+      - Never
+      answer: 1
+      explain: Continuous checks catch regressions.
+- slug: capstone-cost-performance
+  title: Performance and cost optimisation
+  summary: Measure latency and cost per request, then improve them with evidence.
+  minutes: 10
+  body:
+    objectives:
+    - Measure tokens, latency and cost per request
+    - Apply two optimisations
+    - Show before/after numbers
+    intro: Measure latency and cost per request, then improve them with evidence. Pick the two biggest levers your
+      traces reveal, not the two you read about.
+    scenes:
+    - engine: graph
+      title: 'Your capstone: performance and cost optimisation'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: cost
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - mem
+        - flow
+        - api
+        - eval
+        - dep
+        state:
+          building: Performance and cost optimisation
+        caption: 'This topic: Performance and cost optimisation. Measure latency and cost per request, then improve
+          them with evidence.'
+      - at: 2
+        node: cost
+        state:
+          building: Performance and cost optimisation
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Measure first
+      text: Find where tokens and time go.
+      step: 1
+    - title: Two real optimisations
+      text: Caching, k, model routing, streaming.
+    - title: Before/after
+      text: Show it.
+      step: 2
+    checks:
+    - id: cap-cost-1
+      type: predict
+      prompt: Traces show 70% of cost is input tokens from 12 retrieved chunks. First optimisation?
+      options:
+      - Bigger model
+      - Retrieve fewer chunks if quality holds
+      - Longer answers
+      answer: 1
+      explain: Attack the biggest share.
+    - id: cap-cost-2
+      type: mcq
+      prompt: Which makes the app feel faster without changing total time?
+      options:
+      - Streaming
+      - Caching
+      - Smaller prompt
+      answer: 0
+      explain: Streaming improves perceived latency.
+- slug: capstone-deployment
+  title: Production deployment
+  summary: Deploy it, document it, and present it.
+  minutes: 10
+  body:
+    objectives:
+    - Deploy with health checks and secrets management
+    - Write a README a reviewer can follow in 5 minutes
+    - Record a 3-minute walkthrough
+    intro: Deploy it, document it, and present it. The capstone is your portfolio piece. Make it easy to run, easy
+      to judge and easy to talk about in an interview.
+    scenes:
+    - engine: graph
+      title: 'Your capstone: production deployment'
+      track:
+      - Whole system
+      - This part
+      - Done
+      nodes:
+        ing:
+          x: 60
+          y: 60
+          label: ingest
+        db:
+          x: 180
+          y: 60
+          label: vector store
+        ret:
+          x: 300
+          y: 60
+          label: retrieve + rerank
+        agent:
+          x: 380
+          y: 140
+          label: agent + tools
+        mem:
+          x: 300
+          y: 200
+          label: state + memory
+        flow:
+          x: 180
+          y: 200
+          label: workflow graph
+        api:
+          x: 60
+          y: 200
+          label: API
+        eval:
+          x: 60
+          y: 130
+          label: eval + traces
+        cost:
+          x: 180
+          y: 130
+          label: cost + speed
+        dep:
+          x: 300
+          y: 130
+          label: deployed
+      edges:
+      - - ing
+        - db
+      - - db
+        - ret
+      - - ret
+        - agent
+      - - agent
+        - mem
+      - - agent
+        - flow
+      - - flow
+        - api
+      - - api
+        - eval
+      - - eval
+        - cost
+      - - cost
+        - dep
+      steps:
+      - at: 0
+        node: ing
+        state:
+          capstone: 10 parts
+        caption: Your capstone is one system with ten parts. Each topic in this level builds one.
+      - at: 1
+        node: dep
+        dim:
+        - ing
+        - db
+        - ret
+        - agent
+        - mem
+        - flow
+        - api
+        - eval
+        - cost
+        state:
+          building: Production deployment
+        caption: 'This topic: Production deployment. Deploy it, document it, and present it.'
+      - at: 2
+        node: dep
+        state:
+          building: Production deployment
+          proof: a milestone in your mission
+        tone: good
+        caption: When this part works, tick its milestone in the capstone mission.
+    points:
+    - title: Live URL
+      text: Reviewers can try it.
+      step: 1
+    - title: Five-minute README
+      text: Setup, architecture, numbers, limits.
+    - title: Explain your choices
+      text: Be ready to defend every trade-off.
+      step: 2
+    checks:
+    - id: cap-dep-1
+      type: multi
+      prompt: What should a strong capstone README include? Pick all that apply.
+      options:
+      - Architecture diagram
+      - How to run it
+      - Metrics and known limits
+      - Your API keys
+      answer:
+      - 0
+      - 1
+      - 2
+      explain: Never secrets.
+    - id: cap-dep-2
+      type: mcq
+      prompt: An interviewer asks why you chose chunk size 400. Best answer?
+      options:
+      - It's the default
+      - Hit rate was 6 points higher than 800 on my test set, with similar latency
+      - I don't remember
+      answer: 1
+      explain: Evidence-backed decisions are what the capstone proves.
+project:
+  slug: capstone-production-agent
+  title: 'Capstone: a production agentic AI app'
+  body:
+    problem: 'Build and deploy a complete agentic AI application for a real domain: it ingests documents, retrieves
+      with hybrid search and reranking, uses tools through an agent with memory and approval steps, runs as an API,
+      and is evaluated, traced and cost-optimised.'
+    requirements:
+    - Document ingestion and RAG over a real domain with citations
+    - Hybrid retrieval with reranking and measured improvement
+    - An agent with at least two domain tools, validation and one approval-gated action
+    - State, checkpoints and user-deletable memory
+    - A deployed FastAPI service with an evaluation gate, tracing and cost numbers
+    milestones:
+    - Ingestion and RAG
+    - Embeddings and vector search
+    - Retrieval and reranking
+    - Agent tools
+    - State and memory
+    - Workflow graph
+    - API
+    - Evaluation and observability
+    - Cost and performance
+    - Deployment and README
+    rubric:
+    - name: RAG quality
+      points: 20
+      pass: Cited, grounded answers; abstains when it should
+    - name: Agent and tools
+      points: 20
+      pass: Useful tools, validation, approval gate
+    - name: Engineering
+      points: 20
+      pass: API, state, checkpoints, deployment
+    - name: Evidence
+      points: 25
+      pass: Test set, metrics, traces, cost numbers, before/after tables
+    - name: Communication
+      points: 15
+      pass: README and walkthrough a reviewer can follow
+    pass_mark: 75
+    submit: Push to a public GitHub repository, put the live URL in the demo field, and link a 3-minute walkthrough
+      in the notes.

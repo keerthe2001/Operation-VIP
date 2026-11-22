@@ -1,0 +1,150 @@
+- slug: lab-first-program
+  title: Write your first program
+  topic: what-is-a-program
+  body:
+    intro: >-
+      You'll write three lines of real Python and watch the computer follow them one by one.
+      Stuck at any point? Press Show me and it types the line for you.
+    minutes: 8
+    steps:
+      - id: say-hi
+        say: "Type this line exactly, then press Run: **print(\"Hello\")**"
+        starter: ""
+        show: 'print("Hello")'
+        check: {stdout: "Hello", fail: "Your output should show Hello. Check the quotes and brackets."}
+        hint: "print, then round brackets, then the word in double quotes."
+        explain: "You told the computer to show Hello, and it did. That's a program."
+      - id: second-line
+        say: "Add a second line underneath that prints **I am learning AI**. Run it."
+        append: "\n"
+        show: 'print("I am learning AI")'
+        check: {stdout: "I am learning AI", fail: "Add a new line: print(\"I am learning AI\")"}
+        hint: "Same shape as line 1, different words."
+        explain: "Two lines, two outputs, in the same order as you wrote them."
+      - id: swap
+        say: "Now move your second line **above** the first one and run again. Watch the order flip in the visual."
+        replace: true
+        check: {expr: "__stdout__.strip().splitlines()[0] == 'I am learning AI'", fail: "The first line of output should now be I am learning AI. Cut the line and paste it at the top."}
+        show: |
+          print("I am learning AI")
+          print("Hello")
+        hint: "Select the second line, cut it, click before the first line, paste."
+        explain: "Same lines, different order, different result. Order is everything in a program."
+
+- slug: lab-variables
+  title: Fill boxes, change boxes
+  topic: variables
+  body:
+    intro: >-
+      Build a small bill calculator. After each run, watch the variable boxes on the right appear
+      and change, line by line.
+    minutes: 10
+    steps:
+      - id: price
+        say: "Create a box called **price** holding **120**. Type: price = 120"
+        starter: ""
+        show: "price = 120"
+        check: {expr: "price == 120", fail: "price should be 120. Type price = 120"}
+        explain: "A box labelled price now holds 120. You'll see it in the Variables panel."
+      - id: qty
+        say: "Add a box **quantity** with **3** on the next line."
+        append: "\n"
+        show: "quantity = 3"
+        check: {expr: "quantity == 3", fail: "quantity should be 3."}
+        explain: "Two boxes now."
+      - id: total
+        say: "Make **total** equal price times quantity. Multiply with *."
+        append: "\n"
+        show: "total = price * quantity"
+        check: {expr: "total == 360", fail: "total should be 120 × 3 = 360. Use total = price * quantity"}
+        explain: "total was calculated from the other two boxes: 360."
+      - id: change
+        say: "Between the quantity line and the total line, add **price = 150**. Predict total before you run."
+        replace: true
+        show: |
+          price = 120
+          quantity = 3
+          price = 150
+          total = price * quantity
+        check: {expr: "total == 450", fail: "Put price = 150 before the total line, so total uses the new price."}
+        hint: "The order matters: change price before total is calculated."
+        explain: "total used the newest price, 150. Step through the replay to see the box change."
+      - id: show
+        say: "Finally, print a sentence with an f-string: **print(f\"Total: {total}\")**"
+        append: "\n"
+        show: 'print(f"Total: {total}")'
+        check: {stdout: "Total: 450", fail: "Your output should say Total: 450"}
+        explain: "f-strings put a box's value straight into text. You'll use this to build prompts."
+
+- slug: lab-lists-loops
+  title: Loop through a list
+  topic: lists-and-loops
+  body:
+    intro: >-
+      You'll add up a list of marks with a loop, and watch each round of the loop in the replay.
+    minutes: 12
+    steps:
+      - id: list
+        say: "Make a list called **marks** with **70, 85, 90**."
+        starter: ""
+        show: "marks = [70, 85, 90]"
+        check: {expr: "marks == [70, 85, 90]", fail: "marks should be [70, 85, 90]"}
+        explain: "One name, three values, in order."
+      - id: start
+        say: "Start a counter: **total = 0**"
+        append: "\n"
+        show: "total = 0"
+        check: {expr: "total == 0 and marks == [70, 85, 90]", fail: "Add total = 0 on a new line."}
+      - id: loop
+        say: "Write the loop. Two lines; the second one starts with **4 spaces**."
+        append: "\n"
+        show: |
+          for m in marks:
+              total = total + m
+        check: {expr: "total == 245", fail: "total should end at 245. Check the 4 spaces before total = total + m"}
+        hint: "The indent tells Python that line belongs inside the loop."
+        explain: "Press play on the replay: the loop line runs three times and total grows 70 → 155 → 245."
+      - id: average
+        say: "After the loop (no indent), store the average: **average = total / len(marks)** and print it."
+        append: "\n"
+        show: |
+          average = total / len(marks)
+          print(average)
+        check: {expr: "abs(average - 81.666) < 0.01", fail: "average should be total divided by the number of marks."}
+        explain: "len(marks) counted the items for you, so this works for any length of list."
+
+- slug: lab-functions
+  title: Turn it into a function
+  topic: functions
+  body:
+    intro: >-
+      Wrap your code in a function so it can be reused. This is exactly how AI tools are written.
+    minutes: 12
+    steps:
+      - id: define
+        say: "Define a function **shout(text)** that returns the text in capital letters. Use text.upper()."
+        starter: ""
+        show: |
+          def shout(text):
+              return text.upper()
+        check: {expr: "shout('hi') == 'HI'", fail: "shout('hi') should give 'HI'. Did you return text.upper()?"}
+        explain: "Nothing printed yet: defining a function doesn't run it."
+      - id: call
+        say: "Call it and print the result: **print(shout(\"agents\"))**"
+        append: "\n"
+        show: 'print(shout("agents"))'
+        check: {stdout: "AGENTS", fail: "Your output should show AGENTS."}
+        explain: "In the replay, watch Python jump into the function, then come back with the answer."
+      - id: tool
+        say: "Write a tool-style function **word_count(text)** that returns the number of words."
+        append: "\n\n"
+        show: |
+          def word_count(text):
+              return len(text.split())
+        check: {expr: "word_count('one two three') == 3", fail: "word_count('one two three') should be 3."}
+      - id: use
+        say: "Print **word_count(\"agents call tools to get things done\")**. What do you expect?"
+        append: "\n"
+        show: 'print(word_count("agents call tools to get things done"))'
+        check: {stdout: "7", fail: "It should print 7."}
+        explain: "You just wrote a tool. In Level 5 an AI agent will decide when to call functions like this."

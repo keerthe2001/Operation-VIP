@@ -1,0 +1,787 @@
+number: 2
+slug: prompt-context-engineering
+title: Prompt & Context Engineering
+summary: Write prompts that get reliable results, get structured output, and give the model the right context and tools.
+hours: 12
+topics:
+
+- slug: prompt-fundamentals
+  title: Prompt engineering fundamentals
+  summary: Clear task, context, format and examples turn vague answers into useful ones.
+  minutes: 8
+  body:
+    objectives:
+      - Name the four parts of a strong prompt
+      - Rewrite a vague prompt into a clear one
+      - Explain why being specific beats being polite
+    intro: >-
+      A prompt is the instruction you give the model. The model can't read your mind, so a vague
+      prompt gets a vague answer. Say the task, give the context, describe the format you want,
+      and show an example if you can.
+    intro_eng: >-
+      Prompt quality is mostly specification quality: explicit task, audience, constraints,
+      output schema and representative examples reduce the space of plausible continuations.
+    scenes:
+      - engine: flow
+        title: Vague prompt versus clear prompt
+        track: [Vague, Answer, Clear, Answer]
+        actors:
+          - {id: you, label: You, icon: person, x: 12, y: 60}
+          - {id: model, label: LLM, icon: brain, x: 50, y: 60}
+          - {id: out, label: Answer, icon: doc, x: 87, y: 60}
+        switches:
+          - {id: clear, label: Use the clear prompt, label_on: "ON · task, context, format", label_off: "OFF · just 'write about RAG'", track: 2}
+        steps:
+          - {at: 0, from: you, to: model, packet: "write about RAG", tone: ask, caption: "A vague prompt: 'write about RAG'. Who is it for? How long? What shape?"}
+          - {at: 1, from: model, to: out, packet: "1,200-word essay…", tone: bad, notes: {out: "too long, too technical"}, caption: "The model guesses, and the guess is a long, technical essay nobody asked for."}
+          - {at: 2, when: clear, from: you, to: model, packet: "3 bullets, for freshers…", tone: ask, notes: {you: "task + context + format"}, caption: "Clear prompt: 'Explain RAG to a fresher in 3 bullet points, under 60 words, with one real example.'"}
+          - {at: 3, when: clear, from: model, to: out, packet: "• RAG finds facts first…", tone: good, notes: {out: "3 bullets, 52 words"}, caption: "Same model, far better answer. The prompt did the work."}
+          - {at: 2, when: "!clear", from: you, to: model, packet: "write about RAG pls", tone: ask, caption: "Adding 'please' doesn't add information."}
+          - {at: 3, when: "!clear", from: model, to: out, packet: "another long essay", tone: bad, caption: "Still guessing. Politeness is fine, but specifics are what help."}
+    points:
+      - {title: Task, text: "Say exactly what to do: explain, summarise, classify, extract.", step: 2}
+      - {title: Context, text: "Who it's for and what they already know.", step: 2}
+      - {title: Format, text: "Length, bullets, JSON, language. Say it.", step: 3}
+      - {title: Examples, text: "One example of a good answer is worth a paragraph of description. That's few-shot prompting, coming up.", step: 3}
+    words:
+      - [Prompt, The text instruction you give the model.]
+      - [Specification, A precise description of what you want.]
+    code:
+      file: prompt.py
+      source: |
+        def build_prompt(task, audience, format_rule, text):
+            return (
+                f"Task: {task}\n"
+                f"Audience: {audience}\n"
+                f"Format: {format_rule}\n\n"
+                f"Text:\n{text}"
+            )
+
+        p = build_prompt("Summarise", "a fresher", "3 bullet points, under 50 words",
+                         "RAG retrieves relevant documents before the model answers...")
+        print(p)
+      notes:
+        1: ["A helper that writes a clear prompt from four parts.", "Prompt assembly function."]
+        2: ["Join the parts into one string.", "Implicit concatenation of f-strings."]
+        3: ["Say the task.", "Task line."]
+        4: ["Say who it's for.", "Audience/context."]
+        5: ["Say the format.", "Output constraints."]
+        6: ["Then the text to work on.", "Payload, separated by a blank line."]
+        9: ["Use it.", "Call with concrete values."]
+        11: ["See the finished prompt.", "Print for inspection: always look at your final prompt."]
+    checks:
+      - id: best
+        type: mcq
+        prompt: "Which prompt is best?"
+        options: ["Tell me about Python", "Please kindly explain Python", "Explain Python lists to a beginner in 4 sentences with one example"]
+        answer: 2
+        explain: "It has a task, an audience, a length and an example."
+      - id: parts
+        type: multi
+        prompt: "Which of these make a prompt clearer? Pick all that apply."
+        options: ["Saying the output format", "Saying who the answer is for", "Adding lots of exclamation marks", "Giving an example"]
+        answer: [0, 1, 3]
+        explain: "Format, audience and examples add information. Punctuation doesn't."
+      - id: predict-vague
+        type: predict
+        prompt: "You ask 'summarise this' with no length. What usually happens?"
+        options: ["Exactly 3 lines", "A length the model guesses, often longer than you want", "An error"]
+        answer: 1
+        explain: "Unstated format means the model guesses."
+
+- slug: roles
+  title: System, user and assistant roles
+  summary: Chat models read a list of messages, each with a role that tells the model who said it.
+  minutes: 8
+  body:
+    objectives:
+      - Explain the three roles
+      - Put durable rules in the system message
+      - Build a message list in Python
+    intro: >-
+      Chat models don't receive one big string. They receive a list of messages. The system
+      message sets the rules, user messages are what people say, and assistant messages are what
+      the model said before.
+    intro_eng: >-
+      Chat APIs take an ordered messages array with roles (system, user, assistant, and often
+      tool). The chat template turns it into tokens with special role markers.
+    scenes:
+      - engine: tokens
+        title: One prompt, three voices
+        track: [System, User, Assistant, Next]
+        roles:
+          system: {label: system, color: l5}
+          user: {label: user, color: l4}
+          assistant: {label: assistant, color: l3}
+        steps:
+          - {at: 0, cells: [{role: system, w: "You|teach|freshers|.|Be|brief|."}], caption: "The system message: rules that hold for the whole chat."}
+          - {at: 1, cells: [{role: system, w: "You|teach|freshers|.|Be|brief|."}, {role: user, w: "What|is|an|API|?"}], caption: "The user's question comes next."}
+          - {at: 2, cells: [{role: system, w: "You|teach|freshers|.|Be|brief|."}, {role: user, w: "What|is|an|API|?"}, {role: assistant, w: "A|messenger|between|programs|."}], caption: "The model's answer is stored as an assistant message."}
+          - {at: 3, cells: [{role: system, w: "You|teach|freshers|.|Be|brief|."}, {role: user, w: "What|is|an|API|?"}, {role: assistant, w: "A|messenger|between|programs|."}, {role: user, w: "Give|an|example"}], tone: good, caption: "Next turn, the whole list is sent again. That's how the model 'remembers' the chat."}
+    points:
+      - {title: System sets the rules, text: "Tone, persona, limits, output format.", step: 0}
+      - {title: User is the person, text: "Questions and instructions from the user.", step: 1}
+      - {title: Assistant is the model's past replies, text: "Stored so the next turn has the history.", step: 2}
+      - {title: Memory is resending, text: "The model has no memory between calls. Your app resends the messages.", step: 3}
+    words:
+      - [System message, Rules for the whole conversation.]
+      - [Role, "Who said a message: system, user, assistant."]
+    code:
+      file: messages.py
+      source: |
+        messages = [
+            {"role": "system", "content": "You teach freshers. Be brief."},
+            {"role": "user", "content": "What is an API?"},
+        ]
+        messages.append({"role": "assistant", "content": "A messenger between programs."})
+        messages.append({"role": "user", "content": "Give an example"})
+        for m in messages:
+            print(m["role"], "→", m["content"])
+      notes:
+        1: ["A chat is a list of messages.", "messages array."]
+        2: ["The rules.", "System message."]
+        3: ["The user's question.", "User turn."]
+        5: ["Save the model's reply.", "Assistant turn appended."]
+        6: ["The next question.", "New user turn; send the full list again."]
+        7: ["Show who said what.", "Iterate for display."]
+    checks:
+      - id: where-rules
+        type: mcq
+        prompt: "Where should 'Always reply in Hindi' go?"
+        options: ["System message", "Every user message", "Assistant message"]
+        answer: 0
+        explain: "Rules for the whole chat belong in the system message."
+      - id: memory
+        type: predict
+        prompt: "Your app only sends the newest user message each time. The user asks 'what did I just say?'"
+        options: ["The model remembers", "The model can't know", "The model checks its logs"]
+        answer: 1
+        explain: "Models have no memory between calls. Without the history, it can't see earlier messages."
+      - id: build
+        type: fill
+        prompt: "Complete the message for the model's previous reply."
+        code: |
+          messages.append({"role": ____, "content": reply})
+        options: ["\"assistant\"", "\"system\"", "\"model\""]
+        answer: "\"assistant\""
+        explain: "The model's own past replies use the assistant role."
+
+- slug: zero-and-few-shot
+  title: Zero-shot and few-shot prompting
+  summary: Show the model a few examples and it copies the pattern.
+  minutes: 8
+  body:
+    objectives:
+      - Explain zero-shot and few-shot
+      - Write a few-shot classifier prompt
+      - Pick good examples
+    intro: >-
+      Zero-shot means asking with no examples. Few-shot means showing two or three solved
+      examples first. The model picks up the pattern and the exact format, often far more
+      reliably than any description.
+    intro_eng: >-
+      In-context learning: demonstrations in the prompt condition the output distribution
+      without weight updates. Example choice, order and label balance all affect accuracy.
+    scenes:
+      - engine: tokens
+        title: Teaching by example
+        track: [Zero-shot, Example 1, Example 2, Ask]
+        roles:
+          ex: {label: example, color: l3}
+          q: {label: question, color: l4}
+          a: {label: model's answer, color: l2}
+        steps:
+          - {at: 0, cells: [{role: q, w: "Review|:|Late|delivery|→|?"}, {role: a, w: "The|sentiment|seems|negative|because|…"}], tone: bad, caption: "Zero-shot: the model answers, but in its own long format."}
+          - {at: 1, cells: [{role: ex, w: "Review|:|Loved|it|→|positive"}], caption: "Few-shot: first show a solved example."}
+          - {at: 2, cells: [{role: ex, w: "Review|:|Loved|it|→|positive"}, {role: ex, w: "Review|:|Broken|box|→|negative"}], caption: "A second example, with the other label."}
+          - {at: 3, cells: [{role: ex, w: "Review|:|Loved|it|→|positive"}, {role: ex, w: "Review|:|Broken|box|→|negative"}, {role: q, w: "Review|:|Late|delivery|→"}, {role: a, w: "negative"}], tone: good, caption: "Now it answers with one word, in exactly the same format."}
+    points:
+      - {title: Zero-shot asks directly, text: "Fine for simple tasks.", step: 0}
+      - {title: Few-shot shows the pattern, text: "2–5 examples usually beat a long description.", step: 2}
+      - {title: Format is copied too, text: "Examples fix the output shape, not just the answer.", step: 3}
+      - {title: Balance your examples, text: "Cover each label and include a tricky case.", eng: "Imbalanced or order-biased demos skew predictions toward the majority or most recent label."}
+    words:
+      - [Zero-shot, Asking without examples.]
+      - [Few-shot, Asking after showing a few solved examples.]
+    code:
+      file: few_shot.py
+      source: |
+        examples = [("Loved it", "positive"), ("Broken box", "negative")]
+
+        def few_shot_prompt(review):
+            lines = ["Classify each review as positive or negative."]
+            for text, label in examples:
+                lines.append(f"Review: {text} -> {label}")
+            lines.append(f"Review: {review} ->")
+            return "\n".join(lines)
+
+        print(few_shot_prompt("Late delivery"))
+      notes:
+        1: ["Two solved examples.", "Demonstrations as (input, label) pairs."]
+        3: ["Build the prompt for a new review.", "Prompt builder."]
+        4: ["Start with the instruction.", "Task line."]
+        5: ["Add each example…", "Iterate demos."]
+        6: ["…in the exact format we want back.", "Consistent delimiter: the model mirrors it."]
+        7: ["End with the new review and an empty answer.", "The model completes after ->."]
+        8: ["Join it into one text.", "Newline-joined prompt."]
+    checks:
+      - id: when-few
+        type: mcq
+        prompt: "The model keeps answering in long paragraphs when you want one word. Best fix?"
+        options: ["Raise temperature", "Add two or three examples with one-word answers", "Use a smaller model"]
+        answer: 1
+        explain: "Examples show the exact format you want."
+      - id: balance
+        type: predict
+        prompt: "All five of your examples are 'positive'. What happens on borderline reviews?"
+        options: ["Nothing changes", "It leans toward 'positive'", "It refuses"]
+        answer: 1
+        explain: "Unbalanced examples bias the model toward the common label."
+      - id: order-fs
+        type: order
+        prompt: "Order a few-shot prompt."
+        items: ["Instruction", "Example 1 with answer", "Example 2 with answer", "New input with empty answer"]
+        explain: "Instruction, examples, then the new case."
+
+- slug: chain-of-thought
+  title: Chain-of-thought
+  summary: Asking for steps before the answer helps on multi-step problems.
+  minutes: 7
+  body:
+    objectives:
+      - Explain why step-by-step helps
+      - Know when it helps and when it doesn't
+      - Separate the reasoning from the final answer
+    intro: >-
+      Because a model writes one token at a time, it "thinks" only by writing. Asking it to work
+      through steps first gives it room to get multi-step problems right, like maths or planning.
+    intro_eng: >-
+      Chain-of-thought prompting elicits intermediate reasoning tokens before the answer. Many
+      newer models reason internally; for those, ask for a short justification or rely on the
+      model's built-in reasoning mode and parse only the final answer.
+    scenes:
+      - engine: graph
+        title: Jumping to an answer versus working it out
+        track: [Question, Step 1, Step 2, Step 3, Answer]
+        nodes:
+          q: {x: 50, y: 120, label: question}
+          s1: {x: 150, y: 120, label: "12 × ₹45"}
+          s2: {x: 250, y: 120, label: "− 10% off"}
+          s3: {x: 340, y: 60, label: "+ ₹40 delivery"}
+          a: {x: 340, y: 180, label: "₹526"}
+        edges: [[q, s1], [s1, s2], [s2, s3], [s3, a]]
+        steps:
+          - {at: 0, node: q, state: {q: "12 pens at ₹45, 10% off, ₹40 delivery"}, caption: "A multi-step question. Jumping straight to a number is error-prone."}
+          - {at: 1, node: s1, edge: q-s1, state: {subtotal: 540}, caption: "Step 1: 12 × 45 = 540."}
+          - {at: 2, node: s2, edge: s1-s2, state: {subtotal: 540, after_discount: 486}, caption: "Step 2: 10% off 540 is 486."}
+          - {at: 3, node: s3, edge: s2-s3, state: {subtotal: 540, after_discount: 486, with_delivery: 526}, caption: "Step 3: add ₹40 delivery."}
+          - {at: 4, node: a, edge: s3-a, state: {answer: "₹526"}, tone: good, caption: "Each step is easy, so the final answer is right. Writing steps gave the model room to think."}
+    points:
+      - {title: Writing is thinking, text: "The model can only reason through the tokens it writes.", step: 1}
+      - {title: Great for multi-step tasks, text: "Maths, logic, planning, debugging.", step: 4}
+      - {title: Not needed for simple lookups, text: "It adds tokens, time and cost.", eng: "Use selectively; reasoning models may do this internally."}
+      - {title: Separate the final answer, text: "Ask for 'Answer: ...' on the last line so code can read it.", step: 4}
+    words:
+      - [Chain-of-thought, Writing out reasoning steps before the answer.]
+    checks:
+      - id: when-cot
+        type: multi
+        prompt: "Where does step-by-step reasoning help most? Pick all that apply."
+        options: ["A word problem with discounts", "Planning a 3-city trip within a budget", "Translating 'hello' to Hindi", "Debugging why a loop runs forever"]
+        answer: [0, 1, 3]
+        explain: "Multi-step problems benefit. Simple lookups don't."
+      - id: parse
+        type: mcq
+        prompt: "How can your code reliably get just the final number?"
+        options: ["Read the first line", "Ask the model to end with 'Answer: <number>' and parse that line", "Hope for the best"]
+        answer: 1
+        explain: "A fixed final-answer format makes parsing reliable."
+      - id: cost
+        type: predict
+        prompt: "You add 'think step by step' to a simple FAQ bot. What changes?"
+        options: ["Better answers for free", "Longer, slower, more expensive answers with little gain", "Nothing"]
+        answer: 1
+        explain: "Extra reasoning tokens cost time and money and don't help simple lookups."
+
+- slug: structured-outputs
+  title: Structured outputs (JSON)
+  summary: Get answers as JSON your code can read, and validate them before trusting them.
+  minutes: 10
+  body:
+    objectives:
+      - Ask for JSON with a clear schema
+      - Parse and validate it in Python
+      - Handle bad output safely
+    intro: >-
+      Apps can't use a friendly paragraph, they need data. Ask the model for JSON with exactly
+      the fields you need, then parse it and check every field before using it.
+    intro_eng: >-
+      Use the provider's JSON/structured-output mode or a schema (JSON Schema/Pydantic) where
+      available; always validate, since models can still emit malformed or out-of-range values.
+    scenes:
+      - engine: tokens
+        title: Pouring text into a JSON mould
+        track: [Ask, Output, Parse, Validate]
+        roles:
+          k: {label: field, color: l4}
+          v: {label: value, color: l3}
+          bad: {label: problem, color: l1}
+        switches:
+          - {id: valid, label: Model output is valid, label_on: "ON · all fields present", label_off: "OFF · a field is missing", track: 3}
+        steps:
+          - {at: 0, cells: [{role: k, w: "Return|JSON|:|name|,|email|,|intent"}], caption: "You ask for JSON with three named fields."}
+          - {at: 1, when: valid, cells: [{role: k, w: "{|\"name\"|:"}, {role: v, w: "\"Asha\""}, {role: k, w: ",|\"email\"|:"}, {role: v, w: "\"asha@x.in\""}, {role: k, w: ",|\"intent\"|:"}, {role: v, w: "\"refund\"|}"}], caption: "The model returns JSON text."}
+          - {at: 1, when: "!valid", cells: [{role: k, w: "{|\"name\"|:"}, {role: v, w: "\"Asha\""}, {role: k, w: ",|\"intent\"|:"}, {role: v, w: "\"refund\"|}"}], caption: "This time the model forgot a field."}
+          - {at: 2, cells: [{role: v, w: "dict|with|keys|parsed"}], note: "json.loads(text)", caption: "json.loads turns the text into a Python dictionary."}
+          - {at: 3, when: valid, cells: [{role: v, w: "name|✓|email|✓|intent|✓"}], tone: good, caption: "Every field is present and the right type. Safe to use."}
+          - {at: 3, when: "!valid", cells: [{role: v, w: "name|✓"}, {role: bad, w: "email|✗|missing"}, {role: v, w: "intent|✓"}], tone: bad, caption: "Validation catches the missing email. Retry or ask the user, never crash."}
+    points:
+      - {title: Name every field, text: "Say exactly which keys and what type each value is.", step: 0}
+      - {title: Parse with json.loads, text: "Turns the text into a dictionary.", step: 2}
+      - {title: Always validate, text: "Models sometimes miss fields or add text around the JSON.", step: 3}
+      - {title: Have a fallback, text: "On failure: retry once with the error message, then degrade gracefully.", eng: "Pass the validation error back to the model in a repair prompt; cap retries."}
+    words:
+      - [JSON, Text format for structured data.]
+      - [Schema, A description of the fields and their types.]
+      - [Validation, Checking data is complete and correct before use.]
+    code:
+      file: parse_json.py
+      source: |
+        import json
+
+        REQUIRED = {"name": str, "email": str, "intent": str}
+
+        def parse_reply(text):
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                return None, "not valid JSON"
+            for field, kind in REQUIRED.items():
+                if not isinstance(data.get(field), kind):
+                    return None, f"missing or wrong: {field}"
+            return data, None
+
+        print(parse_reply('{"name": "Asha", "email": "a@x.in", "intent": "refund"}'))
+        print(parse_reply('{"name": "Asha", "intent": "refund"}'))
+        print(parse_reply("Sure! Here is the JSON"))
+      notes:
+        1: ["Python's JSON helper.", "stdlib json."]
+        3: ["The fields we need and their types.", "A minimal schema."]
+        5: ["Parse and check a model reply.", "Returns (data, error)."]
+        6: ["Try to read the text as JSON…", "Guard parsing."]
+        8: ["…and if it isn't JSON, say so instead of crashing.", "Catch JSONDecodeError."]
+        10: ["Check every required field.", "Iterate the schema."]
+        11: ["Missing, or not the right type?", "isinstance on .get() handles both."]
+        13: ["All good: return the data.", "Success path."]
+        15: ["A good reply.", "Valid."]
+        16: ["Missing email.", "Validation error."]
+        17: ["Not JSON at all.", "Parse error."]
+    exercise:
+      prompt: "Extend REQUIRED so the reply must also include priority as an int, and make sure a reply without it fails."
+      starter: |
+        import json
+
+        REQUIRED = {"name": str, "email": str, "intent": str}
+
+        def parse_reply(text):
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                return None, "not valid JSON"
+            for field, kind in REQUIRED.items():
+                if not isinstance(data.get(field), kind):
+                    return None, f"missing or wrong: {field}"
+            return data, None
+      tests: |
+        ok, err = parse_reply('{"name": "A", "email": "a@x.in", "intent": "x", "priority": 2}')
+        assert err is None, "A complete reply with priority should pass."
+        bad, err = parse_reply('{"name": "A", "email": "a@x.in", "intent": "x"}')
+        assert bad is None and "priority" in err, "A reply without priority should fail."
+      solution: |
+        import json
+
+        REQUIRED = {"name": str, "email": str, "intent": str, "priority": int}
+
+        def parse_reply(text):
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                return None, "not valid JSON"
+            for field, kind in REQUIRED.items():
+                if not isinstance(data.get(field), kind):
+                    return None, f"missing or wrong: {field}"
+            return data, None
+    checks:
+      - id: why-validate
+        type: mcq
+        prompt: "You asked for JSON. Why still validate?"
+        options: ["JSON is slow", "Models can still miss fields or wrap JSON in extra text", "Validation makes it shorter"]
+        answer: 1
+        explain: "Asking isn't a guarantee. Check before you trust."
+      - id: dbg-json
+        type: debug
+        prompt: "This crashes on 'Sure! {...}'. Tap the line that needs protection."
+        code: |
+          import json
+          def parse(text):
+              data = json.loads(text)
+              return data["intent"]
+        answer: 3
+        explain: "json.loads raises an error on non-JSON text. Wrap it in try/except."
+      - id: fallback
+        type: order
+        prompt: "Order a safe structured-output flow."
+        items: ["Ask for JSON with named fields", "Parse with json.loads", "Validate every field", "On failure, retry once with the error"]
+        explain: "Ask, parse, validate, recover."
+    lab: lab-json
+
+- slug: templates-and-variables
+  title: Prompt templates and variables
+  summary: Write a prompt once with {slots}, fill it safely many times.
+  minutes: 7
+  body:
+    objectives:
+      - Build a reusable prompt template
+      - Fill it from data
+      - Keep user text from breaking your instructions
+    intro: >-
+      Real apps send the same prompt shape thousands of times with different data. A template is
+      the prompt with named slots like {name} and {question}. Fill the slots, send, repeat.
+    intro_eng: >-
+      Templates separate fixed instructions from variable payloads. Delimit untrusted input
+      clearly (e.g. tags or fenced blocks) to reduce prompt-injection and formatting breaks.
+    scenes:
+      - engine: tokens
+        title: Filling the slots
+        track: [Template, Data, Filled]
+        roles:
+          fixed: {label: fixed text, color: l4}
+          slot: {label: slot, color: l1}
+          data: {label: filled in, color: l3}
+        steps:
+          - {at: 0, cells: [{role: fixed, w: "Explain"}, {role: slot, w: "{topic}"}, {role: fixed, w: "to|a"}, {role: slot, w: "{level}"}, {role: fixed, w: "in|3|bullets"}], caption: "The template: fixed text with named slots."}
+          - {at: 1, cells: [{role: slot, w: "topic|="}, {role: data, w: "embeddings"}, {role: slot, w: "level|="}, {role: data, w: "fresher"}], caption: "Data for this request."}
+          - {at: 2, cells: [{role: fixed, w: "Explain"}, {role: data, w: "embeddings"}, {role: fixed, w: "to|a"}, {role: data, w: "fresher"}, {role: fixed, w: "in|3|bullets"}], tone: good, caption: "Filled. The same template works for any topic and level."}
+    points:
+      - {title: Write the shape once, text: "Instructions stay fixed; only the slots change.", step: 0}
+      - {title: Fill from data, text: "Python's format() or f-strings do the filling.", step: 2}
+      - {title: Fence user text, text: "Wrap user input in clear markers so it can't pass as instructions.", eng: "e.g. <user_input>…</user_input>, and say in the system prompt that text inside is data, not instructions."}
+    words:
+      - [Template, A prompt with named slots.]
+      - [Slot, "A placeholder like {topic} that gets filled in."]
+    code:
+      file: template.py
+      source: |
+        TEMPLATE = "Explain {topic} to a {level} in 3 bullet points.\nQuestion:\n<user>{question}</user>"
+
+        def fill(topic, level, question):
+            return TEMPLATE.format(topic=topic, level=level, question=question)
+
+        print(fill("embeddings", "fresher", "why are they useful?"))
+      notes:
+        1: ["The template with three slots. User text sits inside <user> markers.", "Delimit untrusted input."]
+        3: ["A function that fills the slots.", "Template renderer."]
+        4: ["format() puts each value in its slot.", "str.format with keyword args."]
+        6: ["Fill and show it.", "Inspect the rendered prompt."]
+    checks:
+      - id: fill-fmt
+        type: fill
+        prompt: "Fill the slot correctly."
+        code: |
+          t = "Translate to {language}: {text}"
+          prompt = t.format(language="Tamil", ____="Good morning")
+        options: ["text", "words", "input"]
+        answer: "text"
+        explain: "The keyword must match the slot name exactly: {text}."
+      - id: fence
+        type: mcq
+        prompt: "Why wrap user text in markers like <user>...</user>?"
+        options: ["It looks nicer", "So the model treats it as data, not as new instructions", "It's required by Python"]
+        answer: 1
+        explain: "Clear boundaries make it harder for user text to override your instructions."
+      - id: tmpl-bug
+        type: debug
+        prompt: "This raises KeyError. Tap the faulty line."
+        code: |
+          t = "Hi {name}, your score is {score}"
+          msg = t.format(name="Ravi", marks=82)
+          print(msg)
+        answer: 2
+        explain: "The slot is {score} but the code fills marks. Names must match."
+
+- slug: context-engineering
+  title: Context engineering
+  summary: Decide what goes into the model's limited window, and what stays out.
+  minutes: 9
+  body:
+    objectives:
+      - List what competes for the context window
+      - Prioritise context by relevance
+      - Explain why more context isn't always better
+    intro: >-
+      Prompting is what you ask. Context engineering is what you show the model alongside it:
+      rules, retrieved documents, chat history, tool results. The window is limited, so you
+      choose what matters most for this request.
+    intro_eng: >-
+      Context engineering is budget allocation over the window: system instructions, retrieved
+      evidence, conversation state, tool outputs and examples, ordered and trimmed by relevance,
+      recency and token cost. Irrelevant context degrades accuracy ("lost in the middle").
+    scenes:
+      - engine: slicer
+        title: Packing a 60-token budget
+        track: [Rules, Docs, History, Trim, Send]
+        text: "RULES: answer from the policy, cite sections. DOC: Casual leave is 12 days a year, section 4. DOC: Office pantry opens at 9. HISTORY: user asked about payslips last week. QUESTION: how many casual leaves?"
+        mode: sentences
+        size: 70
+        overlap: 0
+        steps:
+          - {at: 0, chunk: 0, caption: "First the rules. They always go in."}
+          - {at: 1, chunk: 1, caption: "Retrieved policy text that answers the question: high value."}
+          - {at: 2, chunk: 2, caption: "Old history and an unrelated document compete for space."}
+          - {at: 3, chunk: all, tone: bad, caption: "Everything together is over budget, and the pantry line only distracts."}
+          - {at: 4, chunk: all, tone: good, caption: "Keep rules, the relevant document and the question. Drop the rest. Smaller, sharper context gives better answers."}
+    points:
+      - {title: Everything competes for space, text: "Rules, documents, history, tool results, examples.", step: 2}
+      - {title: Relevance first, text: "Include what helps answer this question; leave out the rest.", step: 4}
+      - {title: More isn't better, text: "Irrelevant text can make answers worse and costs more.", eng: "Models attend unevenly across long contexts; put key evidence near the start or end."}
+      - {title: It's a budget, text: "Decide a token budget per part and stick to it.", step: 3}
+    words:
+      - [Context, Everything the model reads besides your question.]
+      - [Token budget, How many tokens you allow each part.]
+    code:
+      file: pack.py
+      source: |
+        def pack(parts, budget):
+            chosen, used = [], 0
+            for name, text, score in sorted(parts, key=lambda p: -p[2]):
+                cost = len(text.split())
+                if used + cost <= budget:
+                    chosen.append(name)
+                    used += cost
+            return chosen, used
+
+        parts = [
+            ("rules", "Answer from the policy and cite sections", 10),
+            ("leave_doc", "Casual leave is 12 days a year (s4.2)", 9),
+            ("pantry_doc", "Office pantry opens at 9", 1),
+            ("old_chat", "User asked about payslips last week", 2),
+        ]
+        print(pack(parts, 16))
+      notes:
+        1: ["Choose parts by importance until the budget runs out.", "Greedy knapsack by relevance score."]
+        3: ["Look at the most important parts first.", "Sort by descending score."]
+        4: ["How many 'tokens' (words) this part costs.", "Approximate cost."]
+        5: ["If it still fits, keep it.", "Budget check."]
+        10: ["Each part has a name, its text and a relevance score.", "Candidates."]
+        16: ["With 16 to spend, rules and the leave policy win.", "Pantry and old chat are dropped."]
+    checks:
+      - id: more
+        type: predict
+        prompt: "You paste 30 pages of mostly unrelated documents into every prompt. What happens to answer quality?"
+        options: ["Always better", "Often worse, and much more expensive", "No change"]
+        answer: 1
+        explain: "Irrelevant context distracts the model and costs tokens."
+      - id: keep
+        type: multi
+        prompt: "For 'How many casual leaves do I get?', what should go in? Pick all that apply."
+        options: ["The rules", "The leave policy section", "The pantry opening time", "The question"]
+        answer: [0, 1, 3]
+        explain: "Keep what helps answer this question."
+      - id: tune-budget
+        type: mcq
+        prompt: "Which part should you trim first when over budget?"
+        options: ["The system rules", "Low-relevance older chat history", "The user's question"]
+        answer: 1
+        explain: "Old, low-relevance history usually goes first."
+
+- slug: function-calling
+  title: Function calling and tool schemas
+  summary: Describe your functions to the model; it replies with which one to call and the arguments.
+  minutes: 10
+  body:
+    objectives:
+      - Write a tool schema
+      - Explain who actually runs the function
+      - Route a model's tool call to Python code
+    intro: >-
+      The model can't run code. But if you describe your functions (name, what they do, what
+      inputs they need), it can reply "call get_weather with city = Chennai". Your code runs the
+      function and sends the result back. This is the foundation of AI agents.
+    intro_eng: >-
+      Tools are declared with a name, description and JSON Schema parameters. The model emits a
+      structured tool call; the application validates arguments, executes, and returns a tool
+      result message for the next model turn.
+    scenes:
+      - engine: flow
+        title: The model asks, your code acts
+        track: [Ask, Choose tool, Run, Result, Answer]
+        actors:
+          - {id: user, label: User, icon: person, x: 10, y: 62}
+          - {id: model, label: LLM, icon: brain, x: 40, y: 62}
+          - {id: app, label: Your code, icon: code, x: 70, y: 62}
+          - {id: api, label: Weather API, icon: cloud, x: 90, y: 22}
+        steps:
+          - {at: 0, from: user, to: model, packet: "Rain in Chennai today?", tone: ask, caption: "The user asks. The model was told about a get_weather tool."}
+          - {at: 1, from: model, to: app, packet: "get_weather(city=Chennai)", tone: ask, notes: {model: "chose a tool"}, caption: "The model doesn't answer yet. It replies with a tool call: name plus arguments as JSON."}
+          - {at: 2, from: app, to: api, packet: "GET /weather?city=Chennai", tone: ask, notes: {app: "validates args, runs it"}, caption: "Your code checks the arguments and runs the real function."}
+          - {at: 3, from: api, to: model, packet: "rain 80%", tone: good, caption: "The result goes back to the model as a tool message."}
+          - {at: 4, from: model, to: user, packet: "Yes, 80% chance of rain", tone: good, caption: "Now the model answers using a real fact."}
+    points:
+      - {title: You describe the tools, text: "Name, description and inputs as a schema.", step: 0}
+      - {title: The model picks and fills, text: "It returns which tool and which arguments, as JSON.", step: 1}
+      - {title: Your code runs it, text: "The model never executes anything itself.", step: 2}
+      - {title: Results go back, text: "The model then writes the final answer.", step: 4}
+    words:
+      - [Tool, A function the model is allowed to ask for.]
+      - [Schema, "Description of a tool's inputs and their types."]
+      - [Tool call, "The model's request: tool name plus arguments."]
+    code:
+      file: tools.py
+      source: |
+        import json
+
+        def get_weather(city):
+            fake = {"Chennai": "rain 80%", "Delhi": "sunny"}
+            return fake.get(city, "unknown")
+
+        TOOLS = {"get_weather": get_weather}
+        schema = {"name": "get_weather", "description": "Today's weather for a city",
+                  "parameters": {"city": "string"}}
+
+        model_reply = '{"tool": "get_weather", "args": {"city": "Chennai"}}'
+        call = json.loads(model_reply)
+        result = TOOLS[call["tool"]](**call["args"])
+        print(result)
+      notes:
+        3: ["A real Python function (with fake data, for the lesson).", "Tool implementation."]
+        7: ["A registry: tool name → function.", "Dispatch table."]
+        8: ["What we tell the model about the tool.", "Simplified schema (real APIs use JSON Schema)."]
+        11: ["Pretend this JSON came back from the model.", "Stand-in for a model tool call, not a live model."]
+        12: ["Read the JSON.", "Parse the call."]
+        13: ["Look up the function by name and run it with the arguments.", "Dispatch with **kwargs. Validate args before this in production."]
+    checks:
+      - id: who-runs
+        type: mcq
+        prompt: "Who actually executes get_weather?"
+        options: ["The LLM", "Your application code", "The user's browser"]
+        answer: 1
+        explain: "The model only asks. Your code decides and runs."
+      - id: tool-order
+        type: order
+        prompt: "Order a tool-calling round trip."
+        items: ["Send the question plus tool schemas", "Model returns a tool call", "Your code runs the tool", "Send the result back to the model", "Model writes the final answer"]
+        explain: "Ask, call, run, return, answer."
+      - id: unknown-tool
+        type: debug
+        prompt: "The model replied with tool 'get_wether' (typo) and this crashed. Tap the line to protect."
+        code: |
+          call = json.loads(reply)
+          fn = TOOLS[call["tool"]]
+          result = fn(**call["args"])
+        answer: 2
+        explain: "Look up tools safely (TOOLS.get) and handle unknown names instead of crashing."
+
+- slug: prompt-evaluation
+  title: Prompt evaluation and optimisation
+  summary: Test prompts on real examples and keep the version that scores best.
+  minutes: 8
+  body:
+    objectives:
+      - Build a small test set
+      - Score two prompt versions
+      - Change one thing at a time
+    intro: >-
+      "This prompt feels better" isn't engineering. Collect 20–50 real examples with the right
+      answers, run each prompt version on all of them, and count how many pass.
+    intro_eng: >-
+      Offline evaluation: a labelled dataset, deterministic settings, an automated scorer (exact
+      match, regex, schema checks, or an LLM judge for open-ended outputs) and versioned prompts.
+    scenes:
+      - engine: meter
+        title: Version A against version B
+        track: [Test set, Prompt A, Prompt B, Decide]
+        gauges:
+          - {label: Correct, max: 100, format: pct, color: l3}
+          - {label: Valid JSON, max: 100, format: pct, color: l4}
+          - {label: Avg tokens, max: 400, format: num, color: l2}
+        steps:
+          - {at: 0, values: [0, 0, 0], log: "40 real support emails with correct labels", caption: "Start with real examples and known right answers."}
+          - {at: 1, values: [78, 85, 180], log: "Prompt A: instruction only", caption: "Prompt A gets 78% right and 85% valid JSON."}
+          - {at: 2, values: [91, 100, 230], log: "Prompt B: + 3 examples + schema", tone: good, caption: "Prompt B adds examples and a schema: 91% correct, 100% valid, slightly longer."}
+          - {at: 3, values: [91, 100, 230], log: "Ship B. Keep the test set for the next change.", tone: good, caption: "Numbers decide. Keep the test set to check every future change."}
+    points:
+      - {title: Collect real examples, text: "20–50 is enough to start.", step: 0}
+      - {title: Score automatically, text: "Exact match, valid JSON, contains the right fields.", step: 1}
+      - {title: One change at a time, text: "Otherwise you won't know what helped.", step: 2}
+      - {title: Re-run on every change, text: "Prompts regress silently. Tests catch it.", step: 3}
+    words:
+      - [Test set, Examples with known right answers.]
+      - [Regression, When a change makes things worse.]
+    code:
+      file: eval_prompts.py
+      source: |
+        tests = [("Refund not received", "refund"), ("App crashes", "bug"), ("Love it", "praise")]
+
+        def prompt_a(text):  # stand-in for a model using prompt A
+            return "refund" if "refund" in text.lower() else "bug"
+
+        def prompt_b(text):  # stand-in for a model using prompt B
+            t = text.lower()
+            return "refund" if "refund" in t else "praise" if "love" in t else "bug"
+
+        for name, fn in [("A", prompt_a), ("B", prompt_b)]:
+            score = sum(fn(text) == label for text, label in tests)
+            print(name, f"{score}/{len(tests)}")
+      notes:
+        1: ["Three examples with the right answers.", "Labelled test set."]
+        3: ["A pretend model using prompt A (no real model here).", "Deterministic stand-in."]
+        6: ["A pretend model using the better prompt B.", "Second variant."]
+        10: ["Run both versions…", "Loop over variants."]
+        11: ["…count how many answers match the labels.", "Exact-match accuracy."]
+        12: ["Show the scores.", "Report."]
+    checks:
+      - id: how-many
+        type: mcq
+        prompt: "What's a reasonable first test set for a prompt?"
+        options: ["1 example", "20–50 real examples", "Only made-up examples"]
+        answer: 1
+        explain: "Enough real cases to see differences, small enough to label."
+      - id: one-change
+        type: predict
+        prompt: "You change the examples, the wording and the temperature together. The score improves. What do you know?"
+        options: ["Which change helped", "Only that the combination helped", "Nothing"]
+        answer: 1
+        explain: "Change one thing at a time to learn what works."
+      - id: eval-order
+        type: order
+        prompt: "Order a prompt evaluation."
+        items: ["Collect labelled examples", "Run prompt A on all of them", "Run prompt B on all of them", "Compare scores and pick"]
+        explain: "Data, run both, compare."
+
+project:
+  slug: structured-output-extractor
+  title: Structured-output extractor
+  body:
+    problem: >-
+      A college help desk receives free-text emails. Build a prompt-and-validation pipeline that
+      turns each email into JSON with name, roll number, intent and urgency, and test it.
+    requirements:
+      - "A prompt template with clear instructions, a JSON schema and 2–3 examples"
+      - "A parse_and_validate() function with type checks and a clear error for each failure"
+      - "A retry step that sends the validation error back (you can use a stand-in model function)"
+      - "A test set of at least 15 emails with expected JSON, and an accuracy report"
+      - "A README comparing at least two prompt versions with numbers"
+    milestones:
+      - Write the template and schema
+      - Write parse_and_validate with tests
+      - Build the 15-email test set
+      - Compare two prompt versions
+      - Write the README
+    rubric:
+      - {name: Template is clear, points: 20, pass: "Task, schema and examples are explicit"}
+      - {name: Validation is solid, points: 25, pass: "Every field checked; bad JSON never crashes"}
+      - {name: Test set and scoring, points: 25, pass: "At least 15 cases, automatic accuracy"}
+      - {name: Prompt comparison, points: 15, pass: "Two versions compared with numbers"}
+      - {name: README, points: 15, pass: "A reviewer can run it in under 5 minutes"}
+    pass_mark: 70
+    submit: "Push your code to a public GitHub repository and paste its link."
