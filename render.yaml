@@ -1,12 +1,14 @@
 # Render Blueprint for HuntExams: one web service (API + website) and one Postgres database.
 # In Render: New → Blueprint → this repository. Then set HX_ADMIN_EMAILS in the dashboard.
+# Free plans: the web service sleeps after 15 idle minutes (first visit then takes ~1 minute),
+# and a free Postgres database expires 30 days after creation unless upgraded.
 services:
   - type: web
     name: huntexams
     runtime: docker
     dockerfilePath: ./huntexams/Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     region: singapore
     healthCheckPath: /api/health
     autoDeploy: true
@@ -30,5 +32,5 @@ databases:
   - name: huntexams-db
     databaseName: huntexams
     user: huntexams
-    plan: basic-256mb
+    plan: free
     region: singapore
