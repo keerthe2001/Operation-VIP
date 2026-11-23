@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app import routes_admin, routes_auth, routes_learn, routes_projects
 from app.config import Settings, get_settings
@@ -92,6 +92,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+# Pages from the previous huntexams.com, sent permanently (301) to their closest new page so
+# old links and search results keep working after the switch.
+LEGACY_REDIRECTS: list[tuple[str, str]] = [
+    ("courses/agentic-ai", "/roadmap"),
+    ("courses/gen-ai", "/roadmap"),
+    ("courses", "/learn"),
+    ("visual", "/learn"),
+    ("blog", "/guides"),
+    ("interview-questions", "/learn"),
+    ("interview-room", "/learn"),
+    ("companies", "/guides"),
+    ("resume", "/guides"),
+    ("search", "/learn"),
+    ("start", "/signup"),
+    ("contact", "/about"),
+    ("disclaimer", "/terms"),
+]
+
+
+def legacy_target(path: str) -> str | None:
+    path = path.strip("/")
+    for prefix, target in LEGACY_REDIRECTS:
+        if path == prefix or path.startswith(prefix + "/"):
+            return target
+    return None
+
+
 def _serve_web(app: FastAPI, dist: Path) -> None:
     """Serve the built single-page app: real files when they exist, index.html otherwise."""
     mimetypes.add_type("application/wasm", ".wasm")
@@ -108,6 +135,8 @@ def _serve_web(app: FastAPI, dist: Path) -> None:
             return JSONResponse(  # type: ignore[return-value]
                 status_code=404, content={"detail": {"code": "not_found", "message": "Not found"}}
             )
+        if (target := legacy_target(path)) is not None:
+            return RedirectResponse(target, status_code=301)  # type: ignore[return-value]
         candidate = (root / path).resolve()
         # Never serve anything outside the dist folder (no ../ traversal).
         if path and candidate.is_relative_to(root) and candidate.is_file():

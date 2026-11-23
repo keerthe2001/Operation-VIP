@@ -24,7 +24,7 @@ services:
       - key: HX_ADMIN_EMAILS
         sync: false
       - key: HX_PUBLIC_SITE_URL
-        sync: false
+        value: https://huntexams.com
       - key: HX_ADSENSE_PUBLISHER_ID
         sync: false
 
