@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app import routes_admin, routes_auth, routes_learn, routes_projects
 from app.config import Settings, get_settings
@@ -62,7 +63,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Cache-Control", "no-store")
+        path = request.url.path
+        if path.startswith(("/assets/", "/pyodide/")):
+            response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+        else:
+            response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     @app.exception_handler(RequestValidationError)
@@ -82,4 +87,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(module.router, prefix="/api")
     app.include_router(routes_auth.me, prefix="/api")
     app.include_router(routes_admin.router, prefix="/api")
+    if settings.web_dist:
+        _serve_web(app, Path(settings.web_dist))
     return app
+
+
+def _serve_web(app: FastAPI, dist: Path) -> None:
+    """Serve the built single-page app: real files when they exist, index.html otherwise."""
+    mimetypes.add_type("application/wasm", ".wasm")
+    mimetypes.add_type("text/javascript", ".mjs")
+    root = dist.resolve()
+    index = root / "index.html"
+    if not index.is_file():
+        logger.warning("HX_WEB_DIST=%s has no index.html; website not served", dist)
+        return
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        if path.startswith("api/") or path == "api":
+            return JSONResponse(  # type: ignore[return-value]
+                status_code=404, content={"detail": {"code": "not_found", "message": "Not found"}}
+            )
+        candidate = (root / path).resolve()
+        # Never serve anything outside the dist folder (no ../ traversal).
+        if path and candidate.is_relative_to(root) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index)

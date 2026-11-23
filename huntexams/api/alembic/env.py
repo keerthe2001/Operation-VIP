@@ -7,13 +7,16 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.config import normalise_db_url
 from app.models import Base
 
 config = context.config
 config.set_main_option(
     "sqlalchemy.url",
-    os.environ.get(
-        "HX_DATABASE_URL", "postgresql+asyncpg://huntexams:huntexams@localhost:5432/huntexams"
+    normalise_db_url(
+        os.environ.get(
+            "HX_DATABASE_URL", "postgresql+asyncpg://huntexams:huntexams@localhost:5432/huntexams"
+        )
     ).replace("%", "%%"),
 )
 if config.config_file_name is not None:

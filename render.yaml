@@ -1,0 +1,34 @@
+# Render Blueprint for HuntExams: one web service (API + website) and one Postgres database.
+# In Render: New → Blueprint → this repository. Then set HX_ADMIN_EMAILS in the dashboard.
+services:
+  - type: web
+    name: huntexams
+    runtime: docker
+    dockerfilePath: ./huntexams/Dockerfile
+    dockerContext: .
+    plan: starter
+    region: singapore
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: HX_DATABASE_URL
+        fromDatabase:
+          name: huntexams-db
+          property: connectionString
+      - key: HX_SECRET_KEY
+        generateValue: true
+      - key: HX_COOKIE_SECURE
+        value: "true"
+      - key: HX_ADMIN_EMAILS
+        sync: false
+      - key: HX_PUBLIC_SITE_URL
+        sync: false
+      - key: HX_ADSENSE_PUBLISHER_ID
+        sync: false
+
+databases:
+  - name: huntexams-db
+    databaseName: huntexams
+    user: huntexams
+    plan: basic-256mb
+    region: singapore

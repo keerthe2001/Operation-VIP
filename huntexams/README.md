@@ -69,6 +69,14 @@ Content changes: edit the YAML, then `uv run python -m app.seed --check` and
 With Docker: `HX_SECRET_KEY=... docker compose -f infra/huntexams-compose.yml up --build`, then open
 http://localhost:8080.
 
+## Deploy on Render
+
+`render.yaml` at the repository root is a Render Blueprint: one Docker web service
+(`huntexams/Dockerfile`, which builds the website and serves it from the API on the same origin)
+and one Postgres database. Migrations run on start, and the curriculum loads on first start.
+After the first deploy, set `HX_ADMIN_EMAILS` (and later `HX_PUBLIC_SITE_URL`) in the dashboard,
+then add a custom domain such as `learn.huntexams.com` and point a CNAME to it in Cloudflare.
+
 ## Tests
 
 | Command | What it proves |

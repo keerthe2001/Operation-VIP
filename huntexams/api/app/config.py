@@ -5,6 +5,14 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
+def normalise_db_url(url: str) -> str:
+    """Hosting providers hand out postgres:// URLs; SQLAlchemy async needs +asyncpg."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+asyncpg://" + url[len(prefix) :]
+    return url
+
+
 class Settings(BaseSettings):
     """HuntExams API settings, read from environment variables (and `.env` in development).
 
@@ -40,6 +48,15 @@ class Settings(BaseSettings):
     # Curriculum source loaded on startup when the database has no content yet.
     content_dir: str = "content"
     seed_content_on_startup: bool = True
+
+    # Built web app (Vite dist). When set, the API also serves the website from the same
+    # origin, which is how the single-service Render deployment works.
+    web_dist: str | None = None
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _asyncpg(cls, value: object) -> object:
+        return normalise_db_url(value) if isinstance(value, str) else value
 
     @field_validator("cors_origins", "admin_emails", mode="before")
     @classmethod
